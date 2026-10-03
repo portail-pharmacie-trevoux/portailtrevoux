@@ -1,0 +1,66 @@
+const q=s=>document.querySelector(s);
+let session=null,people=[],editId=null,removeId=null,currentUniverse=null;
+function node(tag,text='',cls=''){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}
+async function api(path,method='GET',data){
+  const options={method,headers:{}};
+  if(method!=='GET'){options.headers['Content-Type']='application/json';if(session)options.headers['X-CSRF-Token']=session.csrf;if(data!==undefined)options.body=JSON.stringify(data);}
+  const response=await fetch(path,options);let body;try{body=await response.json();}catch{throw Error('Le service ne répond pas. Réessayez.');}
+  if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Error(body.error||'Demande impossible.');}return body;
+}
+function error(e){q('#global-message').textContent=e.message;}
+function showLogin(){session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showHome(){
+  currentUniverse=null;q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
+  q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
+  document.querySelectorAll('[data-universe]').forEach(b=>b.classList.toggle('hidden',session.user.role!=='admin'&&(b.dataset.universe==='Collaborateurs'||!session.user.rights.includes(b.dataset.universe))));
+  q('.section-label>span').textContent=session.user.role!=='admin'&&!session.user.rights.length?'Aucun accès attribué. Contactez votre administrateur.':'Vos espaces autorisés';
+}
+function afterLogin(){if(session.user.mustChange){q('#login').classList.add('hidden');q('#logout').classList.remove('hidden');openPassword();}else showHome();}
+q('#login-form').onsubmit=async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;q('#login-error').textContent='';try{session=await api('/api/login','POST',{email:q('#login-email').value,password:q('#login-password').value});q('#login-password').value='';afterLogin();}catch(e){q('#login-error').textContent=e.message;}finally{btn.disabled=false;}};
+q('#logout').onclick=async()=>{try{await api('/api/logout','POST');showLogin();}catch(e){error(e);}};
+q('#account').onclick=()=>openPassword();
+function openPassword(){q('#password-form').reset();q('#password-error').textContent='';q('#password-intro').textContent=session.user.mustChange?'Remplacez votre mot de passe provisoire pour accéder au portail.':'Choisissez un mot de passe personnel de 12 caractères minimum.';q('#password-cancel').classList.toggle('hidden',session.user.mustChange);q('#password-dialog').showModal();}
+q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
+q('#password-cancel').onclick=()=>q('#password-dialog').close();
+q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
+const descriptions={'Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
+document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
+q('#back').onclick=()=>showHome();
+async function openUniverse(name){
+  currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';q('#title').textContent=name;q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs');q('#content').replaceChildren(node('div','Chargement…','empty'));
+  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Agenda')await renderCalendar();else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+}
+function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
+function renderPeople(){const content=q('#content');content.replaceChildren();if(!people.length){content.append(node('div','Aucun collaborateur ajouté. Créez un premier compte pour votre équipe.','empty'));return;}
+  const wrap=node('div','','tablewrap'),table=document.createElement('table'),head=document.createElement('thead'),row=document.createElement('tr');['Collaborateur','Fonction','Adresse e-mail','Univers accessibles','Actions'].forEach(t=>{const th=node('th',t);th.scope='col';row.append(th);});head.append(row);table.append(head);const body=document.createElement('tbody');
+  people.forEach(p=>{const tr=document.createElement('tr');tr.append(node('td',p.name),node('td',p.job),node('td',p.email),node('td',p.rights.join(' · ')||'Aucun univers','rights'));const actions=node('td','','actions');const change=button('Modifier',()=>openEditor(p.id));change.setAttribute('aria-label','Modifier '+p.name);const del=button('Supprimer',()=>{removeId=p.id;q('#removeText').textContent='Le compte de '+p.name+' et ses accès seront supprimés.';q('#removeDialog').showModal();},'btn small danger');del.setAttribute('aria-label','Supprimer '+p.name);del.style.marginLeft='8px';actions.append(change,del);tr.append(actions);body.append(tr);});table.append(body);wrap.append(table);content.append(wrap);
+}
+function openEditor(id=null){editId=id;q('#form').reset();q('#editor-error').textContent='';q('#dialogtitle').textContent=id===null?'Ajouter un collaborateur':'Modifier le collaborateur';q('#temporary-password').required=id===null;q('#password-help').textContent=id===null?'12 caractères minimum. À communiquer au salarié par un canal personnel.':'Laissez vide pour conserver le mot de passe. Remplissez pour attribuer un nouveau mot de passe provisoire.';if(id!==null){const p=people.find(p=>p.id===id);q('#fullname').value=p.name;q('#job').value=p.job;q('#email').value=p.email;document.querySelectorAll('[name=right]').forEach(c=>c.checked=p.rights.includes(c.value));}q('#editor').showModal();q('#fullname').focus();}
+q('#add').onclick=()=>openEditor();q('#cancel').onclick=()=>q('#editor').close();q('#editor').addEventListener('close',()=>q('#temporary-password').value='');
+q('#form').onsubmit=async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',{name:q('#fullname').value,job:q('#job').value,email:q('#email').value,password:q('#temporary-password').value,rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});q('#form').reset();q('#editor').close();people=await api('/api/users');renderPeople();q('#feedback').textContent='Compte enregistré. Les modifications de droits s’appliquent immédiatement.';}catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}};
+q('#keep').onclick=()=>q('#removeDialog').close();q('#confirmRemove').onclick=async()=>{const btn=q('#confirmRemove');btn.disabled=true;try{await api('/api/users/'+removeId,'DELETE');q('#removeDialog').close();people=await api('/api/users');renderPeople();q('#feedback').textContent='Compte supprimé.';}catch(e){q('#removeDialog').close();q('#feedback').textContent=e.message;}finally{btn.disabled=false;}};
+async function runCalendarAction(action){try{q('#feedback').textContent='Veuillez patienter…';await action();q('#feedback').textContent='';if(currentUniverse==='Agenda')await renderCalendar();}catch(e){q('#feedback').textContent=e.message;}}
+async function renderCalendar(){
+  const data=await api('/api/calendar');if(currentUniverse!=='Agenda')return;const content=q('#content');content.replaceChildren();
+  if(session.user.role==='admin'){
+    const status=await api('/api/google/status');if(currentUniverse!=='Agenda')return;
+    const tools=node('div','','calendar-tools');tools.append(node('h3','Connexion Google Agenda'));
+    if(!status.configured){tools.append(node('p','Ajoutez les identifiants Google dans les paramètres Render pour activer la connexion.','admin-hint'),node('p','Adresse de retour à renseigner dans Google : '+status.callback,'admin-hint'));}
+    else tools.append(button(status.connected?'Renouveler l’autorisation Google':'Connecter Google Agenda',()=>runCalendarAction(async()=>{const result=await api('/api/google/connect','POST');window.location.assign(result.url);}),'btn primary'));
+    if(status.connected){
+      try{const calendars=await api('/api/google/calendars');if(currentUniverse!=='Agenda')return;const label=node('label','Agenda à afficher');label.htmlFor='calendar-choice';const select=node('select','','calendar-select');select.id='calendar-choice';select.append(new Option('Choisir un agenda',''));calendars.forEach(c=>select.append(new Option(c.name,c.id)));select.value=status.calendarId;tools.append(label,select,button('Enregistrer cet agenda',()=>runCalendarAction(async()=>{if(!select.value)throw Error('Choisissez un agenda.');await api('/api/google/calendar','POST',{id:select.value});})));}
+      catch(e){tools.append(node('p',e.message,'calendar-warning'));}
+      tools.append(button('Actualiser maintenant',()=>runCalendarAction(()=>api('/api/google/sync','POST'))),button('Déconnecter Google',()=>{if(confirm('Déconnecter Google et retirer les événements du portail ?'))runCalendarAction(()=>api('/api/google/disconnect','POST'));},'btn small danger'));
+    }
+    content.append(tools);
+  }
+  content.append(node('h3',data.name));
+  if(data.syncedAt)content.append(node('p','Dernière synchronisation : '+new Date(data.syncedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' · Actualisation toutes les 15 minutes.','status-line'));
+  if(data.error)content.append(node('p',data.error+' Les événements affichés peuvent ne pas être à jour.','calendar-warning'));
+  const today=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
+  const events=data.events.filter(e=>(e.end?.date||e.end?.dateTime||e.start?.date||e.start?.dateTime||'').slice(0,10)>=today);
+  if(!events.length)content.append(node('div',data.connected?'Aucun événement à venir dans la période couverte (six prochains mois), ou aucun agenda sélectionné.':'L’agenda n’est pas encore connecté.','empty'));
+  events.forEach(e=>{const card=node('article','','event');card.append(node('h3',e.title));let when;if(e.start?.date){const date=e.start.date.split('-').reverse().join('/');const end=new Date(e.end.date+'T12:00:00Z');end.setUTCDate(end.getUTCDate()-1);const last=end.toISOString().slice(0,10).split('-').reverse().join('/');when=date+(date!==last?' — '+last:'')+' · Toute la journée';}else{const format=d=>new Date(d).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});when=format(e.start.dateTime)+' — '+format(e.end.dateTime);}card.append(node('p',when,'event-time'));if(e.location)card.append(node('p',e.location));if(e.description)card.append(node('p',e.description));content.append(card);});
+}
+setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda')renderCalendar().catch(error);},15*60000);
+(async()=>{try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}}catch{showLogin();}})();
