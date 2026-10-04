@@ -166,6 +166,7 @@ q('#tile-order-save').onclick=()=>{
 
 async function renderMusic(){
   let tracks=await api('/api/music');if(currentUniverse!=='Fun')return;
+  const selectedTracks=new Set();
   const content=q('#content');content.replaceChildren();
   const intro=node('div','','music-intro');intro.append(node('h3','La musique de toute l’équipe'),node('p','Ajoutez vos morceaux préférés à la sélection partagée de la pharmacie.'));
   const form=node('form','','music-form');
@@ -179,14 +180,29 @@ async function renderMusic(){
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
   const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
 
-  const exportButton=button('Exporter pour Deezer (CSV)',()=>{
+  const exportButton=button('Exporter les titres cochés (CSV)',()=>{
+    const chosen=tracks.filter(t=>selectedTracks.has(t.id));if(!chosen.length)return;
     const csvCell=value=>'"'+String(value).replace(/"/g,'""')+'"';
-    const csv='\uFEFF'+[['Artist','Title'],...tracks.map(t=>[t.artist,t.title])].map(row=>row.map(csvCell).join(',')).join('\r\n');
+    const csv='\uFEFF'+[['Artist','Title'],...chosen.map(t=>[t.artist,t.title])].map(row=>row.map(csvCell).join(',')).join('\r\n');
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     const a=node('a');a.href=url;a.download='Playlist_PORTAIL_PLUS_Deezer.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   const transfer=node('a','Importer le CSV dans Deezer','btn small');transfer.href='https://www.tunemymusic.com/transfer/file-to-deezer';transfer.target='_blank';transfer.rel='noopener noreferrer';
-  const actions=node('div','','agenda-navigation');actions.append(exportButton,transfer);
+  const selectionCount=node('span','','status-line');selectionCount.setAttribute('role','status');
+  function updateSelection(){
+    const total=tracks.filter(t=>selectedTracks.has(t.id)).length;
+    selectionCount.textContent=total+' titre'+(total!==1?'s':'')+' coché'+(total!==1?'s':'');
+    exportButton.disabled=!total;
+  }
+  function filteredTracks(){
+    const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
+    return tracks.filter(t=>terms.every(term=>normalizeSearch(t.artist+' '+t.title).includes(term)));
+  }
+  const selectAll=button('Tout cocher',()=>{filteredTracks().forEach(t=>selectedTracks.add(t.id));display();});
+  const selectNone=button('Tout décocher',()=>{selectedTracks.clear();display();});
+  const selectionTools=node('div','','music-selection-tools');selectionTools.append(selectAll,selectNone,node('span','« Tout cocher » sélectionne tous les résultats de la recherche, y compris les lignes non affichées.','field-note'));
+  toolbar.append(selectionTools);
+  const actions=node('div','','agenda-navigation');actions.append(exportButton,selectionCount,transfer);
   content.append(actions,toolbar,count,list,more);
   if(session.user.role==='admin'){
     const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
@@ -211,12 +227,16 @@ async function renderMusic(){
 
   function display(){
     const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
-    const visible=tracks.filter(t=>terms.every(term=>normalizeSearch(t.artist+' '+t.title).includes(term)));
+    const visible=filteredTracks();updateSelection();
     count.textContent=visible.length+' morceau'+(visible.length!==1?'x':'')+(terms.length?' trouvé'+(visible.length!==1?'s':''):' dans la sélection');
     list.replaceChildren();
     visible.slice(0,limit).forEach(t=>{
       const row=node('div','','music-row');row.setAttribute('role','listitem');
+      const check=node('input','','music-row-check');check.type='checkbox';check.checked=selectedTracks.has(t.id);check.setAttribute('aria-label','Exporter '+t.title+' de '+t.artist);
+      check.onchange=()=>{if(check.checked)selectedTracks.add(t.id);else selectedTracks.delete(t.id);updateSelection();};
       const song=node('span',t.title,'music-row-title'),artistName=node('span',t.artist,'music-row-artist');
+      const added=node('time','','music-row-date'),addedDate=new Date(t.created_at);
+      if(t.created_at&&!Number.isNaN(addedDate.getTime())){added.dateTime=addedDate.toISOString();added.textContent='Ajouté le '+addedDate.toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});}else added.textContent='Date inconnue';
       const actions=node('div','','music-row-actions');
       const link=node('a','Deezer','btn small');link.href='https://www.deezer.com/search/'+encodeURIComponent(t.artist+' '+t.title);link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label','Rechercher '+t.title+' de '+t.artist+' sur Deezer');
       const remove=button('Supprimer',async()=>{
@@ -225,11 +245,11 @@ async function renderMusic(){
         try{
           await api('/api/music/'+t.id,'DELETE');
           if(currentUniverse!=='Fun')return;
-          tracks=tracks.filter(track=>track.id!==t.id);display();message.textContent='« '+t.title+' » a été retiré de la sélection.';
+          tracks=tracks.filter(track=>track.id!==t.id);selectedTracks.delete(t.id);display();message.textContent='« '+t.title+' » a été retiré de la sélection.';
         }catch(e){message.textContent=e.message;}finally{remove.disabled=false;}
       },'btn small danger');
       remove.setAttribute('aria-label','Supprimer '+t.title+' de '+t.artist+' de la sélection');
-      actions.append(link,remove);row.append(song,artistName,actions);list.append(row);
+      actions.append(link,remove);row.append(check,song,artistName,added,actions);list.append(row);
     });
     if(!visible.length)list.append(node('div','Aucun morceau ne correspond à votre recherche.','empty'));
     more.classList.toggle('hidden',visible.length<=limit);
