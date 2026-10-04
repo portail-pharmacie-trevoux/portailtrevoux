@@ -177,7 +177,7 @@ async function renderMusic(){
   form.append(artistField,titleField,submit);content.append(intro,form,message);
   content.append(node('p','Cette liste rassemble les choix de l’équipe. Pour mettre à jour Deezer, exportez la liste en CSV puis importez-la avec Tune My Music. La synchronisation automatique n’est pas activée.','status-line'));
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
-  const list=node('div','','music-list'),count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
+  const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
 
   const exportButton=button('Exporter pour Deezer (CSV)',()=>{
     const csvCell=value=>'"'+String(value).replace(/"/g,'""')+'"';
@@ -215,9 +215,21 @@ async function renderMusic(){
     count.textContent=visible.length+' morceau'+(visible.length!==1?'x':'')+(terms.length?' trouvé'+(visible.length!==1?'s':''):' dans la sélection');
     list.replaceChildren();
     visible.slice(0,limit).forEach(t=>{
-      const card=node('article','','event music-track');card.append(node('h3',t.title),node('p',t.artist,'event-time'));
-      if(t.contributor)card.append(node('p',(t.source==='import'?'Sélection initiale · ':'Proposé par ')+t.contributor,'status-line'));
-      const link=node('a','Rechercher sur Deezer','btn small');link.href='https://www.deezer.com/search/'+encodeURIComponent(t.artist+' '+t.title);link.target='_blank';link.rel='noopener noreferrer';card.append(link);list.append(card);
+      const row=node('div','','music-row');row.setAttribute('role','listitem');
+      const song=node('span',t.title,'music-row-title'),artistName=node('span',t.artist,'music-row-artist');
+      const actions=node('div','','music-row-actions');
+      const link=node('a','Deezer','btn small');link.href='https://www.deezer.com/search/'+encodeURIComponent(t.artist+' '+t.title);link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label','Rechercher '+t.title+' de '+t.artist+' sur Deezer');
+      const remove=button('Supprimer',async()=>{
+        if(!confirm('Retirer « '+t.title+' » de '+t.artist+' de la sélection partagée de l’équipe ?'))return;
+        remove.disabled=true;message.textContent='';
+        try{
+          await api('/api/music/'+t.id,'DELETE');
+          if(currentUniverse!=='Fun')return;
+          tracks=tracks.filter(track=>track.id!==t.id);display();message.textContent='« '+t.title+' » a été retiré de la sélection.';
+        }catch(e){message.textContent=e.message;}finally{remove.disabled=false;}
+      },'btn small danger');
+      remove.setAttribute('aria-label','Supprimer '+t.title+' de '+t.artist+' de la sélection');
+      actions.append(link,remove);row.append(song,artistName,actions);list.append(row);
     });
     if(!visible.length)list.append(node('div','Aucun morceau ne correspond à votre recherche.','empty'));
     more.classList.toggle('hidden',visible.length<=limit);
