@@ -15,3 +15,9 @@ test('annuaire salarié ne contient jamais naissance, fonction, email ou droits'
  const result=publicPerson({id:2,first_name:'Alice',last_name:'Test',phone:'0600000000',active:true,birthday:'1990-01-01',email:'private@example.test',job:'Private',rights:['Agenda'],role:'employee'},false,2);
  assert.deepEqual(Object.keys(result).sort(),['id','firstName','lastName','phone','active','isSelf'].sort());assert.equal(result.isSelf,true);
 });
+
+test('une ancienne page administrateur reçoit toujours le nom complet',()=>{
+ const person={id:2,name:'Alice Exemple',first_name:'Alice',last_name:'Exemple',phone:'',active:true,email:null,job:'',rights:[],role:'employee'};
+ const admin=publicPerson(person,true,1);assert.equal(admin.name,'Alice EXEMPLE');assert.equal(admin.firstName,'Alice');assert.equal(admin.lastName,'Exemple');assert.deepEqual(admin.rights,[]);
+ assert.equal(publicPerson(person,false,1).name,undefined);
+});

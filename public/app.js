@@ -101,7 +101,7 @@ async function openUniverse(name){
   if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
-function personName(p){return [p.firstName,p.lastName].filter(Boolean).join(' ');}
+function personName(p){return [p.firstName,p.lastName?.toLocaleUpperCase('fr-FR')].filter(Boolean).join(' ');}
 async function reloadPeople(message=''){people=await api('/api/users');if(currentUniverse==='Collaborateurs'){renderPeople();q('#feedback').textContent=message;}}
 function renderPeople(){
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
@@ -117,7 +117,7 @@ function renderPeople(){
     const body=node('tbody');
     for(const p of list){
       const tr=node('tr','','person-row'+(p.isSelf?' own-person':''));tr.dataset.personId=p.id;
-      const first=node('td'),last=node('td',p.lastName),phone=node('td',p.phone||'À renseigner','person-phone');
+      const first=node('td'),last=node('td',p.lastName.toLocaleUpperCase('fr-FR')),phone=node('td',p.phone||'À renseigner','person-phone');
       if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
       tr.append(first,last,phone);
       if(isAdmin){

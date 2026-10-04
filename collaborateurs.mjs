@@ -8,7 +8,8 @@ export function parisDate(now=new Date()) {
 const dateText=d=>d instanceof Date?d.toISOString().slice(0,10):String(d||'').slice(0,10);
 export function publicPerson(p,isAdmin,selfId) {
   const base={id:p.id,firstName:p.first_name,lastName:p.last_name,phone:p.phone,active:p.active,isSelf:p.id===selfId};
-  return isAdmin?{...base,job:p.job,birthday:dateText(p.birthday),email:p.email||'',rights:p.rights,role:p.role}:base;
+  // Keep the full name for administrator pages opened before the directory update.
+  return isAdmin?{...base,name:p.first_name&&p.last_name?p.first_name+' '+p.last_name.toLocaleUpperCase('fr-FR'):p.name,job:p.job,birthday:dateText(p.birthday),email:p.email||'',rights:p.rights,role:p.role}:base;
 }
 export function validatePerson(data,fail) {
   const text=(key,max=100)=>{const v=data[key]??'';if(typeof v!=='string'||v.length>max)throw fail(400,'Champ invalide : '+key);return v.trim();};
