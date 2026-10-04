@@ -6,8 +6,14 @@ function parisDay(value=new Date()){
 function moveDay(day,offset){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);}
 function eventDays(e){return {start:e.start?.date||parisDay(e.start.dateTime),end:e.end?.date?moveDay(e.end.date,-1):parisDay(new Date(new Date(e.end?.dateTime||e.start.dateTime).getTime()-1))};}
 function normalizeSearch(value){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr').trim();}
+function eventIcons(title){
+  const text=normalizeSearch(title||'');
+  return [text.includes('conge')?'🏝️':'',text.includes('formation')?'🎓':''].filter(Boolean).join(' ');
+}
 function eventCard(e){
-  const card=node('article','','event');card.append(node('h3',e.title));let when;
+  const card=node('article','','event'),heading=node('h3'),icons=eventIcons(e.title);
+  if(icons){const icon=node('span',icons+' ');icon.setAttribute('aria-hidden','true');heading.append(icon);}
+  heading.append(node('span',e.title));card.append(heading);let when;
   if(e.start?.date){const {start,end}=eventDays(e);when=start.split('-').reverse().join('/')+(start!==end?' — '+end.split('-').reverse().join('/'):'')+' · Toute la journée';}
   else {const format=d=>new Date(d).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});when=format(e.start.dateTime)+' — '+format(e.end?.dateTime||e.start.dateTime);}
   card.append(node('p',when,'event-time'));if(e.location)card.append(node('p',e.location));if(e.description)card.append(node('p',e.description));return card;
