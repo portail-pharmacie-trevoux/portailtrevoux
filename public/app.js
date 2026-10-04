@@ -468,7 +468,7 @@ async function refreshHomeExtras(){
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
-      if(tile.dataset.universe==='Collaborateurs')return;
+      if(['Collaborateurs','Contacts utiles'].includes(tile.dataset.universe))return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
       badge.append(node('span',count?'●':'○','news-dot'),node('span',count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue'));
