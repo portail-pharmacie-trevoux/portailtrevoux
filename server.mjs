@@ -1,4 +1,5 @@
 import express from 'express';
+import { createYouTube } from './youtube.mjs';
 import { validateMusic, musicKey } from './music.mjs';
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
@@ -127,6 +128,24 @@ export function createApp(db,config) {
       await setSetting('sync_error','');
     })().catch(async error=>{await setSetting('sync_error',error.status?error.message:'Échec de la synchronisation. Réessayez plus tard.');throw error;}).finally(()=>{syncing=null;});return syncing;
   }
+  const youtube=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt});
+  app.get('/api/youtube/status',auth,ready,async(req,res)=>res.json(await youtube.status()));
+  app.post('/api/youtube/connect',auth,ready,admin,csrf,async(req,res)=>{
+    if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
+    const state='youtube_'+token(),verifier=token();
+    await db.query("UPDATE sessions SET oauth_state=$1,oauth_expires=now()+interval '10 minutes',oauth_verifier=$2 WHERE id=$3",[digest(state),verifier,req.auth.session_id]);
+    const params=new URLSearchParams({client_id:config.googleId,redirect_uri:callback,response_type:'code',scope:youtube.scope,access_type:'offline',prompt:'select_account consent',state,code_challenge:Buffer.from(digest(verifier),'hex').toString('base64url'),code_challenge_method:'S256'});
+    res.json({url:'https://accounts.google.com/o/oauth2/v2/auth?'+params});
+  });
+  app.get('/api/youtube/playlists',auth,ready,admin,async(req,res)=>res.json(await youtube.playlists()));
+  app.post('/api/youtube/playlist',auth,ready,admin,csrf,async(req,res)=>res.json(await youtube.choosePlaylist(req.body.id)));
+  app.post('/api/youtube/playlists',auth,ready,admin,csrf,async(req,res)=>res.status(201).json(await youtube.createPlaylist(req.body.title)));
+  app.post('/api/youtube/candidates',auth,ready,csrf,async(req,res)=>res.json(await youtube.candidates(req.body.trackId)));
+  app.post('/api/youtube/add',auth,ready,csrf,async(req,res)=>res.json(await youtube.add(req.body)));
+  app.post('/api/youtube/disconnect',auth,ready,admin,csrf,async(req,res)=>{
+    await db.query("DELETE FROM settings WHERE key IN ('youtube_tokens','youtube_channel_id','youtube_channel_name','youtube_playlist_id','youtube_playlist_name')");
+    res.json({ok:true});
+  });
   app.post('/api/google/connect',auth,ready,admin,csrf,async(req,res)=>{
     if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
     const state=token(),verifier=token();
@@ -138,11 +157,13 @@ export function createApp(db,config) {
     const state=typeof req.query.state==='string'?req.query.state:'';
     const {rows}=await db.query('UPDATE sessions SET oauth_state=NULL,oauth_expires=NULL,oauth_verifier=NULL WHERE id=$1 AND oauth_state=$2 AND oauth_expires>now() RETURNING $3::text AS verifier',[req.auth.session_id,digest(state),(await db.query('SELECT oauth_verifier FROM sessions WHERE id=$1',[req.auth.session_id])).rows[0]?.oauth_verifier]);
     if(!state||!rows[0])throw fail(400,'Autorisation expirée. Relancez la connexion Google.');
-    if(req.query.error)return res.redirect('/?google=refused');
+    const forYouTube=state.startsWith('youtube_');
+    if(req.query.error)return res.redirect(forYouTube?'/?youtube=refused':'/?google=refused');
     if(typeof req.query.code!=='string')throw fail(400,'Autorisation Google invalide.');
     const result=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,code:req.query.code,grant_type:'authorization_code',redirect_uri:callback,code_verifier:rows[0].verifier}),signal:AbortSignal.timeout(20000)});
     if(!result.ok)throw fail(400,'Connexion Google impossible. Vérifiez les réglages puis réessayez.');
     const tokens=await result.json();
+    if(forYouTube){await youtube.connect(tokens);return res.redirect('/?youtube=connected');}
     const identity=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token},signal:AbortSignal.timeout(20000)});
     const profile=identity.ok?await identity.json():{};
     if(!profile.email_verified||profile.email?.toLowerCase()!==config.googleEmail.toLowerCase())throw fail(403,'Connectez le compte Google de la pharmacie.');
