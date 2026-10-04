@@ -216,8 +216,10 @@ function tileAllowed(name){return session.user.role==='admin'||(session.user.per
 function canEditUniverse(name){return session.user.role==='admin'||(tileAllowed(name)&&(session.user.permissionsConfigured?session.user.editRights?.includes(name):name==='Fun'));}
 function tilePreferences(){
   let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
-  if(Array.isArray(saved))return {order:saved,hidden:[]};
-  return {order:Array.isArray(saved?.order)?saved.order:[],hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
+  const order=Array.isArray(saved)?saved:Array.isArray(saved?.order)?saved.order:[];
+  // Migrate the former first row once, while preserving custom orders and hidden tiles.
+  if((saved?.version||0)<2&&order.indexOf('Procédures')===3&&order.indexOf('Actualités')>3){const index=order.indexOf('Actualités');[order[3],order[index]]=[order[index],order[3]];}
+  return {order,hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
 }
 function applyTileVisibility(){
   const hidden=new Set(tilePreferences().hidden);
@@ -255,7 +257,7 @@ q('#organize-tiles').onclick=()=>{
 q('#tile-order-cancel').onclick=()=>q('#tile-order-dialog').close();
 q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(tileAllowed);draftHiddenTiles.clear();renderTileOrder();q('#tile-order-status').textContent='Ordre initial et toutes vos tuiles affichées.';};
 q('#tile-order-save').onclick=()=>{
-  try{localStorage.setItem(tileOrderKey(),JSON.stringify({order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
+  try{localStorage.setItem(tileOrderKey(),JSON.stringify({version:2,order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
   catch{q('#tile-order-status').textContent='Ce navigateur ne permet pas de mémoriser votre ordre.';}
 };
 
