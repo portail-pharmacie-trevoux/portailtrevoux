@@ -33,3 +33,9 @@ CREATE TABLE IF NOT EXISTS publication_reads (
  universe TEXT NOT NULL, last_id BIGINT NOT NULL DEFAULT 0,
  PRIMARY KEY(user_id,universe)
 );
+CREATE TABLE IF NOT EXISTS schedule_weeks (
+ week DATE PRIMARY KEY CHECK(EXTRACT(ISODOW FROM week)=1),
+ draft JSONB NOT NULL DEFAULT '{}', published JSONB,
+ revision INTEGER NOT NULL DEFAULT 0, published_revision INTEGER,
+ published_at TIMESTAMPTZ
+);

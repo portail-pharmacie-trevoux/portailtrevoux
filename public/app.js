@@ -60,13 +60,13 @@ async function api(path,method='GET',data){
   if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Error(body.error||'Demande impossible.');}return body;
 }
 function error(e){q('#global-message').textContent=e.message;}
-function showLogin(){document.querySelectorAll('.tile-news,.daily-joke,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showLogin(){scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.daily-joke,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
-  document.querySelectorAll('[data-universe]').forEach(b=>b.classList.toggle('hidden',session.user.role!=='admin'&&(b.dataset.universe==='Collaborateurs'||(b.dataset.universe!=='Fun'&&!session.user.rights.includes(b.dataset.universe)))));
+  applyTileVisibility();
   void refreshHomeExtras();
-  q('.section-label>span').textContent=session.user.role!=='admin'&&!session.user.rights.length?'Aucun accès attribué. Contactez votre administrateur.':'Vos espaces autorisés';
+  q('.section-label>span').textContent=[...document.querySelectorAll('.grid .tile')].some(b=>!b.classList.contains('hidden'))?'Vos espaces autorisés':'Vos tuiles sont masquées. Utilisez « Organiser mes tuiles » pour les réafficher.';
 }
 function afterLogin(){if(session.user.mustChange){q('#login').classList.add('hidden');q('#logout').classList.remove('hidden');openPassword();}else showHome();}
 q('#login-form').onsubmit=async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;q('#login-error').textContent='';try{session=await api('/api/login','POST',{email:q('#login-email').value,password:q('#login-password').value});q('#login-password').value='';afterLogin();}catch(e){q('#login-error').textContent=e.message;}finally{btn.disabled=false;}};
@@ -76,7 +76,7 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-const descriptions={'Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
+const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
 document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
 q('#back').onclick=()=>showHome();
 function setUniverseHeading(name){
@@ -96,7 +96,7 @@ function setUniverseHeading(name){
 async function openUniverse(name){
   q('#universe-publications')?.remove();
   currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs');q('#content').replaceChildren(node('div','Chargement…','empty'));
-  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
   if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
@@ -132,18 +132,30 @@ setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda
 (async()=>{try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('youtube=')){await openUniverse('Fun');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation YouTube annulée.';else q('#feedback').textContent='YouTube connecté. Cliquez sur son logo pour choisir votre playlist.';history.replaceState(null,'','/');}}catch{showLogin();}})();
 
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
-let draftTileOrder=[];
+let draftTileOrder=[],draftHiddenTiles=new Set();
 function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
+function tileAllowed(name){return session.user.role==='admin'||(name!=='Collaborateurs'&&(['Fun','Outils de calculs rapides'].includes(name)||session.user.rights.includes(name)));}
+function tilePreferences(){
+  let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
+  if(Array.isArray(saved))return {order:saved,hidden:[]};
+  return {order:Array.isArray(saved?.order)?saved.order:[],hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
+}
+function applyTileVisibility(){
+  const hidden=new Set(tilePreferences().hidden);
+  document.querySelectorAll('.grid [data-universe]').forEach(tile=>tile.classList.toggle('hidden',!tileAllowed(tile.dataset.universe)||hidden.has(tile.dataset.universe)));
+}
 function applyTileOrder(){
-  let saved=[];try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'[]');}catch{}
-  if(!Array.isArray(saved))saved=[];
+  const saved=tilePreferences().order;
   const order=[...new Set([...saved.filter(n=>initialTileOrder.includes(n)),...initialTileOrder])];
-  const grid=q('.grid');order.forEach(name=>{const tile=[...grid.children].find(b=>b.dataset.universe===name);if(tile)grid.append(tile);});
+  const grid=q('.grid');order.forEach(name=>{const tile=[...grid.children].find(b=>b.dataset.universe===name);if(tile)grid.append(tile);});applyTileVisibility();
 }
 function renderTileOrder(focusName,focusDirection){
   const list=q('#tile-order-list');list.replaceChildren();
   draftTileOrder.forEach((name,index)=>{
     const row=node('div','','tile-order-row'),label=node('span',name),actions=node('div','','tile-order-actions');
+    const visibility=node('label','','tile-visibility'),check=node('input');check.type='checkbox';check.checked=!draftHiddenTiles.has(name);check.setAttribute('aria-label','Afficher '+name);
+    check.onchange=()=>{if(check.checked)draftHiddenTiles.delete(name);else draftHiddenTiles.add(name);q('#tile-order-status').textContent=name+(check.checked?' sera affiché.':' sera masqué.');};
+    visibility.append(check,node('span','Afficher'));actions.append(visibility);
     ['up','down'].forEach(direction=>{
       const offset=direction==='up'?-1:1;
       const control=button(direction==='up'?'↑':'↓',()=>{
@@ -157,13 +169,14 @@ function renderTileOrder(focusName,focusDirection){
   if(focusName){const controls=[...list.querySelectorAll('button')];const focused=controls.find(b=>b.dataset.name===focusName&&b.dataset.direction===focusDirection&&!b.disabled)||controls.find(b=>b.dataset.name===focusName&&!b.disabled);focused?.focus();}
 }
 q('#organize-tiles').onclick=()=>{
-  draftTileOrder=[...document.querySelectorAll('.grid [data-universe]')].filter(b=>!b.classList.contains('hidden')).map(b=>b.dataset.universe);
+  draftTileOrder=[...document.querySelectorAll('.grid [data-universe]')].filter(b=>tileAllowed(b.dataset.universe)).map(b=>b.dataset.universe);
+  draftHiddenTiles=new Set(tilePreferences().hidden.filter(name=>initialTileOrder.includes(name)));
   q('#tile-order-status').textContent='';renderTileOrder();q('#tile-order-dialog').showModal();
 };
 q('#tile-order-cancel').onclick=()=>q('#tile-order-dialog').close();
-q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(n=>draftTileOrder.includes(n));renderTileOrder();};
+q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(tileAllowed);draftHiddenTiles.clear();renderTileOrder();q('#tile-order-status').textContent='Ordre initial et toutes vos tuiles affichées.';};
 q('#tile-order-save').onclick=()=>{
-  try{localStorage.setItem(tileOrderKey(),JSON.stringify([...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))]));applyTileOrder();q('#tile-order-dialog').close();}
+  try{localStorage.setItem(tileOrderKey(),JSON.stringify({order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
   catch{q('#tile-order-status').textContent='Ce navigateur ne permet pas de mémoriser votre ordre.';}
 };
 
@@ -420,3 +433,99 @@ setInterval(()=>{
   if(!session||session.user.mustChange||document.hidden)return;
   if(currentUniverse)void renderPublications(currentUniverse);else void refreshHomeExtras();
 },60000);
+
+let scheduleWeek='',scheduleScope='',scheduleData=null,scheduleRequest=0;
+const scheduleLabels={travail:'Travail',formation:'🎓 Formation',conge:'🏝️ Congé',absence:'Absence',repos:'Repos'};
+function mondayOf(day){const date=new Date(day+'T12:00:00Z');return moveDay(day,-((date.getUTCDay()+6)%7));}
+function formatHours(minutes){return Math.floor(minutes/60)+' h'+(minutes%60?' '+String(minutes%60).padStart(2,'0'):'');}
+function scheduleMinutes(entry){return (entry?.slots||[]).reduce((sum,[a,b])=>{const parse=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};return sum+parse(b)-parse(a);},0);}
+function scheduleDate(day,options={day:'numeric',month:'long'}){return new Date(day+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',...options});}
+function schedulePreference(){try{return localStorage.getItem('portail-plus:schedule-scope:'+session.user.id);}catch{return null;}}
+async function renderSchedule(){
+  if(!session)return;const userId=session.user.id,request=++scheduleRequest;
+  if(!scheduleWeek)scheduleWeek=mondayOf(parisDay());
+  if(!scheduleScope)scheduleScope=schedulePreference()||(session.user.role==='admin'?'team':'mine');
+  const data=await api('/api/schedule?week='+scheduleWeek+'&scope='+scheduleScope);
+  if(currentUniverse!=='Emplois du temps'||session?.user.id!==userId||request!==scheduleRequest)return;
+  scheduleData=data;const isAdmin=session.user.role==='admin',content=q('#content');
+  const root=node('div','','schedule'),toolbar=node('div','','schedule-toolbar');
+  const navigate=async offset=>{scheduleWeek=moveDay(scheduleWeek,offset);try{await renderSchedule();}catch(e){error(e);}};
+  const weekInput=node('input');weekInput.type='date';weekInput.value=scheduleWeek;weekInput.setAttribute('aria-label','Semaine à consulter');
+  weekInput.onchange=async()=>{if(weekInput.value){scheduleWeek=mondayOf(weekInput.value);try{await renderSchedule();}catch(e){error(e);}}};
+  toolbar.append(button('← Semaine précédente',()=>navigate(-7)),button('Cette semaine',async()=>{scheduleWeek=mondayOf(parisDay());try{await renderSchedule();}catch(e){error(e);}}),button('Semaine suivante →',()=>navigate(7)),weekInput);
+  const scope=node('div','','schedule-scope');scope.setAttribute('role','group');scope.setAttribute('aria-label','Choisir le planning à afficher');
+  [['mine','Mon planning'],['team','Toute l’équipe']].forEach(([value,label])=>{
+    const b=button(label,async()=>{scheduleScope=value;try{localStorage.setItem('portail-plus:schedule-scope:'+session.user.id,value);}catch{}try{await renderSchedule();}catch(e){error(e);}},'btn small'+(scheduleScope===value?' primary':''));
+    b.setAttribute('aria-pressed',String(scheduleScope===value));scope.append(b);
+  });
+  toolbar.append(scope,button('Imprimer',()=>window.print()));root.append(toolbar);
+  const title=node('h3','Semaine du '+scheduleDate(scheduleWeek)+' au '+scheduleDate(moveDay(scheduleWeek,6),{day:'numeric',month:'long',year:'numeric'}),'schedule-week-title');
+  const status=node('p',data.publishedAt?(isAdmin&&data.unpublishedChanges?'Brouillon modifié · la dernière version publiée reste visible pour l’équipe.':'Publié le '+new Date(data.publishedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'})):(isAdmin?'Brouillon · cette semaine n’est pas encore publiée.':'Cette semaine n’a pas encore été publiée.'),'schedule-status');
+  root.append(title,status);
+  if(isAdmin){
+    const actions=node('div','','schedule-admin');
+    const sourceLabel=node('label','Copier une semaine :');sourceLabel.htmlFor='schedule-copy-week';const source=node('input');source.id='schedule-copy-week';source.type='date';source.value=moveDay(scheduleWeek,-7);
+    const copy=button('Copier pour toute l’équipe',async()=>{
+      if(!source.value)return;
+      if(data.draftEntryCount){openScheduleCopy(source.value,data);return;}
+      copy.disabled=true;try{await copyScheduleWeek(source.value,data);}catch(e){error(e);}finally{copy.disabled=false;}
+    });
+    const publish=button(data.publishedAt?'Republier le planning de l’équipe':'Publier le planning de l’équipe',async()=>{
+      publish.disabled=true;try{await api('/api/schedule/'+data.week+'/publish','POST',{revision:data.revision});await renderSchedule();q('#feedback').textContent='Planning publié : l’équipe peut le consulter.';void renderPublications('Emplois du temps');}catch(e){error(e);publish.disabled=false;}
+    },'btn primary');publish.disabled=!!data.publishedAt&&!data.unpublishedChanges;
+    actions.append(sourceLabel,source,copy,publish,button('Recharger la semaine',async()=>{try{await renderSchedule();}catch(e){error(e);}}));root.append(actions,node('p','Cliquez sur une journée pour saisir les horaires. La copie et la publication portent sur toute l’équipe. Les congés, absences et repos s’appliquent à toute la journée.','field-note'));
+  }
+  const legend=node('div','','schedule-legend');Object.entries(scheduleLabels).forEach(([kind,label])=>legend.append(node('span',label,'schedule-kind '+kind)));root.append(legend);
+  const wrap=node('div','','schedule-scroll');wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label','Planning hebdomadaire, défilement horizontal');
+  const table=node('table','','schedule-table'),head=node('thead'),headRow=node('tr');headRow.append(node('th','Collaborateur'));
+  const days=Array.from({length:7},(_,i)=>moveDay(scheduleWeek,i));days.forEach(day=>headRow.append(node('th',scheduleDate(day,{weekday:'short',day:'2-digit',month:'2-digit'}))));headRow.append(node('th','Total prévu'));headRow.querySelectorAll('th').forEach(th=>th.scope='col');head.append(headRow);table.append(head);
+  const entries=new Map(data.entries.map(e=>[e.userId+':'+e.day,e])),body=node('tbody');
+  data.people.forEach(person=>{
+    const tr=node('tr'),name=node('th',person.name);name.scope='row';tr.append(name);let total=0;
+    days.forEach(day=>{
+      const entry=entries.get(person.id+':'+day),td=node('td'),cell=node(isAdmin?'button':'div','','schedule-day '+(entry?.kind||'empty-day'));
+      if(isAdmin){cell.type='button';cell.setAttribute('aria-label','Modifier '+person.name+', '+scheduleDate(day,{weekday:'long',day:'numeric',month:'long'}));cell.onclick=()=>editScheduleDay(person,day,entry,data);}
+      if(entry){cell.append(node('span',scheduleLabels[entry.kind],'schedule-day-kind'));entry.slots.forEach(([start,end])=>cell.append(node('span',start+' – '+end,'schedule-slot')));total+=scheduleMinutes(entry);}
+      else cell.append(node('span',isAdmin?'+':'—'));
+      td.append(cell);tr.append(td);
+    });tr.append(node('td',formatHours(total),'schedule-total'));body.append(tr);
+  });table.append(body);wrap.append(table);root.append(wrap);
+  if(!data.people.length)root.append(node('p','Aucun collaborateur dans cette vue.','empty'));
+  if(!isAdmin&&!data.publishedAt)root.append(node('p','Vous serez averti dans les nouveautés lorsque le planning sera publié.','field-note'));
+  root.append(node('p','Total des créneaux de travail et de formation, hors congés, absences et repos.','field-note'));
+  content.replaceChildren(root);
+}
+async function copyScheduleWeek(from,data){
+  await api('/api/schedule/'+data.week+'/copy','POST',{from:mondayOf(from),revision:data.revision});await renderSchedule();q('#feedback').textContent='Semaine copiée dans le brouillon. Vérifiez les horaires, puis publiez le planning.';
+}
+function scheduleDialog(title){
+  q('#schedule-dialog')?.remove();const dialog=node('dialog');dialog.id='schedule-dialog';dialog.setAttribute('aria-labelledby','schedule-dialog-title');const h=node('h2',title);h.id='schedule-dialog-title';dialog.append(h);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());return dialog;
+}
+function openScheduleCopy(from,data){
+  const dialog=scheduleDialog('Remplacer le brouillon de cette semaine ?');dialog.append(node('p','La copie remplacera les journées préparées. La version publiée restera visible jusqu’à votre prochaine publication.'));
+  const status=node('p','','error'),actions=node('div','','dialog-actions');const confirm=button('Remplacer le brouillon',async()=>{confirm.disabled=true;try{await copyScheduleWeek(from,data);dialog.close();}catch(e){status.textContent=e.message;confirm.disabled=false;}},'btn primary');actions.append(button('Annuler',()=>dialog.close()),confirm);dialog.append(status,actions);dialog.showModal();
+}
+function editScheduleDay(person,day,entry,data){
+  const dialog=scheduleDialog(person.name+' · '+scheduleDate(day,{weekday:'long',day:'numeric',month:'long'})),form=node('form'),typeLabel=node('label','Type de journée','field');typeLabel.htmlFor='schedule-kind';
+  const kind=node('select');kind.id='schedule-kind';Object.entries(scheduleLabels).forEach(([value,label])=>{const option=node('option',label);option.value=value;kind.append(option);});kind.value=entry?.kind||'travail';
+  const slots=node('div','','schedule-slot-editor'),inputs=[];
+  for(let i=0;i<2;i++){
+    const row=node('div'),label=node('p',i===0?'Créneau 1':'Créneau 2 (facultatif)'),pair=[];row.append(label);
+    for(const [j,text] of [[0,'Début'],[1,'Fin']]){const l=node('label',text),input=node('input');input.type='time';input.id='schedule-slot-'+i+'-'+j;l.htmlFor=input.id;input.value=entry?.slots?.[i]?.[j]||'';row.append(l,input);pair.push(input);}inputs.push(pair);slots.append(row);
+  }
+  const total=node('p','','field-note'),update=()=>{
+    const timed=['travail','formation'].includes(kind.value);slots.classList.toggle('hidden',!timed);inputs.flat().forEach(input=>{input.disabled=!timed;input.required=timed&&inputs[0].includes(input);});
+    const valid=inputs.filter(pair=>pair.every(input=>input.value)).map(pair=>pair.map(input=>input.value));total.textContent=timed?'Durée saisie : '+formatHours(Math.max(0,scheduleMinutes({slots:valid}))):'Journée entière · hors total des heures.';
+  };kind.onchange=update;inputs.flat().forEach(input=>input.oninput=update);update();
+  const status=node('p','','error');status.setAttribute('role','alert');const actions=node('div','','dialog-actions');
+  const save=node('button','Enregistrer le brouillon','btn primary');save.type='submit';
+  const clear=button('Vider cette journée',async()=>{
+    clear.disabled=true;try{await api('/api/schedule/'+data.week+'/clear-day','POST',{userId:person.id,day,revision:data.revision});dialog.close();await renderSchedule();q('#feedback').textContent='Journée retirée du brouillon.';}catch(e){status.textContent=e.message;clear.disabled=false;}
+  });clear.disabled=!entry;
+  actions.append(clear,button('Annuler',()=>dialog.close()),save);form.append(typeLabel,kind,slots,total,status,actions);dialog.append(form);
+  form.onsubmit=async e=>{
+    e.preventDefault();status.textContent='';const pairs=['travail','formation'].includes(kind.value)?inputs.map(pair=>pair.map(input=>input.value)).filter(pair=>pair.some(Boolean)):[];
+    if(pairs.some(pair=>pair.some(value=>!value))){status.textContent='Renseignez le début et la fin de chaque créneau.';return;}
+    save.disabled=true;clear.disabled=true;try{await api('/api/schedule/'+data.week+'/day','PUT',{userId:person.id,day,kind:kind.value,slots:pairs,revision:data.revision});dialog.close();await renderSchedule();q('#feedback').textContent='Journée enregistrée dans le brouillon.';}catch(e){status.textContent=e.message;save.disabled=false;clear.disabled=!entry;}
+  };dialog.showModal();kind.focus();
+}

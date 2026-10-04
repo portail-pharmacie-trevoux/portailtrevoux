@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="260" viewBox="0 0 800 260">
+<rect width="800" height="260" rx="42" fill="#17233C"/>
+<path d="M90 62 L48 140 H91 L73 202 L151 113 H108 L132 62 Z" fill="#20B486"/>
+<text x="175" y="145" font-family="Arial, sans-serif" font-size="92" font-weight="700" fill="#FFFFFF">Promo</text>
+<text x="475" y="145" font-family="Arial, sans-serif" font-size="92" font-weight="700" fill="#20B486">Flash</text>
+<text x="180" y="190" font-family="Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="5" fill="#B9C2D4">ANALYSE DE RENTABILITÉ PROMOTIONNELLE</text>
+</svg>

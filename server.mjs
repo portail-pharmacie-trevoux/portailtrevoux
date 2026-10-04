@@ -1,4 +1,5 @@
 import express from 'express';
+import { registerSchedule } from './schedule.mjs';
 import { createDailyJoke } from './updates.mjs';
 import { createYouTube } from './youtube.mjs';
 import { validateMusic, musicKey } from './music.mjs';
@@ -16,7 +17,7 @@ export function createApp(db,config) {
   app.set('trust proxy',1); app.disable('x-powered-by');
   app.use((req,res,next)=>{
     res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
-      'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.openfoodfacts.org; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       'Permissions-Policy':'camera=(), microphone=(), geolocation=()'});
     if(secure)res.set('Strict-Transport-Security','max-age=31536000');
     next();
@@ -69,6 +70,7 @@ export function createApp(db,config) {
     res.json({ok:true});
   });
   app.get('/api/fun/joke',auth,ready,async(req,res)=>res.json(await dailyJoke()));
+  registerSchedule({app,db,auth,ready,admin,csrf,canAccess,fail});
   const callback=origin+'/auth/google/callback';
   const cookieOptions={httpOnly:true,secure,sameSite:'lax',path:'/',maxAge:8*60*60*1000};
   async function newSession(user,res){
@@ -266,6 +268,20 @@ export function createApp(db,config) {
     const {rowCount}=await db.query('DELETE FROM music_tracks WHERE id=$1',[id]);
     if(!rowCount)throw fail(404,'Ce morceau ne figure plus dans la sélection.');
     res.json({ok:true});
+  });
+  const productCache=new Map();
+  app.get('/api/promoflash/product/:ean',auth,ready,async(req,res)=>{
+    const ean=req.params.ean;
+    if(!/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(ean))throw fail(400,'Code EAN invalide.');
+    const cached=productCache.get(ean);if(cached&&cached.until>Date.now())return res.json(cached.result);
+    try{
+      const response=await fetch('https://world.openfoodfacts.org/api/v2/product/'+ean+'.json?fields=product_name,product_name_fr,brands,image_front_url',{headers:{'User-Agent':'PortailPlus-PromoFlash/1.0 ('+origin+')'},signal:AbortSignal.timeout(10000)});
+      if(!response.ok&&response.status!==404)throw Error('Source indisponible');
+      const data=await response.json(),p=data.product||{};let image='';
+      if(typeof p.image_front_url==='string'){try{const url=new URL(p.image_front_url);if(url.origin==='https://images.openfoodfacts.org'&&url.pathname.startsWith('/images/products/'))image=url.href;}catch{}}
+      const result={found:data.status===1,name:String(p.product_name_fr||p.product_name||'Produit sans nom').slice(0,300),brand:String(p.brands||'').slice(0,200),image};
+      if(!result.found)result.image='';if(productCache.size>=200)productCache.delete(productCache.keys().next().value);productCache.set(ean,{result,until:Date.now()+3600000});res.json(result);
+    }catch{throw fail(502,'La recherche de produit est momentanément indisponible.');}
   });
   app.get('/api/universes/:name',auth,ready,(req,res)=>{if(!canAccess(req.auth,req.params.name))throw fail(403,'Accès refusé.');res.json({items:[]});});
   app.use(express.static(root+'public',{index:'index.html',etag:false}));
