@@ -180,14 +180,17 @@ async function renderMusic(){
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
   const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
 
-  const exportButton=button('Exporter les titres cochés (CSV)',()=>{
+  const exportButton=button('ETAPE 1 créer un fichier CSV avec les titres cochés',()=>{
     const chosen=tracks.filter(t=>selectedTracks.has(t.id));if(!chosen.length)return;
     const csvCell=value=>'"'+String(value).replace(/"/g,'""')+'"';
     const csv='\uFEFF'+[['Artist','Title'],...chosen.map(t=>[t.artist,t.title])].map(row=>row.map(csvCell).join(',')).join('\r\n');
     const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     const a=node('a');a.href=url;a.download='Playlist_PORTAIL_PLUS_Deezer.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
-  const transfer=node('a','Importer le CSV dans Deezer','btn small');transfer.href='https://www.tunemymusic.com/transfer/file-to-deezer';transfer.target='_blank';transfer.rel='noopener noreferrer';
+  const transfer=node('a','ETAPE 2 importer le CSV généré dans Deezer','btn small');transfer.href='https://www.tunemymusic.com/transfer/file-to-deezer';transfer.target='_blank';transfer.rel='noopener noreferrer';
+  const youtubeTransfer=button('ETAPE 2 importer le CSV généré dans Youtube',()=>{});
+  youtubeTransfer.disabled=true;youtubeTransfer.setAttribute('aria-describedby','music-youtube-status');
+  const youtubeStatus=node('span','YouTube : à paramétrer.','field-note');youtubeStatus.id='music-youtube-status';
   const selectionCount=node('span','','status-line');selectionCount.setAttribute('role','status');
   function updateSelection(){
     const total=tracks.filter(t=>selectedTracks.has(t.id)).length;
@@ -202,7 +205,7 @@ async function renderMusic(){
   const selectNone=button('Tout décocher',()=>{selectedTracks.clear();display();});
   const selectionTools=node('div','','music-selection-tools');selectionTools.append(selectAll,selectNone,node('span','« Tout cocher » sélectionne tous les résultats de la recherche, y compris les lignes non affichées.','field-note'));
   toolbar.append(selectionTools);
-  const actions=node('div','','agenda-navigation');actions.append(exportButton,selectionCount,transfer);
+  const actions=node('div','','agenda-navigation');actions.append(exportButton,selectionCount,transfer,youtubeTransfer,youtubeStatus);
   content.append(actions,toolbar,count,list,more);
   if(session.user.role==='admin'){
     const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
