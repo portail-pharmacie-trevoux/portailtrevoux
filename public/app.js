@@ -104,6 +104,7 @@ function button(label,action,cls='btn small'){const b=node('button',label,cls);b
 function personName(p){return [p.firstName,p.lastName?.toLocaleUpperCase('fr-FR')].filter(Boolean).join(' ');}
 async function reloadPeople(message=''){people=await api('/api/users');if(currentUniverse==='Collaborateurs'){renderPeople();q('#feedback').textContent=message;}}
 function renderPeople(){
+  employeeRecordRequest++;q('#add').classList.toggle('hidden',session.user.role!=='admin');
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
   content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
   if(isAdmin)content.append(node('p','Complétez les téléphones et, si besoin, créez les accès personnels depuis « Modifier ». Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));
@@ -118,10 +119,11 @@ function renderPeople(){
     for(const p of list){
       const tr=node('tr','','person-row'+(p.isSelf?' own-person':''));tr.dataset.personId=p.id;
       const first=node('td'),last=node('td',p.lastName.toLocaleUpperCase('fr-FR')),phone=node('td',p.phone||'À renseigner','person-phone');
-      if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
+      if(isAdmin){const open=button(p.firstName,()=>openEmployeeRecord(p),'person-open');open.setAttribute('aria-label','Ouvrir la fiche de '+personName(p));first.append(open);const surname=button(p.lastName.toLocaleUpperCase('fr-FR'),()=>openEmployeeRecord(p),'person-open');surname.setAttribute('aria-label','Consulter la fiche de '+personName(p));last.replaceChildren(surname);}
+      else if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
       tr.append(first,last,phone);
       if(isAdmin){
-        const actions=node('td','','actions');const edit=button('Modifier',()=>openEditor(p.id));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
+        const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
         if(p.role!=='admin'){
           if(active){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
           else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);}
@@ -132,6 +134,14 @@ function renderPeople(){
     }
     table.append(body);wrap.append(table);section.append(wrap);content.append(section);
   }
+}
+let employeeRecordRequest=0;
+async function openEmployeeRecord(person){
+  if(session?.user.role!=='admin')return;
+  const request=++employeeRecordRequest,userId=session.user.id;const valid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
+  q('#add').classList.add('hidden');q('#feedback').textContent='';q('#content').replaceChildren(node('p','Chargement de la fiche…','field-note'));
+  try{const module=await import('/employee-record.js');if(!valid())return;await module.renderEmployeeRecord({container:q('#content'),api,person,onClose:()=>reloadPeople(),onSaved:async(result,message)=>{await reloadPeople(message);},onPayroll:openMyPayroll,universes:initialTileOrder,isCurrent:valid});}
+  catch(e){if(valid()){q('#content').replaceChildren(node('p',e.message,'error'),button('Retour à l’annuaire',()=>reloadPeople()));}}
 }
 async function openMyPayroll(){
   q('#my-payroll-dialog')?.remove();const dialog=node('dialog');dialog.id='my-payroll-dialog';dialog.setAttribute('aria-labelledby','my-payroll-title');
@@ -202,7 +212,8 @@ setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
 let draftTileOrder=[],draftHiddenTiles=new Set();
 function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
-function tileAllowed(name){return session.user.role==='admin'||(['Fun','Outils de calculs rapides','Collaborateurs'].includes(name)||session.user.rights.includes(name));}
+function tileAllowed(name){return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs'].includes(name)||session.user.rights.includes(name)));}
+function canEditUniverse(name){return session.user.role==='admin'||(tileAllowed(name)&&(session.user.permissionsConfigured?session.user.editRights?.includes(name):name==='Fun'));}
 function tilePreferences(){
   let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
   if(Array.isArray(saved))return {order:saved,hidden:[]};
@@ -251,7 +262,7 @@ q('#tile-order-save').onclick=()=>{
 async function renderMusic(){
   let tracks=await api('/api/music');if(currentUniverse!=='Fun')return;
   const selectedTracks=new Set();
-  const content=q('#content');content.replaceChildren();
+  const editable=canEditUniverse('Fun'),content=q('#content');content.replaceChildren();
   const intro=node('div','','music-intro');intro.append(node('h3','La musique de toute l’équipe'),node('p','Ajoutez vos morceaux préférés à la sélection partagée de la pharmacie.'));
   const form=node('form','','music-form');
   const artistLabel=node('label','Artiste'),artist=node('input');artist.type='text';artist.id='music-artist';artist.maxLength=200;artist.required=true;artist.placeholder='Ex. : Adele';artistLabel.htmlFor=artist.id;
@@ -259,7 +270,7 @@ async function renderMusic(){
   const artistField=node('div'),titleField=node('div');artistField.append(artistLabel,artist);titleField.append(titleLabel,title);
   const submit=node('button','Ajouter à la sélection','btn primary');submit.type='submit';
   const message=node('p','','music-feedback');message.setAttribute('role','status');
-  form.append(artistField,titleField,submit);content.append(intro,form,message);
+  form.append(artistField,titleField,submit);content.append(intro);if(editable)content.append(form);else content.append(node('p','Vous consultez la sélection musicale. L’ajout et la suppression de titres nécessitent un droit de modification.','field-note'));content.append(message);
   content.append(node('p','Cette liste rassemble les choix de l’équipe. Cochez vos titres puis choisissez une plateforme. Deezer télécharge le CSV et ouvre Tune My Music : chargez-y le fichier téléchargé. YouTube permet de vérifier les vidéos puis de les ajouter directement à la playlist connectée.','status-line'));
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
   const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
@@ -293,7 +304,7 @@ async function renderMusic(){
   const selectionTools=node('div','','music-selection-tools');selectionTools.append(selectAll,selectNone,node('span','« Tout cocher » sélectionne tous les résultats de la recherche, y compris les lignes non affichées.','field-note'));
   toolbar.append(selectionTools);
   const actions=node('div','','agenda-navigation');actions.append(exportButton,youtubeTransfer,selectionCount);
-  content.append(actions,youtubePanel,toolbar,count,list,more);
+  if(!editable){youtubeTransfer.classList.add('hidden');}content.append(actions,youtubePanel,toolbar,count,list,more);
   if(session.user.role==='admin'){
     const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
     const label=node('label','Fichier CSV avec les colonnes Artist et Title'),file=node('input');file.type='file';file.accept='.csv,text/csv';file.id='music-csv-import';label.htmlFor=file.id;
@@ -339,7 +350,7 @@ async function renderMusic(){
         }catch(e){message.textContent=e.message;}finally{remove.disabled=false;}
       },'btn small danger');
       remove.setAttribute('aria-label','Supprimer '+t.title+' de '+t.artist+' de la sélection');
-      actions.append(link,remove);row.append(check,song,artistName,added,actions);list.append(row);
+      actions.append(link);if(editable)actions.append(remove);row.append(check,song,artistName,added,actions);list.append(row);
     });
     if(!visible.length)list.append(node('div','Aucun morceau ne correspond à votre recherche.','empty'));
     more.classList.toggle('hidden',visible.length<=limit);
@@ -517,7 +528,7 @@ async function renderSchedule(){
   if(!scheduleScope)scheduleScope=schedulePreference()||(session.user.role==='admin'?'team':'mine');
   const data=await api('/api/schedule?week='+scheduleWeek+'&scope='+scheduleScope);
   if(currentUniverse!=='Emplois du temps'||session?.user.id!==userId||request!==scheduleRequest)return;
-  scheduleData=data;const isAdmin=session.user.role==='admin',content=q('#content');
+  scheduleData=data;const isAdmin=data.canEdit??(session.user.role==='admin'),content=q('#content');
   const root=node('div','','schedule'),toolbar=node('div','','schedule-toolbar');
   const navigate=async offset=>{scheduleWeek=moveDay(scheduleWeek,offset);try{await renderSchedule();}catch(e){error(e);}};
   const weekInput=node('input');weekInput.type='date';weekInput.value=scheduleWeek;weekInput.setAttribute('aria-label','Semaine à consulter');
@@ -605,8 +616,7 @@ function renderCelebrations(data){
   const block=node('span','','tile-celebrations');block.append(node('strong','🎉 Fêtes et anniversaires du jour'));
   if(!data)block.append(node('span','Les célébrations sont momentanément indisponibles.'));
   else{
-    block.append(node('span',data.feastsAvailable?'Bonne fête : '+data.feasts.join(', '):'Fêtes momentanément indisponibles.'));
-    if(data.nameDays.length)block.append(node('span','🌷 '+data.nameDays.join(', ')));
+    block.append(node('span',data.feastsAvailable?(data.nameDays.length?'🌷 Bonne fête : '+data.nameDays.join(', '):'🌷 Aucune fête dans l’équipe aujourd’hui.'):'Fêtes momentanément indisponibles.'));
     block.append(node('span',data.birthdays.length?'🎂 '+data.birthdays.join(', '):'🎂 Aucun anniversaire dans l’équipe aujourd’hui.'));
     block.append(node('small',data.day.split('-').reverse().join('/')+' · Calendrier Nominis'));
   }

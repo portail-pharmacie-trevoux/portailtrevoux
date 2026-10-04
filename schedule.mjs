@@ -39,21 +39,22 @@ export function copySchedule(source,sourceWeek,targetWeek,allowedIds){
   }
   return result;
 }
-export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,fail}){
+export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModify,fail}){
   const access=(req,res,next)=>canAccess(req.auth,'Emplois du temps')?next():next(fail(403,'Accès refusé.'));
+  const editor=(req,res,next)=>canModify(req.auth,'Emplois du temps')?next():next(fail(403,'Vous pouvez uniquement consulter le planning.'));
   const conflict=()=>fail(409,'Le planning a été modifié entre-temps. Rechargez la semaine avant de continuer.');
   const roster=async()=>(await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY name')).rows;
   async function weekRow(week){return (await db.query('SELECT * FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];}
   async function ensureWeek(week){await db.query('INSERT INTO schedule_weeks(week) VALUES($1::date) ON CONFLICT(week) DO NOTHING',[week]);}
   app.get('/api/schedule',auth,ready,access,async(req,res)=>{
     const week=validWeek(req.query.week),scope=req.query.scope||'team';if(!['mine','team'].includes(scope))throw fail(400,'Vue invalide.');
-    const [row,all]=await Promise.all([weekRow(week),roster()]);const isAdmin=req.auth.role==='admin';
+    const [row,all]=await Promise.all([weekRow(week),roster()]);const isAdmin=canModify(req.auth,'Emplois du temps');
     const people=scope==='mine'?all.filter(p=>p.id===req.auth.id):all,ids=new Set(people.map(p=>p.id));
     const entries=Object.values(isAdmin?row?.draft||{}:row?.published||{}).filter(e=>ids.has(e.userId));
-    res.json({week,people,entries,draftEntryCount:isAdmin?Object.keys(row?.draft||{}).length:undefined,revision:isAdmin?row?.revision||0:undefined,publishedAt:row?.published_at||null,
+    res.json({week,people,entries,canEdit:isAdmin,draftEntryCount:isAdmin?Object.keys(row?.draft||{}).length:undefined,revision:isAdmin?row?.revision||0:undefined,publishedAt:row?.published_at||null,
       unpublishedChanges:isAdmin?!!row&&row.revision!==row.published_revision:undefined});
   });
-  app.put('/api/schedule/:week/day',auth,ready,admin,csrf,async(req,res)=>{
+  app.put('/api/schedule/:week/day',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision),entry=validateDay(req.body,week);
     if(!(await roster()).some(p=>p.id===entry.userId))throw fail(404,'Collaborateur introuvable.');
     await ensureWeek(week);
@@ -61,14 +62,14 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,fail}){
       WHERE week=$3::date AND revision=$4 RETURNING revision`,[entry.userId+':'+entry.day,JSON.stringify(entry),week,revision]);
     if(!rows.length)throw conflict();res.json(rows[0]);
   });
-  app.post('/api/schedule/:week/clear-day',auth,ready,admin,csrf,async(req,res)=>{
+  app.post('/api/schedule/:week/clear-day',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision),{userId,day}=req.body;
     validateDay({userId,day,kind:'repos',slots:[]},week);await ensureWeek(week);
     const {rows}=await db.query(`UPDATE schedule_weeks SET draft=draft-$1::text,revision=revision+1
       WHERE week=$2::date AND revision=$3 RETURNING revision`,[userId+':'+day,week,revision]);
     if(!rows.length)throw conflict();res.json(rows[0]);
   });
-  app.post('/api/schedule/:week/copy',auth,ready,admin,csrf,async(req,res)=>{
+  app.post('/api/schedule/:week/copy',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),from=validWeek(req.body.from),revision=validRevision(req.body.revision);
     if(from===week)throw fail(400,'Choisissez une autre semaine à copier.');
     const source=await weekRow(from);if(!source||!Object.keys(source.draft).length)throw fail(400,'La semaine à copier est vide.');
@@ -77,7 +78,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,fail}){
       WHERE week=$2::date AND revision=$3 RETURNING revision`,[JSON.stringify(copied),week,revision]);
     if(!rows.length)throw conflict();res.json(rows[0]);
   });
-  app.post('/api/schedule/:week/publish',auth,ready,admin,csrf,async(req,res)=>{
+  app.post('/api/schedule/:week/publish',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision);await ensureWeek(week);
     const {rows}=await db.query(`WITH changed AS (
       UPDATE schedule_weeks SET published=draft,published_revision=revision,published_at=now()

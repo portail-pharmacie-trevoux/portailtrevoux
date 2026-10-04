@@ -1,7 +1,7 @@
 import { randomBytes, scrypt as rawScrypt, timingSafeEqual, createHash, createCipheriv, createDecipheriv } from 'node:crypto';
 import { promisify } from 'node:util';
 const scrypt = promisify(rawScrypt);
-export const universes = ['Emplois du temps','Agenda','Procédures','Laboratoires','Challenges','Actualités','Formations','Contacts utiles','Ressources humaines','Fun','Passerelle groupement','Outils de calculs rapides'];
+export const universes = ['Collaborateurs','Emplois du temps','Agenda','Procédures','Laboratoires','Challenges','Actualités','Formations','Contacts utiles','Ressources humaines','Fun','Passerelle groupement','Outils de calculs rapides'];
 export function passwordValid(p) { return typeof p === 'string' && p.length >= 12 && Buffer.byteLength(p) <= 256; }
 export async function hashPassword(password) {
   const salt=randomBytes(16).toString('hex');
@@ -28,5 +28,13 @@ export function decrypt(value,secret) {
   cipher.setAuthTag(tag);
   return JSON.parse(Buffer.concat([cipher.update(data),cipher.final()]).toString('utf8'));
 }
-export const canAccess=(user,universe)=>(!!user&&['Fun','Outils de calculs rapides','Collaborateurs'].includes(universe))||user?.role==='admin'||user?.rights?.includes(universe);
-
+export function canAccess(user,universe) {
+ if(!user)return false;if(user.role==='admin')return true;
+ if(user.permissions_configured)return !!user.rights?.includes(universe);
+ return ['Fun','Outils de calculs rapides','Collaborateurs'].includes(universe)||!!user.rights?.includes(universe);
+}
+export function canModify(user,universe) {
+ if(!user||!canAccess(user,universe))return false;if(user.role==='admin')return true;
+ if(universe==='Collaborateurs')return false;
+ return user.permissions_configured?!!user.edit_rights?.includes(universe):universe==='Fun';
+}

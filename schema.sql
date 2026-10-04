@@ -12,6 +12,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS directory_key TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS edit_rights JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions_configured BOOLEAN NOT NULL DEFAULT FALSE;
 UPDATE users SET first_name=split_part(name,' ',1),last_name=trim(substr(name,length(split_part(name,' ',1))+1)) WHERE first_name='';
 CREATE TABLE IF NOT EXISTS sessions (
  id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -48,4 +50,11 @@ CREATE TABLE IF NOT EXISTS schedule_weeks (
  draft JSONB NOT NULL DEFAULT '{}', published JSONB,
  revision INTEGER NOT NULL DEFAULT 0, published_revision INTEGER,
  published_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS employee_details (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ payload TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
+ updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

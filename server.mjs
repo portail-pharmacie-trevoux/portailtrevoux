@@ -8,10 +8,10 @@ import { validateMusic, musicKey } from './music.mjs';
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { hashPassword, verifyPassword, passwordValid, token, digest, encrypt, decrypt, universes, canAccess } from './security.mjs';
+import { hashPassword, verifyPassword, passwordValid, token, digest, encrypt, decrypt, universes, canAccess, canModify } from './security.mjs';
 
 const root=fileURLToPath(new URL('.',import.meta.url));
-const cleanUser=u=>({id:u.id,name:u.name,job:u.job,email:u.email,role:u.role,rights:u.rights,mustChange:u.must_change});
+const cleanUser=u=>({id:u.id,name:u.name,job:u.job,email:u.email,role:u.role,rights:u.rights,editRights:u.edit_rights||[],permissionsConfigured:!!u.permissions_configured,mustChange:u.must_change});
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function createApp(db,config) {
   const app=express(), secret=config.secret, origin=new URL(config.origin).origin;
@@ -41,13 +41,15 @@ export function createApp(db,config) {
   const ready=(req,res,next)=>req.auth?.must_change?next(fail(403,'Changez votre mot de passe provisoire.')):next();
   const admin=(req,res,next)=>req.auth?.role==='admin'?next():next(fail(403,'Accès réservé à l’administrateur.'));
   const csrf=(req,res,next)=>req.get('x-csrf-token')===req.auth?.csrf?next():next(fail(403,'Session à actualiser.'));
+  const viewUniverse=name=>(req,res,next)=>canAccess(req.auth,name)?next():next(fail(403,'Accès refusé.'));
+  const editUniverse=name=>(req,res,next)=>canModify(req.auth,name)?next():next(fail(403,'Cet univers est en consultation seule pour votre compte.'));
   const getSetting=async key=>(await db.query('SELECT value FROM settings WHERE key=$1',[key])).rows[0]?.value;
   const setSetting=async(key,value)=>db.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[key,value]);
   async function publish(universe,title,key=null) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
   const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
-  const allowedPublications=user=>universes.filter(name=>canAccess(user,name));
+  const allowedPublications=user=>universes.filter(name=>name!=='Collaborateurs'&&canAccess(user,name));
   app.get('/api/publications',auth,ready,async(req,res)=>{
     const allowed=allowedPublications(req.auth);
     const {rows}=await db.query(`SELECT p.universe,COUNT(*) FILTER(WHERE p.id>COALESCE(r.last_id,0))::int AS unread,
@@ -71,8 +73,8 @@ export function createApp(db,config) {
       ON CONFLICT(user_id,universe) DO UPDATE SET last_id=GREATEST(publication_reads.last_id,EXCLUDED.last_id)`,[req.auth.id,name,id]);
     res.json({ok:true});
   });
-  app.get('/api/fun/joke',auth,ready,async(req,res)=>res.json(await dailyJoke()));
-  registerSchedule({app,db,auth,ready,admin,csrf,canAccess,fail});
+  app.get('/api/fun/joke',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await dailyJoke()));
+  registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModify,fail});
   const callback=origin+'/auth/google/callback';
   const cookieOptions={httpOnly:true,secure,sameSite:'lax',path:'/',maxAge:8*60*60*1000};
   async function newSession(user,res){
@@ -107,7 +109,7 @@ export function createApp(db,config) {
     await db.query('DELETE FROM sessions WHERE user_id=$1',[req.auth.id]);
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
-  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,feastCalendar:config.feastCalendar});
+  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar});
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');
     let tokens=decrypt(stored,secret);
@@ -146,7 +148,7 @@ export function createApp(db,config) {
     })().catch(async error=>{await setSetting('sync_error',error.status?error.message:'Échec de la synchronisation. Réessayez plus tard.');throw error;}).finally(()=>{syncing=null;});return syncing;
   }
   const youtube=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt});
-  app.get('/api/youtube/status',auth,ready,async(req,res)=>res.json(await youtube.status()));
+  app.get('/api/youtube/status',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await youtube.status()));
   app.post('/api/youtube/connect',auth,ready,admin,csrf,async(req,res)=>{
     if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
     const state='youtube_'+token(),verifier=token();
@@ -157,8 +159,8 @@ export function createApp(db,config) {
   app.get('/api/youtube/playlists',auth,ready,admin,async(req,res)=>res.json(await youtube.playlists()));
   app.post('/api/youtube/playlist',auth,ready,admin,csrf,async(req,res)=>res.json(await youtube.choosePlaylist(req.body.id)));
   app.post('/api/youtube/playlists',auth,ready,admin,csrf,async(req,res)=>res.status(201).json(await youtube.createPlaylist(req.body.title)));
-  app.post('/api/youtube/candidates',auth,ready,csrf,async(req,res)=>res.json(await youtube.candidates(req.body.trackId)));
-  app.post('/api/youtube/add',auth,ready,csrf,async(req,res)=>res.json(await youtube.add(req.body)));
+  app.post('/api/youtube/candidates',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtube.candidates(req.body.trackId)));
+  app.post('/api/youtube/add',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtube.add(req.body)));
   app.post('/api/youtube/disconnect',auth,ready,admin,csrf,async(req,res)=>{
     await db.query("DELETE FROM settings WHERE key IN ('youtube_tokens','youtube_channel_id','youtube_channel_name','youtube_playlist_id','youtube_playlist_name')");
     res.json({ok:true});
@@ -231,26 +233,26 @@ export function createApp(db,config) {
     if(rows.length)await publish('Fun',rows.length+' nouveau'+(rows.length>1?'x titres importés':' titre importé'));
     res.json({added:rows.length,duplicates:tracks.length-rows.length});
   });
-  app.get('/api/music',auth,ready,async(req,res)=>{
+  app.get('/api/music',auth,ready,viewUniverse('Fun'),async(req,res)=>{
     res.json((await db.query('SELECT id,artist,title,contributor,source,created_at FROM music_tracks ORDER BY created_at DESC,id DESC')).rows);
   });
-  app.post('/api/music',auth,ready,csrf,async(req,res)=>{
+  app.post('/api/music',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>{
     const {artist,title,trackKey}=validateMusic(req.body);
     const {rows}=await db.query("INSERT INTO music_tracks(artist,title,track_key,contributor,added_by) VALUES($1,$2,$3,$4,$5) ON CONFLICT(track_key) DO NOTHING RETURNING id,artist,title,contributor,source,created_at",[artist,title,trackKey,req.auth.name,req.auth.id]);
     if(!rows[0])throw fail(409,'Ce morceau figure déjà dans la liste partagée.');
     await publish('Fun',title+' — '+artist,'music:'+rows[0].id);
     res.status(201).json(rows[0]);
   });
-  app.delete('/api/music/:id',auth,ready,csrf,async(req,res)=>{
+  app.delete('/api/music/:id',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>{
     const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Morceau invalide.');
     const {rowCount}=await db.query('DELETE FROM music_tracks WHERE id=$1',[id]);
     if(!rowCount)throw fail(404,'Ce morceau ne figure plus dans la sélection.');
     res.json({ok:true});
   });
   const products=createProductSources({origin,serpKey:config.serpKey});
-  app.get('/api/promoflash/product/:ean',auth,ready,async(req,res)=>{const result=await products.product(req.params.ean);res.json({...result,image:result.image?'/api/promoflash/image/'+req.params.ean:''});});
-  app.get('/api/promoflash/image/:ean',auth,ready,async(req,res)=>{const result=await products.image(req.params.ean);res.type(result.type).send(Buffer.from(result.bytes));});
-  app.get('/api/promoflash/prices/:ean',auth,ready,async(req,res)=>res.json(await products.prices(req.params.ean)));
+  app.get('/api/promoflash/product/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>{const result=await products.product(req.params.ean);res.json({...result,image:result.image?'/api/promoflash/image/'+req.params.ean:''});});
+  app.get('/api/promoflash/image/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>{const result=await products.image(req.params.ean);res.type(result.type).send(Buffer.from(result.bytes));});
+  app.get('/api/promoflash/prices/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>res.json(await products.prices(req.params.ean)));
   app.get('/api/universes/:name',auth,ready,(req,res)=>{if(!canAccess(req.auth,req.params.name))throw fail(403,'Accès refusé.');res.json({items:[]});});
   app.use(express.static(root+'public',{index:'index.html',etag:false}));
   app.use((error,req,res,next)=>{
