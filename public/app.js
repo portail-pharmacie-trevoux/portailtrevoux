@@ -161,10 +161,40 @@ async function renderMusic(){
   const submit=node('button','Ajouter à la sélection','btn primary');submit.type='submit';
   const message=node('p','','music-feedback');message.setAttribute('role','status');
   form.append(artistField,titleField,submit);content.append(intro,form,message);
-  content.append(node('p','Cette liste rassemble les choix de l’équipe. La synchronisation avec la playlist YouTube n’est pas encore activée.','status-line'));
+  content.append(node('p','Cette liste rassemble les choix de l’équipe. Pour mettre à jour Deezer, exportez la liste en CSV puis importez-la avec Tune My Music. La synchronisation automatique n’est pas activée.','status-line'));
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
   const list=node('div','','music-list'),count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
-  content.append(toolbar,count,list,more);
+
+  const exportButton=button('Exporter pour Deezer (CSV)',()=>{
+    const csvCell=value=>'"'+String(value).replace(/"/g,'""')+'"';
+    const csv='\uFEFF'+[['Artist','Title'],...tracks.map(t=>[t.artist,t.title])].map(row=>row.map(csvCell).join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const a=node('a');a.href=url;a.download='Playlist_PORTAIL_PLUS_Deezer.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
+  const transfer=node('a','Importer le CSV dans Deezer','btn small');transfer.href='https://www.tunemymusic.com/transfer/file-to-deezer';transfer.target='_blank';transfer.rel='noopener noreferrer';
+  const actions=node('div','','agenda-navigation');actions.append(exportButton,transfer);
+  content.append(actions,toolbar,count,list,more);
+  if(session.user.role==='admin'){
+    const importPanel=node('details','','calendar-tools');importPanel.append(node('summary','Importer la liste initiale (CSV)'));
+    const label=node('label','Fichier CSV avec les colonnes Artist et Title'),file=node('input');file.type='file';file.accept='.csv,text/csv';file.id='music-csv-import';label.htmlFor=file.id;
+    const state=node('p','','status-line');state.setAttribute('role','status');
+    let pending=[];
+    const importButton=button('Importer dans le portail',async()=>{
+      importButton.disabled=true;file.disabled=true;let added=0,duplicates=0,done=0;
+      try{
+        for(let i=0;i<pending.length;i+=25){
+          const batch=pending.slice(i,i+25);const result=await api('/api/music/import','POST',{tracks:batch});added+=result.added;duplicates+=result.duplicates;done+=batch.length;state.textContent=done+' / '+pending.length+' morceaux traités…';
+        }
+        tracks=await api('/api/music');if(currentUniverse!=='Fun')return;display();state.textContent=added+' morceaux importés, '+duplicates+' doublons déjà présents.';pending=[];file.value='';
+      }catch(e){state.textContent=e.message+' '+done+' morceaux traités. Vous pouvez relancer : les doublons sont ignorés.';}finally{file.disabled=false;importButton.disabled=!pending.length;}
+    });importButton.disabled=true;
+    file.onchange=async()=>{
+      pending=[];importButton.disabled=true;state.textContent='';
+      try{const selected=file.files[0];if(!selected)return;if(selected.size>2000000)throw Error('Le fichier CSV est trop volumineux.');pending=parseMusicCSV(await selected.text());state.textContent=pending.length+' morceaux prêts à être importés.';importButton.disabled=false;}catch(e){state.textContent=e.message;}
+    };
+    importPanel.append(label,file,state,importButton);content.append(importPanel);
+  }
+
   function display(){
     const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
     const visible=tracks.filter(t=>terms.every(term=>normalizeSearch(t.artist+' '+t.title).includes(term)));
@@ -173,7 +203,7 @@ async function renderMusic(){
     visible.slice(0,limit).forEach(t=>{
       const card=node('article','','event music-track');card.append(node('h3',t.title),node('p',t.artist,'event-time'));
       if(t.contributor)card.append(node('p',(t.source==='import'?'Sélection initiale · ':'Proposé par ')+t.contributor,'status-line'));
-      const link=node('a','Rechercher sur YouTube','btn small');link.href='https://www.youtube.com/results?search_query='+encodeURIComponent(t.artist+' '+t.title);link.target='_blank';link.rel='noopener noreferrer';card.append(link);list.append(card);
+      const link=node('a','Rechercher sur Deezer','btn small');link.href='https://www.deezer.com/search/'+encodeURIComponent(t.artist+' '+t.title);link.target='_blank';link.rel='noopener noreferrer';card.append(link);list.append(card);
     });
     if(!visible.length)list.append(node('div','Aucun morceau ne correspond à votre recherche.','empty'));
     more.classList.toggle('hidden',visible.length<=limit);
@@ -188,4 +218,25 @@ async function renderMusic(){
     }catch(e){message.textContent=e.message;}finally{submit.disabled=false;}
   };
   display();
+}
+
+function parseMusicCSV(text){
+  const rows=[];let row=[],field='',quoted=false;
+  text=text.replace(/^\uFEFF/,'');
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(c==='"'){
+      if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;
+    }else if(!quoted&&c===','){row.push(field);field='';}
+    else if(!quoted&&(c==='\n'||c==='\r')){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(v=>v.trim()))rows.push(row);row=[];field='';}
+    else field+=c;
+  }
+  if(quoted)throw Error('Le fichier CSV contient des guillemets incomplets.');
+  row.push(field);if(row.some(v=>v.trim()))rows.push(row);
+  const headers=(rows.shift()||[]).map(v=>v.trim().toLowerCase());
+  const ai=headers.findIndex(v=>['artist','artiste','artist name'].includes(v)),ti=headers.findIndex(v=>['title','titre','track name'].includes(v));
+  if(ai<0||ti<0)throw Error('Choisissez un CSV contenant les colonnes Artist et Title.');
+  const tracks=rows.map(r=>({artist:(r[ai]||'').trim(),title:(r[ti]||'').trim()}));
+  if(!tracks.length||tracks.length>2000||tracks.some(t=>!t.artist||!t.title||t.artist.length>200||t.title.length>200))throw Error('Le fichier doit contenir de 1 à 2 000 morceaux avec artiste et titre complets.');
+  return tracks;
 }
