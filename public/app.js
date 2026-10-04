@@ -1,3 +1,49 @@
+let calendarDay='',calendarQuery='';
+function parisDay(value=new Date()){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));
+  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;
+}
+function moveDay(day,offset){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);}
+function eventDays(e){return {start:e.start?.date||parisDay(e.start.dateTime),end:e.end?.date?moveDay(e.end.date,-1):parisDay(new Date(new Date(e.end?.dateTime||e.start.dateTime).getTime()-1))};}
+function normalizeSearch(value){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr').trim();}
+function eventCard(e){
+  const card=node('article','','event');card.append(node('h3',e.title));let when;
+  if(e.start?.date){const {start,end}=eventDays(e);when=start.split('-').reverse().join('/')+(start!==end?' — '+end.split('-').reverse().join('/'):'')+' · Toute la journée';}
+  else {const format=d=>new Date(d).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});when=format(e.start.dateTime)+' — '+format(e.end?.dateTime||e.start.dateTime);}
+  card.append(node('p',when,'event-time'));if(e.location)card.append(node('p',e.location));if(e.description)card.append(node('p',e.description));return card;
+}
+function renderCalendarResults(data,container){
+  const today=parisDay();if(!calendarDay)calendarDay=today;
+  const navigation=node('div','','agenda-navigation');
+  const date=node('input');date.type='date';date.value=calendarDay;date.setAttribute('aria-label','Date à consulter');
+  const redraw=()=>renderCalendarResults(data,container);
+  date.onchange=()=>{if(date.value){calendarDay=date.value;calendarQuery='';redraw();}};
+  const change=offset=>{calendarDay=moveDay(calendarDay,offset);calendarQuery='';redraw();};
+  navigation.append(button('Jour précédent',()=>change(-1)),button('Aujourd’hui',()=>{calendarDay=parisDay();calendarQuery='';redraw();},'btn primary'),button('Jour suivant',()=>change(1)),date);
+  const searchLabel=node('label','Rechercher un événement à venir');searchLabel.htmlFor='agenda-search';
+  const search=node('input');search.type='search';search.id='agenda-search';search.placeholder='Mot-clé, lieu, titre…';search.value=calendarQuery;
+  const searchBar=node('div','','agenda-search');searchBar.append(searchLabel,search,node('p','Recherche dans les titres, lieux et descriptions, jusqu’à six mois à venir.','status-line'));
+  const results=node('div');results.setAttribute('aria-live','polite');
+  const display=()=>{
+    results.replaceChildren();const query=normalizeSearch(calendarQuery),terms=query.split(/\s+/).filter(Boolean),now=Date.now();
+    const events=data.events.filter(e=>{
+      if(!e.start?.date&&!e.start?.dateTime)return false;
+      const days=eventDays(e);
+      if(query){const future=e.end?.date?days.end>=today:new Date(e.end?.dateTime||e.start.dateTime).getTime()>now;return future&&terms.every(t=>normalizeSearch([e.title,e.location,e.description].join(' ')).includes(t));}
+      return days.start<=calendarDay&&days.end>=calendarDay;
+    }).sort((a,b)=>(a.start.date||a.start.dateTime).localeCompare(b.start.date||b.start.dateTime));
+    const label=query?'Résultats à venir':(calendarDay===today?'Aujourd’hui · ':'')+new Date(calendarDay+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    results.append(node('h3',label,'agenda-day-title'),node('p',events.length+' événement'+(events.length!==1?'s':''),'status-line'));
+    if(!events.length)results.append(node('div',!data.connected?'L’agenda n’est pas encore connecté.':query?'Aucun événement à venir ne correspond à votre recherche.':'Aucun événement pour cette journée.','empty'));
+    events.forEach(e=>{
+      if(query){const day=eventDays(e).start;const go=button('Voir cette journée',()=>{calendarDay=day<today?today:day;calendarQuery='';redraw();});const card=eventCard(e);card.append(go);results.append(card);}else results.append(eventCard(e));
+    });
+  };
+  search.oninput=()=>{calendarQuery=search.value;display();};
+  searchBar.append(button('Effacer la recherche',()=>{calendarQuery='';search.value='';display();search.focus();}));
+  container.replaceChildren(navigation,searchBar,results);display();
+}
+
 const q=s=>document.querySelector(s);
 let session=null,people=[],editId=null,removeId=null,currentUniverse=null;
 function node(tag,text='',cls=''){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}
@@ -28,7 +74,7 @@ document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniver
 q('#back').onclick=()=>showHome();
 async function openUniverse(name){
   currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';q('#title').textContent=name;q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs');q('#content').replaceChildren(node('div','Chargement…','empty'));
-  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Agenda')await renderCalendar();else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
 function renderPeople(){const content=q('#content');content.replaceChildren();if(!people.length){content.append(node('div','Aucun collaborateur ajouté. Créez un premier compte pour votre équipe.','empty'));return;}
@@ -44,7 +90,7 @@ async function renderCalendar(){
   const data=await api('/api/calendar');if(currentUniverse!=='Agenda')return;const content=q('#content');content.replaceChildren();
   if(session.user.role==='admin'){
     const status=await api('/api/google/status');if(currentUniverse!=='Agenda')return;
-    const tools=node('div','','calendar-tools');tools.append(node('h3','Connexion Google Agenda'));
+    const tools=node('details','','calendar-tools');tools.open=!status.connected;tools.append(node('summary','Paramètres de l’agenda'));
     if(!status.configured){tools.append(node('p','Ajoutez les identifiants Google dans les paramètres Render pour activer la connexion.','admin-hint'),node('p','Adresse de retour à renseigner dans Google : '+status.callback,'admin-hint'));}
     else tools.append(button(status.connected?'Renouveler l’autorisation Google':'Connecter Google Agenda',()=>runCalendarAction(async()=>{const result=await api('/api/google/connect','POST');window.location.assign(result.url);}),'btn primary'));
     if(status.connected){
@@ -57,10 +103,7 @@ async function renderCalendar(){
   content.append(node('h3',data.name));
   if(data.syncedAt)content.append(node('p','Dernière synchronisation : '+new Date(data.syncedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' · Actualisation toutes les 15 minutes.','status-line'));
   if(data.error)content.append(node('p',data.error+' Les événements affichés peuvent ne pas être à jour.','calendar-warning'));
-  const today=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
-  const events=data.events.filter(e=>(e.end?.date||e.end?.dateTime||e.start?.date||e.start?.dateTime||'').slice(0,10)>=today);
-  if(!events.length)content.append(node('div',data.connected?'Aucun événement à venir dans la période couverte (six prochains mois), ou aucun agenda sélectionné.':'L’agenda n’est pas encore connecté.','empty'));
-  events.forEach(e=>{const card=node('article','','event');card.append(node('h3',e.title));let when;if(e.start?.date){const date=e.start.date.split('-').reverse().join('/');const end=new Date(e.end.date+'T12:00:00Z');end.setUTCDate(end.getUTCDate()-1);const last=end.toISOString().slice(0,10).split('-').reverse().join('/');when=date+(date!==last?' — '+last:'')+' · Toute la journée';}else{const format=d=>new Date(d).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});when=format(e.start.dateTime)+' — '+format(e.end.dateTime);}card.append(node('p',when,'event-time'));if(e.location)card.append(node('p',e.location));if(e.description)card.append(node('p',e.description));content.append(card);});
+  const results=node('section','','agenda-results');content.append(results);renderCalendarResults(data,results);
 }
 setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda')renderCalendar().catch(error);},15*60000);
 (async()=>{try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}}catch{showLogin();}})();
