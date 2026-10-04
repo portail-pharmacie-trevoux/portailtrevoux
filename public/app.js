@@ -60,11 +60,12 @@ async function api(path,method='GET',data){
   if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Error(body.error||'Demande impossible.');}return body;
 }
 function error(e){q('#global-message').textContent=e.message;}
-function showLogin(){session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showLogin(){document.querySelectorAll('.tile-news,.daily-joke,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
-  currentUniverse=null;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
+  currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
   document.querySelectorAll('[data-universe]').forEach(b=>b.classList.toggle('hidden',session.user.role!=='admin'&&(b.dataset.universe==='Collaborateurs'||(b.dataset.universe!=='Fun'&&!session.user.rights.includes(b.dataset.universe)))));
+  void refreshHomeExtras();
   q('.section-label>span').textContent=session.user.role!=='admin'&&!session.user.rights.length?'Aucun accès attribué. Contactez votre administrateur.':'Vos espaces autorisés';
 }
 function afterLogin(){if(session.user.mustChange){q('#login').classList.add('hidden');q('#logout').classList.remove('hidden');openPassword();}else showHome();}
@@ -75,7 +76,7 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-const descriptions={'Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès à votre groupement.','Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
+const descriptions={'Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
 document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
 q('#back').onclick=()=>showHome();
 function setUniverseHeading(name){
@@ -93,8 +94,10 @@ function setUniverseHeading(name){
   heading.append(node('span',name));
 }
 async function openUniverse(name){
+  q('#universe-publications')?.remove();
   currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs');q('#content').replaceChildren(node('div','Chargement…','empty'));
   try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+  if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
 function renderPeople(){const content=q('#content');content.replaceChildren();if(!people.length){content.append(node('div','Aucun collaborateur ajouté. Créez un premier compte pour votre équipe.','empty'));return;}
@@ -361,3 +364,59 @@ async function renderYouTubePanel(panel,chosen){
     });panel.append(prepare,results,add);
   }catch(e){panel.replaceChildren(node('p',e.message,'error'));}
 }
+let homeExtrasPending=false;
+async function refreshHomeExtras(){
+  if(!session||session.user.mustChange||homeExtrasPending)return;
+  const userId=session.user.id;homeExtrasPending=true;
+  try{
+    let joke=null;try{joke=await api('/api/fun/joke');}catch{}
+    const news=await api('/api/publications');
+    if(session?.user.id!==userId)return;
+    document.querySelectorAll('.grid .tile').forEach(tile=>{
+      tile.querySelector('.tile-news')?.remove();
+      const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
+      const badge=node('span','','tile-news'+(count?' has-news':''));
+      badge.append(node('span',count?'●':'○','news-dot'),node('span',count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue'));
+      tile.append(badge);
+    });
+    const fun=q('.grid [data-universe="Fun"]');fun.querySelector('.daily-joke')?.remove();
+    const block=node('span','','daily-joke');block.append(node('strong','😄 La blague du jour'));
+    block.append(node('span',joke?.text||'La blague du jour arrive bientôt.'));
+    if(joke)block.append(node('small',(joke.stale?'Dernière blague disponible · ':'')+joke.day.split('-').reverse().join('/')+' · '+joke.source));
+    fun.insertBefore(block,fun.querySelector('.tile-news'));
+  }catch{}finally{homeExtrasPending=false;}
+}
+async function renderPublications(name){
+  if(!session)return;const userId=session.user.id;
+  try{
+    const items=await api('/api/publications/'+encodeURIComponent(name));
+    if(session?.user.id!==userId||currentUniverse!==name)return;
+    q('#universe-publications')?.remove();
+    const area=node('section','','publications');area.id='universe-publications';area.setAttribute('aria-label','Nouvelles parutions');
+    const top=node('div','','publications-heading');top.append(node('h3','✉ Nouvelles parutions'));
+    if(items.some(i=>i.unread)){
+      const read=button('Marquer comme lu',async()=>{
+        read.disabled=true;try{await api('/api/publications/'+encodeURIComponent(name)+'/read','POST',{id:items[0].id});await renderPublications(name);void refreshHomeExtras();}catch(e){read.disabled=false;error(e);}
+      });top.append(read);
+    }
+    area.append(top);
+    if(!items.length)area.append(node('p','Les nouvelles publications de cet univers apparaîtront ici.','field-note'));
+    else{
+      const list=node('ul','','publication-list');
+      items.forEach(item=>{
+        const li=node('li','','publication'+(item.unread?' unread':''));
+        li.append(node('span',item.unread?'●':'○','news-dot'),node('span',item.title),node('time',new Date(item.created_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'})));
+        li.querySelector('time').dateTime=item.created_at;list.append(li);
+      });area.append(list);
+    }
+    q('#content').after(area);
+  }catch(e){
+    if(session?.user.id===userId&&currentUniverse===name){
+      q('#universe-publications')?.remove();const area=node('section','Nouvelles parutions momentanément indisponibles.','publications');area.id='universe-publications';q('#content').after(area);
+    }
+  }
+}
+setInterval(()=>{
+  if(!session||session.user.mustChange||document.hidden)return;
+  if(currentUniverse)void renderPublications(currentUniverse);else void refreshHomeExtras();
+},60000);

@@ -21,3 +21,15 @@ CREATE TABLE IF NOT EXISTS music_tracks (
  source TEXT NOT NULL DEFAULT 'collaborateur',
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+
+CREATE TABLE IF NOT EXISTS publications (
+ id BIGSERIAL PRIMARY KEY, universe TEXT NOT NULL, title TEXT NOT NULL,
+ source_key TEXT UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS publications_universe_id ON publications(universe,id DESC);
+CREATE TABLE IF NOT EXISTS publication_reads (
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ universe TEXT NOT NULL, last_id BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(user_id,universe)
+);

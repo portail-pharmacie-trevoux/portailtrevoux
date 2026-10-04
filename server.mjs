@@ -1,4 +1,5 @@
 import express from 'express';
+import { createDailyJoke } from './updates.mjs';
 import { createYouTube } from './youtube.mjs';
 import { validateMusic, musicKey } from './music.mjs';
 import pg from 'pg';
@@ -39,6 +40,35 @@ export function createApp(db,config) {
   const csrf=(req,res,next)=>req.get('x-csrf-token')===req.auth?.csrf?next():next(fail(403,'Session à actualiser.'));
   const getSetting=async key=>(await db.query('SELECT value FROM settings WHERE key=$1',[key])).rows[0]?.value;
   const setSetting=async(key,value)=>db.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[key,value]);
+  async function publish(universe,title,key=null) {
+    await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
+  }
+  const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
+  const allowedPublications=user=>[...universes,'Collaborateurs'].filter(name=>name==='Collaborateurs'?user.role==='admin':canAccess(user,name));
+  app.get('/api/publications',auth,ready,async(req,res)=>{
+    const allowed=allowedPublications(req.auth);
+    const {rows}=await db.query(`SELECT p.universe,COUNT(*) FILTER(WHERE p.id>COALESCE(r.last_id,0))::int AS unread,
+      MAX(p.id)::text AS latest FROM publications p LEFT JOIN publication_reads r ON r.user_id=$1 AND r.universe=p.universe
+      WHERE p.universe=ANY($2::text[]) GROUP BY p.universe`,[req.auth.id,allowed]);
+    res.json(rows);
+  });
+  app.get('/api/publications/:name',auth,ready,async(req,res)=>{
+    if(!allowedPublications(req.auth).includes(req.params.name))throw fail(403,'Accès refusé.');
+    const {rows}=await db.query(`SELECT p.id::text,p.title,p.created_at,p.id>COALESCE(r.last_id,0) AS unread
+      FROM publications p LEFT JOIN publication_reads r ON r.user_id=$1 AND r.universe=p.universe
+      WHERE p.universe=$2 ORDER BY p.id DESC LIMIT 20`,[req.auth.id,req.params.name]);
+    res.json(rows);
+  });
+  app.post('/api/publications/:name/read',auth,ready,csrf,async(req,res)=>{
+    const name=req.params.name,id=req.body.id;
+    if(!allowedPublications(req.auth).includes(name))throw fail(403,'Accès refusé.');
+    if(typeof id!=='string'||!/^\d{1,18}$/.test(id))throw fail(400,'Parution invalide.');
+    await db.query(`INSERT INTO publication_reads(user_id,universe,last_id)
+      SELECT $1,$2,COALESCE(MAX(id),0) FROM publications WHERE universe=$2 AND id<=$3::bigint
+      ON CONFLICT(user_id,universe) DO UPDATE SET last_id=GREATEST(publication_reads.last_id,EXCLUDED.last_id)`,[req.auth.id,name,id]);
+    res.json({ok:true});
+  });
+  app.get('/api/fun/joke',auth,ready,async(req,res)=>res.json(await dailyJoke()));
   const callback=origin+'/auth/google/callback';
   const cookieOptions={httpOnly:true,secure,sameSite:'lax',path:'/',maxAge:8*60*60*1000};
   async function newSession(user,res){
@@ -83,6 +113,7 @@ export function createApp(db,config) {
   app.post('/api/users',auth,ready,admin,csrf,async(req,res)=>{
     validateUser(req.body,true); const d=req.body;
     const {rows}=await db.query('INSERT INTO users(name,job,email,password_hash,rights) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING *',[d.name.trim(),d.job.trim(),d.email.trim().toLowerCase(),await hashPassword(d.password),JSON.stringify([...new Set(d.rights)])]);
+    await publish('Collaborateurs','Un nouveau collaborateur a rejoint l’équipe','user:'+rows[0].id);
     res.status(201).json(cleanUser(rows[0]));
   });
   app.put('/api/users/:id',auth,ready,admin,csrf,async(req,res)=>{
@@ -124,6 +155,12 @@ export function createApp(db,config) {
         events.push(...(data.items||[]).filter(e=>e.status!=='cancelled').map(e=>({id:e.id,title:e.summary||'Événement',start:e.start,end:e.end,location:e.location||'',description:e.description||''})));page=data.nextPageToken;
         if(events.length>20000)throw fail(502,'Agenda trop volumineux pour la période sélectionnée.');
       }while(page);
+      const previous=(await db.query('SELECT events FROM calendar_cache WHERE singleton=TRUE')).rows[0]?.events;
+      if(previous){
+        const ids=new Set(previous.map(e=>e.id));
+        const fresh=events.filter(e=>!ids.has(e.id)&&(e.end?.date||e.end?.dateTime||e.start?.date||e.start?.dateTime)>=new Date(now).toISOString().slice(0,10));
+        for(const event of fresh)await publish('Agenda',event.title,'calendar:'+calendar+':'+event.id);
+      }
       await db.query('INSERT INTO calendar_cache(singleton,events,synced_at) VALUES(TRUE,$1::jsonb,now()) ON CONFLICT(singleton) DO UPDATE SET events=EXCLUDED.events,synced_at=EXCLUDED.synced_at',[JSON.stringify(events)]);
       await setSetting('sync_error','');
     })().catch(async error=>{await setSetting('sync_error',error.status?error.message:'Échec de la synchronisation. Réessayez plus tard.');throw error;}).finally(()=>{syncing=null;});return syncing;
@@ -211,6 +248,7 @@ export function createApp(db,config) {
       SELECT item->>'artist',item->>'title',item->>'trackKey','','import'
       FROM jsonb_array_elements($1::jsonb) item
       ON CONFLICT(track_key) DO NOTHING RETURNING id`,[JSON.stringify(tracks)]);
+    if(rows.length)await publish('Fun',rows.length+' nouveau'+(rows.length>1?'x titres importés':' titre importé'));
     res.json({added:rows.length,duplicates:tracks.length-rows.length});
   });
   app.get('/api/music',auth,ready,async(req,res)=>{
@@ -220,6 +258,7 @@ export function createApp(db,config) {
     const {artist,title,trackKey}=validateMusic(req.body);
     const {rows}=await db.query("INSERT INTO music_tracks(artist,title,track_key,contributor,added_by) VALUES($1,$2,$3,$4,$5) ON CONFLICT(track_key) DO NOTHING RETURNING id,artist,title,contributor,source,created_at",[artist,title,trackKey,req.auth.name,req.auth.id]);
     if(!rows[0])throw fail(409,'Ce morceau figure déjà dans la liste partagée.');
+    await publish('Fun',title+' — '+artist,'music:'+rows[0].id);
     res.status(201).json(rows[0]);
   });
   app.delete('/api/music/:id',auth,ready,csrf,async(req,res)=>{
@@ -236,7 +275,7 @@ export function createApp(db,config) {
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message});
   });
-  return {app,sync};
+  return {app,sync,dailyJoke};
 }
 
 export async function initialize(db,config){
@@ -246,10 +285,11 @@ export async function initialize(db,config){
   await db.query(`INSERT INTO music_tracks(artist,title,track_key,contributor,source)
     SELECT item->>'artist',item->>'title',item->>'trackKey',item->>'contributor','import'
     FROM jsonb_array_elements($1::jsonb) item ON CONFLICT(track_key) DO NOTHING`,[JSON.stringify(seed)]);
+  await db.query("UPDATE users SET name='Nicolas Marchand' WHERE role='admin' AND lower(email)='pharmaciedetrevoux@gmail.com'");
   const count=(await db.query("SELECT COUNT(*) AS count FROM users WHERE role='admin'")).rows[0].count;
   if(Number(count)===0){
     if(!passwordValid(config.adminPassword))throw new Error('ADMIN_PASSWORD doit contenir au moins 12 caractères.');
-    await db.query("INSERT INTO users(name,job,email,password_hash,role,rights,must_change) VALUES($1,$2,$3,$4,'admin',$5::jsonb,TRUE)",['Administrateur','Titulaire',config.adminEmail.toLowerCase(),await hashPassword(config.adminPassword),JSON.stringify(universes)]);
+    await db.query("INSERT INTO users(name,job,email,password_hash,role,rights,must_change) VALUES($1,$2,$3,$4,'admin',$5::jsonb,TRUE)",['Nicolas Marchand','Titulaire',config.adminEmail.toLowerCase(),await hashPassword(config.adminPassword),JSON.stringify(universes)]);
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
@@ -258,9 +298,10 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
   await initialize(db,config);config.dummyHash=await hashPassword(token());
-  const {app,sync}=createApp(db,config);
+  const {app,sync,dailyJoke}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await dailyJoke();}catch{console.error('Blague du jour à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }
+
