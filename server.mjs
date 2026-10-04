@@ -182,6 +182,16 @@ export function createApp(db,config) {
     res.json({name:await getSetting('calendar_name')||'Agenda équipe',events:current?.events||[],syncedAt:current?.synced_at||null,error:await getSetting('sync_error')||'',connected:!!await getSetting('google_tokens')});
   });
 
+
+  app.post('/api/music/import',auth,ready,admin,csrf,async(req,res)=>{
+    if(!Array.isArray(req.body.tracks)||!req.body.tracks.length||req.body.tracks.length>25)throw fail(400,'Importez de 1 à 25 morceaux par lot.');
+    const tracks=req.body.tracks.map(validateMusic);
+    const {rows}=await db.query(`INSERT INTO music_tracks(artist,title,track_key,contributor,source)
+      SELECT item->>'artist',item->>'title',item->>'trackKey','','import'
+      FROM jsonb_array_elements($1::jsonb) item
+      ON CONFLICT(track_key) DO NOTHING RETURNING id`,[JSON.stringify(tracks)]);
+    res.json({added:rows.length,duplicates:tracks.length-rows.length});
+  });
   app.get('/api/music',auth,ready,async(req,res)=>{
     res.json((await db.query('SELECT id,artist,title,contributor,source,created_at FROM music_tracks ORDER BY created_at DESC,id DESC')).rows);
   });
