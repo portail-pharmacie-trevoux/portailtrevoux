@@ -201,6 +201,12 @@ export function createApp(db,config) {
     if(!rows[0])throw fail(409,'Ce morceau figure déjà dans la liste partagée.');
     res.status(201).json(rows[0]);
   });
+  app.delete('/api/music/:id',auth,ready,csrf,async(req,res)=>{
+    const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Morceau invalide.');
+    const {rowCount}=await db.query('DELETE FROM music_tracks WHERE id=$1',[id]);
+    if(!rowCount)throw fail(404,'Ce morceau ne figure plus dans la sélection.');
+    res.json({ok:true});
+  });
   app.get('/api/universes/:name',auth,ready,(req,res)=>{if(!canAccess(req.auth,req.params.name))throw fail(403,'Accès refusé.');res.json({items:[]});});
   app.use(express.static(root+'public',{index:'index.html',etag:false}));
   app.use((error,req,res,next)=>{
