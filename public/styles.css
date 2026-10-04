@@ -37,3 +37,6 @@ main{max-width:1256px;padding:44px 28px}.welcome{display:flex;justify-content:sp
 
 /* Choix des titres à exporter et date d’ajout */
 .music-row{grid-template-columns:20px minmax(0,1.3fr) minmax(0,1fr) auto auto;gap:12px}.music-row input.music-row-check{margin:0;width:18px;height:18px}.music-row-date{font-size:13px;color:#61717b;white-space:nowrap}.music-selection-tools{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:12px}.music-selection-tools .field-note{flex:1 1 280px}@media(max-width:800px){.music-row{grid-template-columns:20px minmax(0,1fr) auto;gap:3px 10px}.music-row-check{grid-column:1;grid-row:1 / span 3}.music-row-title{grid-column:2;grid-row:1}.music-row-artist{grid-column:2;grid-row:2;font-size:14px}.music-row-date{grid-column:2;grid-row:3}.music-row-actions{grid-column:3;grid-row:1 / span 3}}@media(max-width:380px){.music-row-actions{flex-direction:column;align-items:stretch}}
+
+/* Boutons de transfert : logos seuls, libellés accessibles et infobulles */
+.agenda-navigation .music-platform-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 64px;width:64px;height:52px;padding:10px;text-decoration:none;background:white}.music-platform-button svg{display:block;width:32px;height:32px}.deezer-button{color:#a238ff}.youtube-button{color:#ff0000}
