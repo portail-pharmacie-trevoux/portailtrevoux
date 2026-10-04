@@ -28,3 +28,6 @@ main{max-width:1256px;padding:44px 28px}.welcome{display:flex;justify-content:sp
 
 /* Icône de la tuile conservée dans sa section */
 #title{display:flex;align-items:center;gap:14px}#title>span:last-child{min-width:0;overflow-wrap:anywhere}.section-symbol{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:14px;color:var(--accent);background:var(--tint)}@media(max-width:560px){#title{gap:12px}.section-symbol{flex-basis:42px;width:42px;height:42px}}
+
+/* Logo de la pharmacie à côté du slogan d’accueil */
+.home-pharmacy-logo{display:block;width:220px;max-width:30%;height:auto;flex-shrink:0;border-radius:10px}.welcome>div:first-child{min-width:0}@media(max-width:800px){.home-pharmacy-logo{width:180px}}@media(max-width:560px){.welcome{align-items:flex-start;flex-direction:column;gap:22px}.home-pharmacy-logo{width:150px;max-width:100%;align-self:center}}
