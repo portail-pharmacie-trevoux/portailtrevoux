@@ -1,4 +1,5 @@
 import express from 'express';
+import { registerContacts } from './contacts.mjs';
 import { registerCollaborateurs } from './collaborateurs.mjs';
 import { createProductSources } from './product-sources.mjs';
 import { registerSchedule } from './schedule.mjs';
@@ -48,6 +49,7 @@ export function createApp(db,config) {
   async function publish(universe,title,key=null) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
+  registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
   const allowedPublications=user=>universes.filter(name=>name!=='Collaborateurs'&&canAccess(user,name));
   app.get('/api/publications',auth,ready,async(req,res)=>{
