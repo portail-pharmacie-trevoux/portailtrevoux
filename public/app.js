@@ -8,7 +8,7 @@ function eventDays(e){return {start:e.start?.date||parisDay(e.start.dateTime),en
 function normalizeSearch(value){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr').trim();}
 function eventIcons(title){
   const text=normalizeSearch(title||'');
-  return [text.includes('conge')?'🏝️':'',text.includes('formation')?'🎓':''].filter(Boolean).join(' ');
+  return [text.includes('conge')?'🏝️':'',text.includes('formation')?'🎓':'',text.includes('rdv')?'📝':'',text.includes('livraison')?'📦':''].filter(Boolean).join(' ');
 }
 function eventCard(e){
   const card=node('article','','event'),heading=node('h3'),icons=eventIcons(e.title);
