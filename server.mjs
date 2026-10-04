@@ -271,7 +271,8 @@ export function createApp(db,config) {
     res.json({ok:true});
   });
   const products=createProductSources({origin,serpKey:config.serpKey});
-  app.get('/api/promoflash/product/:ean',auth,ready,async(req,res)=>res.json(await products.product(req.params.ean)));
+  app.get('/api/promoflash/product/:ean',auth,ready,async(req,res)=>{const result=await products.product(req.params.ean);res.json({...result,image:result.image?'/api/promoflash/image/'+req.params.ean:''});});
+  app.get('/api/promoflash/image/:ean',auth,ready,async(req,res)=>{const result=await products.image(req.params.ean);res.type(result.type).send(Buffer.from(result.bytes));});
   app.get('/api/promoflash/prices/:ean',auth,ready,async(req,res)=>res.json(await products.prices(req.params.ean)));
   app.get('/api/universes/:name',auth,ready,(req,res)=>{if(!canAccess(req.auth,req.params.name))throw fail(403,'Accès refusé.');res.json({items:[]});});
   app.use(express.static(root+'public',{index:'index.html',etag:false}));

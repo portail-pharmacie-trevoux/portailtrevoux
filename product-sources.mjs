@@ -46,5 +46,16 @@ export function createProductSources({origin,serpKey,fetchImpl=fetch}){
       }catch{return {retrievedAt,googleConfigured:true,google:[],googleError:true};}
     });
   }
-  return {product,prices};
+  async function image(ean){
+    const result=await product(ean);
+    if(!result.image)throw Object.assign(Error('Aucune photo disponible pour ce produit.'),{status:404});
+    const response=await fetchImpl(result.image,{redirect:'error',signal:AbortSignal.timeout(12000)});
+    const type=(response.headers.get('content-type')||'').split(';')[0];
+    if(!response.ok||!['image/jpeg','image/png','image/webp'].includes(type))throw Object.assign(Error('La photo du produit est momentanément indisponible.'),{status:502});
+    const chunks=[];let size=0;
+    for await(const chunk of response.body){size+=chunk.length;if(size>2097152)throw Object.assign(Error('Photo trop volumineuse.'),{status:502});chunks.push(chunk);}
+    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+    return {bytes,type};
+  }
+  return {product,prices,image};
 }

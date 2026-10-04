@@ -31,3 +31,11 @@ test('régression EAN 3337875597449 : réponse v3 success, nom et photo anglaise
  }});
  const p=await sources.product('3337875597449');assert.equal(p.found,true);assert.equal(p.brand,'CeraVe');assert.equal(p.quantity,'52ml');assert.match(p.image,/front_en/);
 });
+
+
+test('photo relayée : URL issue de la fiche, type image uniquement et redirections refusées',async()=>{
+  const calls=[];const service=createProductSources({origin:'https://portal.example',fetchImpl:async(url,options)=>{calls.push({url,options});return url.includes('/api/v3/')?new Response(JSON.stringify({status:'success',result:{id:'product_found'},product:{image_front_url:'https://images.openbeautyfacts.org/images/products/333/front.jpg'}}),{headers:{'content-type':'application/json'}}):new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/jpeg'}});}});
+  const image=await service.image('3337875597449');assert.equal(image.type,'image/jpeg');assert.deepEqual([...image.bytes],[1,2,3]);assert.equal(calls[1].options.redirect,'error');
+  const invalid=createProductSources({origin:'https://portal.example',fetchImpl:async(url)=>url.includes('/api/v3/')?new Response(JSON.stringify({status:1,product:{image_front_url:'https://images.openbeautyfacts.org/images/products/333/front.jpg'}})):new Response('<html>error</html>',{headers:{'content-type':'text/html'}})});
+  await assert.rejects(()=>invalid.image('3337875597449'),e=>e.status===502);
+});

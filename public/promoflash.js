@@ -22,52 +22,55 @@ export function renderPromoFlash({container,api,isAdmin=false}){
   const shopping=element('a','Voir Google Shopping','btn small');shopping.target='_blank';shopping.rel='noopener noreferrer';
   const updatePriceLink=()=>{shopping.href='https://www.google.com/search?tbm=shop&q='+encodeURIComponent(ean.value.trim());};
   productForm.append(eanLabel,ean,search,price);const info=element('p','Aucun produit chargé.','field-note');info.setAttribute('role','status');const image=element('img','','promo-product-image hidden');
-  product.append(productForm,info,image);
+  const photoStatus=element('p','','field-note');photoStatus.setAttribute('role','status');product.append(productForm,info,image,photoStatus);
   const nameWrap=grid(product),productName=input(nameWrap,'product_name','Nom du produit');productName.inputMode='text';
   productName.oninput=updatePriceLink;
   const links=element('div','','promo-product-form');links.append(shopping);product.append(links);
   const market=grid(product);input(market,'market_low','Prix minimum relevé (€ TTC)');input(market,'market_avg','Prix moyen relevé (€ TTC)');input(market,'market_high','Prix maximum relevé (€ TTC)');
   const site=input(market,'market_site','Site du prix minimum');site.inputMode='text';input(market,'market_date','Date du relevé','','date');
   const source=element('p','Fiches et photos : Open Beauty Facts / Open Food Facts.','field-note');product.append(source);
+  const priceStatus=element('p','Cliquez sur « Rechercher les prix » pour remplir les cases à partir des offres Google Shopping.','field-note');priceStatus.setAttribute('role','status');market.before(priceStatus);
   const priceResults=element('section','','promo-price-results');priceResults.setAttribute('aria-label','Offres de prix trouvées');product.append(priceResults);
   let lookup=0,timer=null,offerData=[],selectedOffers=new Set(),retrievedAt=null;
   function resetMarket(){offerData=[];selectedOffers.clear();priceResults.replaceChildren();['market_low','market_avg','market_high','market_site','market_date'].forEach(key=>fields[key].value='');}
   function addOffers(items,at){
-    retrievedAt=at;for(const offer of items){if(!offerData.some(old=>old.provider===offer.provider&&old.seller===offer.seller&&old.link===offer.link&&old.price===offer.price))offerData.push(offer);}drawOffers();
+    retrievedAt=at;for(const offer of items){if(!offerData.some(old=>old.provider===offer.provider&&old.seller===offer.seller&&old.link===offer.link&&old.price===offer.price))offerData.push(offer);}offerData.forEach((offer,index)=>selectedOffers.add(index));fillMarket();drawOffers();
   }
   function drawOffers(){
     priceResults.querySelector('.promo-offers')?.remove();if(!offerData.length)return;
     const block=element('div','','promo-offers');block.append(element('p','Cochez uniquement les offres correspondant au même produit et au même conditionnement. Les prix sont hors frais de livraison.','field-note'));
     const list=element('div','','promo-offer-list');
     offerData.forEach((offer,index)=>{
-      const row=element('label','','promo-offer-row'),check=element('input');check.type='checkbox';check.checked=selectedOffers.has(index);check.setAttribute('aria-label','Inclure '+offer.title+' chez '+offer.seller);check.onchange=()=>{if(check.checked)selectedOffers.add(index);else selectedOffers.delete(index);};
+      const row=element('label','','promo-offer-row'),check=element('input');check.type='checkbox';check.checked=selectedOffers.has(index);check.setAttribute('aria-label','Inclure '+offer.title+' chez '+offer.seller);check.onchange=()=>{if(check.checked)selectedOffers.add(index);else selectedOffers.delete(index);fillMarket();};
       const details=element('span');details.append(element('strong',offer.title),element('small',offer.provider+' · '+offer.seller+(offer.ageDays===null?'':' · mis à jour il y a '+offer.ageDays+' j')));
       const link=element('a','Voir l’offre');link.href=offer.link;link.target='_blank';link.rel='noopener noreferrer';
       row.append(check,details,element('strong',euro(offer.price)),link);if(offer.ageDays>30)row.classList.add('old-price');list.append(row);
     });
-    const apply=element('button','Utiliser les offres cochées','btn primary');apply.type='button';const summary=element('p','','field-note');summary.setAttribute('role','status');
-    apply.onclick=()=>{
-      const seen=new Set(),chosen=[...selectedOffers].map(index=>offerData[index]).filter(offer=>{const key=offer.seller.toLowerCase().replace(/\s/g,'')+':'+offer.price;if(seen.has(key))return false;seen.add(key);return true;});
-      if(!chosen.length){summary.textContent='Cochez au moins une offre vérifiée.';return;}
-      const min=chosen.reduce((a,b)=>a.price<=b.price?a:b),mean=chosen.reduce((sum,o)=>sum+o.price,0)/chosen.length;
-      fields.market_low.value=min.price.toFixed(2).replace('.',',');fields.market_avg.value=mean.toFixed(2).replace('.',',');fields.market_high.value=Math.max(...chosen.map(o=>o.price)).toFixed(2).replace('.',',');fields.market_site.value=min.seller+' ('+min.provider+')';
-      const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(retrievedAt)).map(p=>[p.type,p.value]));fields.market_date.value=parts.year+'-'+parts.month+'-'+parts.day;
-      summary.textContent='Moyenne calculée sur '+chosen.length+' offre'+(chosen.length>1?'s':'')+' cochée'+(chosen.length>1?'s':'')+' et distincte'+(chosen.length>1?'s':'')+'.'+(chosen.some(o=>o.ageDays>30)?' Attention : votre sélection inclut des prix mis à jour il y a plus de 30 jours.':'')+' Il s’agit de prix relevés, pas du minimum historique de l’année.';
-    };
-    block.append(list,apply,summary);priceResults.append(block);
+    block.append(list);priceResults.append(block);
   }
+  function fillMarket(){
+    const seen=new Set(),chosen=[...selectedOffers].map(index=>offerData[index]).filter(offer=>{const key=offer.seller.toLowerCase().replace(/\s/g,'')+':'+offer.price;if(seen.has(key))return false;seen.add(key);return true;});
+    ['market_low','market_avg','market_high','market_site','market_date'].forEach(key=>fields[key].value='');
+    if(!chosen.length){priceStatus.textContent='Aucune offre sélectionnée : cochez les offres du produit ou saisissez vos relevés.';return;}
+    const min=chosen.reduce((a,b)=>a.price<=b.price?a:b),mean=chosen.reduce((sum,o)=>sum+o.price,0)/chosen.length;
+    fields.market_low.value=min.price.toFixed(2).replace('.',',');fields.market_avg.value=mean.toFixed(2).replace('.',',');fields.market_high.value=Math.max(...chosen.map(o=>o.price)).toFixed(2).replace('.',',');fields.market_site.value=min.seller+' ('+min.provider+')';
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(retrievedAt)).map(p=>[p.type,p.value]));fields.market_date.value=parts.year+'-'+parts.month+'-'+parts.day;
+    priceStatus.textContent='Cases remplies avec '+chosen.length+' offre'+(chosen.length>1?'s':'')+' Google Shopping. Prix indicatifs du jour, hors livraison : vérifiez le produit et le conditionnement, puis décochez les offres inadaptées ci-dessous pour actualiser les cases.';
+  }
+
   async function loadPrices(request=lookup){
     const code=ean.value.trim();if(!/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(code)){info.textContent='Renseignez un EAN pour rechercher les prix.';return;}
-    price.disabled=true;priceResults.replaceChildren(element('p','Recherche des offres de prix…','field-note'));offerData=[];selectedOffers.clear();
+    price.disabled=true;priceStatus.textContent='Recherche des prix Google Shopping…';priceResults.replaceChildren(element('p','Recherche des offres de prix…','field-note'));offerData=[];selectedOffers.clear();
     try{
       const result=await api('/api/promoflash/prices/'+code);if(request!==lookup)return;
       priceResults.replaceChildren();retrievedAt=result.retrievedAt||new Date().toISOString();
       priceResults.append(element('p','Offres consultées le '+new Date(retrievedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'})+'. Vérifiez la variante et le conditionnement avant de les utiliser.','field-note'));
       if(!result.googleConfigured)priceResults.append(element('p',isAdmin?'Google Shopping : la connexion est prête. Ajoutez la clé SERPAPI_KEY dans les variables Render pour activer les résultats automatiques.':'Google Shopping n’est pas encore activé par l’administrateur. Vous pouvez utiliser le lien de recherche.','field-note'));
       if(result.googleError)priceResults.append(element('p','Google Shopping est momentanément indisponible ou son quota est atteint.','field-note'));
-      addOffers(result.google||[],retrievedAt);
+      if((result.google||[]).length)addOffers(result.google,retrievedAt);
+      else priceStatus.textContent=!result.googleConfigured?'Les prix ne peuvent pas encore être récupérés : la connexion Google Shopping doit être activée par l’administrateur.':result.googleError?'Recherche indisponible : aucun prix récupéré. Réessayez plus tard.':'Aucun prix trouvé pour cet EAN.';
       if(!(result.google||[]).length)priceResults.append(element('p','Aucune offre exploitable. Vous pouvez relancer la recherche ou saisir vos relevés manuellement.','field-note'));
-    }catch(e){if(request===lookup)priceResults.replaceChildren(element('p',e.message,'field-note'));}finally{if(request===lookup)price.disabled=false;}
+    }catch(e){if(request===lookup){priceResults.replaceChildren(element('p',e.message,'field-note'));priceStatus.textContent='La recherche des prix a échoué : '+e.message;}}finally{if(request===lookup)price.disabled=false;}
   }
   async function loadProduct(){
     clearTimeout(timer);const code=ean.value.trim(),request=++lookup;
@@ -76,12 +79,13 @@ export function renderPromoFlash({container,api,isAdmin=false}){
     try{const result=await api('/api/promoflash/product/'+code);if(request!==lookup)return;
       info.textContent=result.found?result.name+(result.brand?' · '+result.brand:'')+(result.quantity?' · '+result.quantity:'')+' · EAN '+code:'Produit non trouvé dans Open Beauty Facts ou Open Food Facts. La recherche de prix utilise votre EAN.';
       productName.value=result.found?result.name+(result.quantity?' '+result.quantity:''):'';source.textContent='Fiche produit : '+(result.source||'Open Beauty Facts / Open Food Facts');updatePriceLink();
-      if(result.image){image.src=result.image;image.alt=result.name;image.classList.remove('hidden');image.onerror=()=>image.classList.add('hidden');}
-      void loadPrices(request);
+      photoStatus.textContent=result.image?'Chargement de la photo…':'Aucune photo disponible dans la fiche produit.';
+      if(result.image){image.onload=()=>{if(request===lookup){image.classList.remove('hidden');photoStatus.textContent='';}};image.onerror=()=>{if(request===lookup){image.classList.add('hidden');photoStatus.textContent='La photo n’a pas pu être chargée. Cliquez sur « Actualiser le produit » pour réessayer.';}};image.alt=result.name;image.src=result.image;}
+
     }catch(e){if(request===lookup)info.textContent=e.message+' Les calculs restent disponibles.';}finally{if(request===lookup)search.disabled=false;}
   }
-  productForm.onsubmit=event=>{event.preventDefault();void loadProduct();};price.onclick=()=>void loadPrices();
-  ean.oninput=()=>{lookup++;clearTimeout(timer);search.disabled=false;price.disabled=false;image.classList.add('hidden');productName.value='';resetMarket();updatePriceLink();if(/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(ean.value.trim()))timer=setTimeout(()=>{if(root.isConnected)void loadProduct();},700);else info.textContent='Saisissez ou scannez le code EAN.';};
+  productForm.onsubmit=event=>{event.preventDefault();void loadProduct();};price.onclick=async()=>{clearTimeout(timer);price.disabled=true;if(!productName.value)await loadProduct();void loadPrices();};
+  ean.oninput=()=>{lookup++;clearTimeout(timer);search.disabled=false;price.disabled=false;image.classList.add('hidden');photoStatus.textContent='';productName.value='';resetMarket();priceStatus.textContent='Cliquez sur « Rechercher les prix » pour remplir les cases.';updatePriceLink();if(/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(ean.value.trim()))timer=setTimeout(()=>{if(root.isConnected)void loadProduct();},700);else info.textContent='Saisissez ou scannez le code EAN.';};
   updatePriceLink();
   const purchase=card(2,'Conditions commerciales','Les deux remises sont appliquées séparément au prix catalogue HT.');const purchases=grid(purchase);
   input(purchases,'catalogue','Prix catalogue (€ HT)',defaults.catalogue);input(purchases,'discount_floor','Remise fond de rayon (%)',defaults.discount_floor);input(purchases,'discount_promo','Remise promo (%)',defaults.discount_promo);
@@ -100,8 +104,8 @@ export function renderPromoFlash({container,api,isAdmin=false}){
   const verdictCard=card(6,'PromoFlash — objectif de volume','Repère du prototype : comparer le volume nécessaire à un doublement des ventes. Ce repère ne prédit pas les ventes réelles.');
   const gauge=element('div','','promo-gauge'),marker=element('span','','promo-marker');marker.setAttribute('aria-hidden','true');gauge.append(marker);const ticks=element('div','','promo-gauge-ticks');[0,1,2,3,4].forEach(n=>ticks.append(element('span','×'+n)));
   const verdict=element('p','','promo-verdict'),explanation=element('p','','field-note');verdict.setAttribute('role','status');verdictCard.append(gauge,ticks,verdict,explanation);
-  const errors=element('p','','error');errors.setAttribute('role','status');root.append(errors,element('p','Calcul de marge brute HT, hors frais de campagne et autres charges. Les prix de marché proviennent des offres cochées ou de vos relevés manuels, hors livraison.','field-note'));
-  const reset=element('button','Réinitialiser l’exemple','btn');reset.type='button';reset.onclick=()=>{lookup++;clearTimeout(timer);resetMarket();price.disabled=false;search.disabled=false;ean.value='';Object.entries(fields).forEach(([key,e])=>e.value=defaults[key]||'');toggle.checked=false;extra.disabled=true;image.classList.add('hidden');image.removeAttribute('src');info.textContent='Aucun produit chargé.';updatePriceLink();recalculate();};root.append(reset);
+  const errors=element('p','','error');errors.setAttribute('role','status');root.append(errors,element('p','Calcul de marge brute HT, hors frais de campagne et autres charges. Les prix de marché proviennent des offres Google Shopping sélectionnées ou de vos relevés manuels, hors livraison.','field-note'));
+  const reset=element('button','Réinitialiser l’exemple','btn');reset.type='button';reset.onclick=()=>{lookup++;clearTimeout(timer);resetMarket();price.disabled=false;search.disabled=false;ean.value='';Object.entries(fields).forEach(([key,e])=>e.value=defaults[key]||'');toggle.checked=false;extra.disabled=true;image.classList.add('hidden');image.removeAttribute('src');info.textContent='Aucun produit chargé.';photoStatus.textContent='';priceStatus.textContent='Cliquez sur « Rechercher les prix » pour remplir les cases.';updatePriceLink();recalculate();};root.append(reset);
   function recalculate(){
     if(!fields.monthly)return;
     const values=Object.fromEntries(Object.entries(fields).map(([key,e])=>[key,e.value]));values.extra_enabled=toggle.checked;const result=calculatePromoFlash(values);
