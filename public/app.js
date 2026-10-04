@@ -189,7 +189,7 @@ async function renderMusic(){
   const actions=node('div','','agenda-navigation');actions.append(exportButton,transfer);
   content.append(actions,toolbar,count,list,more);
   if(session.user.role==='admin'){
-    const importPanel=node('details','','calendar-tools');importPanel.append(node('summary','Importer la liste initiale (CSV)'));
+    const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
     const label=node('label','Fichier CSV avec les colonnes Artist et Title'),file=node('input');file.type='file';file.accept='.csv,text/csv';file.id='music-csv-import';label.htmlFor=file.id;
     const state=node('p','','status-line');state.setAttribute('role','status');
     let pending=[];
@@ -206,7 +206,7 @@ async function renderMusic(){
       pending=[];importButton.disabled=true;state.textContent='';
       try{const selected=file.files[0];if(!selected)return;if(selected.size>2000000)throw Error('Le fichier CSV est trop volumineux.');pending=parseMusicCSV(await selected.text());state.textContent=pending.length+' morceaux prêts à être importés.';importButton.disabled=false;}catch(e){state.textContent=e.message;}
     };
-    importPanel.append(label,file,state,importButton);content.append(importPanel);
+    importPanel.append(label,file,state,importButton);content.insertBefore(importPanel,toolbar);
   }
 
   function display(){
