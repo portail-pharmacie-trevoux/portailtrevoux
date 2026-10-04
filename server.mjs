@@ -1,4 +1,5 @@
 import express from 'express';
+import { createProductSources } from './product-sources.mjs';
 import { registerSchedule } from './schedule.mjs';
 import { createDailyJoke } from './updates.mjs';
 import { createYouTube } from './youtube.mjs';
@@ -17,7 +18,7 @@ export function createApp(db,config) {
   app.set('trust proxy',1); app.disable('x-powered-by');
   app.use((req,res,next)=>{
     res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
-      'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.openfoodfacts.org; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.openfoodfacts.org https://images.openbeautyfacts.org; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       'Permissions-Policy':'camera=(), microphone=(), geolocation=()'});
     if(secure)res.set('Strict-Transport-Security','max-age=31536000');
     next();
@@ -269,20 +270,9 @@ export function createApp(db,config) {
     if(!rowCount)throw fail(404,'Ce morceau ne figure plus dans la sélection.');
     res.json({ok:true});
   });
-  const productCache=new Map();
-  app.get('/api/promoflash/product/:ean',auth,ready,async(req,res)=>{
-    const ean=req.params.ean;
-    if(!/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(ean))throw fail(400,'Code EAN invalide.');
-    const cached=productCache.get(ean);if(cached&&cached.until>Date.now())return res.json(cached.result);
-    try{
-      const response=await fetch('https://world.openfoodfacts.org/api/v2/product/'+ean+'.json?fields=product_name,product_name_fr,brands,image_front_url',{headers:{'User-Agent':'PortailPlus-PromoFlash/1.0 ('+origin+')'},signal:AbortSignal.timeout(10000)});
-      if(!response.ok&&response.status!==404)throw Error('Source indisponible');
-      const data=await response.json(),p=data.product||{};let image='';
-      if(typeof p.image_front_url==='string'){try{const url=new URL(p.image_front_url);if(url.origin==='https://images.openfoodfacts.org'&&url.pathname.startsWith('/images/products/'))image=url.href;}catch{}}
-      const result={found:data.status===1,name:String(p.product_name_fr||p.product_name||'Produit sans nom').slice(0,300),brand:String(p.brands||'').slice(0,200),image};
-      if(!result.found)result.image='';if(productCache.size>=200)productCache.delete(productCache.keys().next().value);productCache.set(ean,{result,until:Date.now()+3600000});res.json(result);
-    }catch{throw fail(502,'La recherche de produit est momentanément indisponible.');}
-  });
+  const products=createProductSources({origin,serpKey:config.serpKey});
+  app.get('/api/promoflash/product/:ean',auth,ready,async(req,res)=>res.json(await products.product(req.params.ean)));
+  app.get('/api/promoflash/prices/:ean',auth,ready,async(req,res)=>res.json(await products.prices(req.params.ean)));
   app.get('/api/universes/:name',auth,ready,(req,res)=>{if(!canAccess(req.auth,req.params.name))throw fail(403,'Accès refusé.');res.json({items:[]});});
   app.use(express.static(root+'public',{index:'index.html',etag:false}));
   app.use((error,req,res,next)=>{
@@ -309,7 +299,7 @@ export async function initialize(db,config){
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const env=process.env,config={origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
+  const env=process.env,config={serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
