@@ -28,4 +28,4 @@ export function decrypt(value,secret) {
   cipher.setAuthTag(tag);
   return JSON.parse(Buffer.concat([cipher.update(data),cipher.final()]).toString('utf8'));
 }
-export const canAccess=(user,universe)=>user?.role==='admin'||user?.rights?.includes(universe);
+export const canAccess=(user,universe)=>(!!user&&universe==='Fun')||user?.role==='admin'||user?.rights?.includes(universe);

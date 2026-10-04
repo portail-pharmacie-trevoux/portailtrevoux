@@ -1,4 +1,5 @@
 import express from 'express';
+import { validateMusic, musicKey } from './music.mjs';
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -180,6 +181,16 @@ export function createApp(db,config) {
     const current=(await db.query('SELECT * FROM calendar_cache WHERE singleton=TRUE')).rows[0];
     res.json({name:await getSetting('calendar_name')||'Agenda équipe',events:current?.events||[],syncedAt:current?.synced_at||null,error:await getSetting('sync_error')||'',connected:!!await getSetting('google_tokens')});
   });
+
+  app.get('/api/music',auth,ready,async(req,res)=>{
+    res.json((await db.query('SELECT id,artist,title,contributor,source,created_at FROM music_tracks ORDER BY created_at DESC,id DESC')).rows);
+  });
+  app.post('/api/music',auth,ready,csrf,async(req,res)=>{
+    const {artist,title,trackKey}=validateMusic(req.body);
+    const {rows}=await db.query("INSERT INTO music_tracks(artist,title,track_key,contributor,added_by) VALUES($1,$2,$3,$4,$5) ON CONFLICT(track_key) DO NOTHING RETURNING id,artist,title,contributor,source,created_at",[artist,title,trackKey,req.auth.name,req.auth.id]);
+    if(!rows[0])throw fail(409,'Ce morceau figure déjà dans la liste partagée.');
+    res.status(201).json(rows[0]);
+  });
   app.get('/api/universes/:name',auth,ready,(req,res)=>{if(!canAccess(req.auth,req.params.name))throw fail(403,'Accès refusé.');res.json({items:[]});});
   app.use(express.static(root+'public',{index:'index.html',etag:false}));
   app.use((error,req,res,next)=>{
@@ -193,6 +204,11 @@ export function createApp(db,config) {
 
 export async function initialize(db,config){
   await db.query(await readFile(new URL('./schema.sql',import.meta.url),'utf8'));
+  const initialMusic=JSON.parse(await readFile(new URL('./music-seed.json',import.meta.url),'utf8'));
+  const seed=initialMusic.map(t=>({...t,trackKey:musicKey(t.artist,t.title)}));
+  await db.query(`INSERT INTO music_tracks(artist,title,track_key,contributor,source)
+    SELECT item->>'artist',item->>'title',item->>'trackKey',item->>'contributor','import'
+    FROM jsonb_array_elements($1::jsonb) item ON CONFLICT(track_key) DO NOTHING`,[JSON.stringify(seed)]);
   const count=(await db.query("SELECT COUNT(*) AS count FROM users WHERE role='admin'")).rows[0].count;
   if(Number(count)===0){
     if(!passwordValid(config.adminPassword))throw new Error('ADMIN_PASSWORD doit contenir au moins 12 caractères.');

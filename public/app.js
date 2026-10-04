@@ -64,7 +64,7 @@ function showLogin(){session=null;currentUniverse=null;q('#home').classList.add(
 function showHome(){
   currentUniverse=null;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
-  document.querySelectorAll('[data-universe]').forEach(b=>b.classList.toggle('hidden',session.user.role!=='admin'&&(b.dataset.universe==='Collaborateurs'||!session.user.rights.includes(b.dataset.universe))));
+  document.querySelectorAll('[data-universe]').forEach(b=>b.classList.toggle('hidden',session.user.role!=='admin'&&(b.dataset.universe==='Collaborateurs'||(b.dataset.universe!=='Fun'&&!session.user.rights.includes(b.dataset.universe)))));
   q('.section-label>span').textContent=session.user.role!=='admin'&&!session.user.rights.length?'Aucun accès attribué. Contactez votre administrateur.':'Vos espaces autorisés';
 }
 function afterLogin(){if(session.user.mustChange){q('#login').classList.add('hidden');q('#logout').classList.remove('hidden');openPassword();}else showHome();}
@@ -75,12 +75,12 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-const descriptions={'Fun':'Sonorisation de l’espace vente.','Passerelle groupement':'Accès à votre groupement.','Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
+const descriptions={'Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès à votre groupement.','Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
 document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
 q('#back').onclick=()=>showHome();
 async function openUniverse(name){
   currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';q('#title').textContent=name;q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs');q('#content').replaceChildren(node('div','Chargement…','empty'));
-  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
 function renderPeople(){const content=q('#content');content.replaceChildren();if(!people.length){content.append(node('div','Aucun collaborateur ajouté. Créez un premier compte pour votre équipe.','empty'));return;}
@@ -149,3 +149,43 @@ q('#tile-order-save').onclick=()=>{
   try{localStorage.setItem(tileOrderKey(),JSON.stringify([...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))]));applyTileOrder();q('#tile-order-dialog').close();}
   catch{q('#tile-order-status').textContent='Ce navigateur ne permet pas de mémoriser votre ordre.';}
 };
+
+async function renderMusic(){
+  let tracks=await api('/api/music');if(currentUniverse!=='Fun')return;
+  const content=q('#content');content.replaceChildren();
+  const intro=node('div','','music-intro');intro.append(node('h3','La musique de toute l’équipe'),node('p','Ajoutez vos morceaux préférés à la sélection partagée de la pharmacie.'));
+  const form=node('form','','music-form');
+  const artistLabel=node('label','Artiste'),artist=node('input');artist.type='text';artist.id='music-artist';artist.maxLength=200;artist.required=true;artist.placeholder='Ex. : Adele';artistLabel.htmlFor=artist.id;
+  const titleLabel=node('label','Titre'),title=node('input');title.type='text';title.id='music-title';title.maxLength=200;title.required=true;title.placeholder='Ex. : Hometown Glory';titleLabel.htmlFor=title.id;
+  const artistField=node('div'),titleField=node('div');artistField.append(artistLabel,artist);titleField.append(titleLabel,title);
+  const submit=node('button','Ajouter à la sélection','btn primary');submit.type='submit';
+  const message=node('p','','music-feedback');message.setAttribute('role','status');
+  form.append(artistField,titleField,submit);content.append(intro,form,message);
+  content.append(node('p','Cette liste rassemble les choix de l’équipe. La synchronisation avec la playlist YouTube n’est pas encore activée.','status-line'));
+  const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
+  const list=node('div','','music-list'),count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
+  content.append(toolbar,count,list,more);
+  function display(){
+    const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
+    const visible=tracks.filter(t=>terms.every(term=>normalizeSearch(t.artist+' '+t.title).includes(term)));
+    count.textContent=visible.length+' morceau'+(visible.length!==1?'x':'')+(terms.length?' trouvé'+(visible.length!==1?'s':''):' dans la sélection');
+    list.replaceChildren();
+    visible.slice(0,limit).forEach(t=>{
+      const card=node('article','','event music-track');card.append(node('h3',t.title),node('p',t.artist,'event-time'));
+      if(t.contributor)card.append(node('p',(t.source==='import'?'Sélection initiale · ':'Proposé par ')+t.contributor,'status-line'));
+      const link=node('a','Rechercher sur YouTube','btn small');link.href='https://www.youtube.com/results?search_query='+encodeURIComponent(t.artist+' '+t.title);link.target='_blank';link.rel='noopener noreferrer';card.append(link);list.append(card);
+    });
+    if(!visible.length)list.append(node('div','Aucun morceau ne correspond à votre recherche.','empty'));
+    more.classList.toggle('hidden',visible.length<=limit);
+  }
+  search.oninput=()=>{limit=40;display();};
+  form.onsubmit=async event=>{
+    event.preventDefault();submit.disabled=true;message.textContent='';
+    try{
+      const track=await api('/api/music','POST',{artist:artist.value,title:title.value});
+      if(currentUniverse!=='Fun')return;
+      tracks.unshift(track);form.reset();search.value='';limit=40;display();message.textContent='Votre morceau a été ajouté à la sélection partagée.';artist.focus();
+    }catch(e){message.textContent=e.message;}finally{submit.disabled=false;}
+  };
+  display();
+}
