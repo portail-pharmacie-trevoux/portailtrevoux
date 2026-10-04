@@ -1,4 +1,5 @@
 import express from 'express';
+import { registerCollaborateurs } from './collaborateurs.mjs';
 import { createProductSources } from './product-sources.mjs';
 import { registerSchedule } from './schedule.mjs';
 import { createDailyJoke } from './updates.mjs';
@@ -31,7 +32,7 @@ export function createApp(db,config) {
   app.use(async(req,res,next)=>{
     const cookie=req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('trevoux_session='))?.slice(16);
     if(cookie && /^[\w-]{43}$/.test(cookie)){
-      const {rows}=await db.query('SELECT s.id AS session_id,s.csrf,u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now()',[digest(cookie)]);
+      const {rows}=await db.query('SELECT s.id AS session_id,s.csrf,u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now() AND u.active=TRUE',[digest(cookie)]);
       if(rows[0])req.auth=rows[0];
     }
     next();
@@ -46,7 +47,7 @@ export function createApp(db,config) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
   const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
-  const allowedPublications=user=>[...universes,'Collaborateurs'].filter(name=>name==='Collaborateurs'?user.role==='admin':canAccess(user,name));
+  const allowedPublications=user=>universes.filter(name=>canAccess(user,name));
   app.get('/api/publications',auth,ready,async(req,res)=>{
     const allowed=allowedPublications(req.auth);
     const {rows}=await db.query(`SELECT p.universe,COUNT(*) FILTER(WHERE p.id>COALESCE(r.last_id,0))::int AS unread,
@@ -91,7 +92,7 @@ export function createApp(db,config) {
     }
     const user=(await db.query('SELECT * FROM users WHERE email=$1',[email])).rows[0];
     const valid=await verifyPassword(req.body.password,user?.password_hash||config.dummyHash);
-    if(!user||!valid)throw fail(401,'Adresse ou mot de passe incorrect.');
+    if(!user||!valid||!user.active)throw fail(401,'Adresse ou mot de passe incorrect.');
     if(req.auth)await db.query('DELETE FROM sessions WHERE id=$1',[req.auth.session_id]);
     res.json(await newSession(user,res));
   });
@@ -106,31 +107,7 @@ export function createApp(db,config) {
     await db.query('DELETE FROM sessions WHERE user_id=$1',[req.auth.id]);
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
-  app.get('/api/users',auth,ready,admin,async(req,res)=>res.json((await db.query("SELECT * FROM users WHERE role='employee' ORDER BY name")).rows.map(cleanUser)));
-  function validateUser(data,creating){
-    if(typeof data.name!=='string'||!data.name.trim()||data.name.length>100||typeof data.job!=='string'||data.job.length>100)throw fail(400,'Nom ou fonction invalide.');
-    if(typeof data.email!=='string'||data.email.length>254||!/^\S+@\S+\.\S+$/.test(data.email))throw fail(400,'Adresse e-mail invalide.');
-    if(!Array.isArray(data.rights)||data.rights.some(r=>!universes.includes(r)))throw fail(400,'Droits invalides.');
-    if((creating||data.password)&&!passwordValid(data.password))throw fail(400,'Le mot de passe provisoire doit comporter au moins 12 caractères.');
-  }
-  app.post('/api/users',auth,ready,admin,csrf,async(req,res)=>{
-    validateUser(req.body,true); const d=req.body;
-    const {rows}=await db.query('INSERT INTO users(name,job,email,password_hash,rights) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING *',[d.name.trim(),d.job.trim(),d.email.trim().toLowerCase(),await hashPassword(d.password),JSON.stringify([...new Set(d.rights)])]);
-    await publish('Collaborateurs','Un nouveau collaborateur a rejoint l’équipe','user:'+rows[0].id);
-    res.status(201).json(cleanUser(rows[0]));
-  });
-  app.put('/api/users/:id',auth,ready,admin,csrf,async(req,res)=>{
-    validateUser(req.body,false);const d=req.body,id=Number(req.params.id);if(!Number.isSafeInteger(id))throw fail(400,'Profil invalide.');
-    const hash=d.password?await hashPassword(d.password):null;
-    const {rows}=await db.query("UPDATE users SET name=$1,job=$2,email=$3,rights=$4::jsonb,password_hash=COALESCE($5,password_hash),must_change=CASE WHEN $5::text IS NULL THEN must_change ELSE TRUE END WHERE id=$6 AND role='employee' RETURNING *",[d.name.trim(),d.job.trim(),d.email.trim().toLowerCase(),JSON.stringify([...new Set(d.rights)]),hash,id]);
-    if(!rows[0])throw fail(404,'Collaborateur introuvable.');
-    await db.query('DELETE FROM sessions WHERE user_id=$1',[id]);res.json(cleanUser(rows[0]));
-  });
-  app.delete('/api/users/:id',auth,ready,admin,csrf,async(req,res)=>{
-    const id=Number(req.params.id);if(!Number.isSafeInteger(id))throw fail(400,'Profil invalide.');
-    const {rowCount}=await db.query("DELETE FROM users WHERE id=$1 AND role='employee'",[id]);
-    if(!rowCount)throw fail(404,'Collaborateur introuvable.');res.json({ok:true});
-  });
+  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,feastCalendar:config.feastCalendar});
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');
     let tokens=decrypt(stored,secret);
@@ -292,11 +269,11 @@ export async function initialize(db,config){
   await db.query(`INSERT INTO music_tracks(artist,title,track_key,contributor,source)
     SELECT item->>'artist',item->>'title',item->>'trackKey',item->>'contributor','import'
     FROM jsonb_array_elements($1::jsonb) item ON CONFLICT(track_key) DO NOTHING`,[JSON.stringify(seed)]);
-  await db.query("UPDATE users SET name='Nicolas Marchand' WHERE role='admin' AND lower(email)='pharmaciedetrevoux@gmail.com'");
+  await db.query("UPDATE users SET name='Nicolas Marchand',first_name='Nicolas',last_name='Marchand' WHERE role='admin' AND lower(email)='pharmaciedetrevoux@gmail.com'");
   const count=(await db.query("SELECT COUNT(*) AS count FROM users WHERE role='admin'")).rows[0].count;
   if(Number(count)===0){
     if(!passwordValid(config.adminPassword))throw new Error('ADMIN_PASSWORD doit contenir au moins 12 caractères.');
-    await db.query("INSERT INTO users(name,job,email,password_hash,role,rights,must_change) VALUES($1,$2,$3,$4,'admin',$5::jsonb,TRUE)",['Nicolas Marchand','Titulaire',config.adminEmail.toLowerCase(),await hashPassword(config.adminPassword),JSON.stringify(universes)]);
+    await db.query("INSERT INTO users(name,first_name,last_name,job,email,password_hash,role,rights,must_change) VALUES($1,'Nicolas','Marchand',$2,$3,$4,'admin',$5::jsonb,TRUE)",['Nicolas Marchand','Titulaire',config.adminEmail.toLowerCase(),await hashPassword(config.adminPassword),JSON.stringify(universes)]);
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){

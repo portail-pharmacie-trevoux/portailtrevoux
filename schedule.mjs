@@ -42,7 +42,7 @@ export function copySchedule(source,sourceWeek,targetWeek,allowedIds){
 export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,fail}){
   const access=(req,res,next)=>canAccess(req.auth,'Emplois du temps')?next():next(fail(403,'Accès refusé.'));
   const conflict=()=>fail(409,'Le planning a été modifié entre-temps. Rechargez la semaine avant de continuer.');
-  const roster=async()=>(await db.query('SELECT id,name FROM users ORDER BY name')).rows;
+  const roster=async()=>(await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY name')).rows;
   async function weekRow(week){return (await db.query('SELECT * FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];}
   async function ensureWeek(week){await db.query('INSERT INTO schedule_weeks(week) VALUES($1::date) ON CONFLICT(week) DO NOTHING',[week]);}
   app.get('/api/schedule',auth,ready,access,async(req,res)=>{

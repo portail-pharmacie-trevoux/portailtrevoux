@@ -60,7 +60,7 @@ async function api(path,method='GET',data){
   if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Error(body.error||'Demande impossible.');}return body;
 }
 function error(e){q('#global-message').textContent=e.message;}
-function showLogin(){scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.daily-joke,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showLogin(){scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
@@ -76,7 +76,7 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'Gérez les collaborateurs et leurs accès.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
+const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'L’annuaire de l’équipe et votre accès personnel aux bulletins de paie.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
 document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
 q('#back').onclick=()=>showHome();
 q('#portal-home').onclick=e=>{if(session&&!session.user.mustChange){e.preventDefault();showHome();}};
@@ -96,19 +96,86 @@ function setUniverseHeading(name){
 }
 async function openUniverse(name){
   q('#universe-publications')?.remove();
-  currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs');q('#content').replaceChildren(node('div','Chargement…','empty'));
+  currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs'||session.user.role!=='admin');q('#content').replaceChildren(node('div','Chargement…','empty'));
   try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
   if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
-function renderPeople(){const content=q('#content');content.replaceChildren();if(!people.length){content.append(node('div','Aucun collaborateur ajouté. Créez un premier compte pour votre équipe.','empty'));return;}
-  const wrap=node('div','','tablewrap'),table=document.createElement('table'),head=document.createElement('thead'),row=document.createElement('tr');['Collaborateur','Fonction','Adresse e-mail','Univers accessibles','Actions'].forEach(t=>{const th=node('th',t);th.scope='col';row.append(th);});head.append(row);table.append(head);const body=document.createElement('tbody');
-  people.forEach(p=>{const tr=document.createElement('tr');tr.append(node('td',p.name),node('td',p.job),node('td',p.email),node('td',p.rights.join(' · ')||'Aucun univers','rights'));const actions=node('td','','actions');const change=button('Modifier',()=>openEditor(p.id));change.setAttribute('aria-label','Modifier '+p.name);const del=button('Supprimer',()=>{removeId=p.id;q('#removeText').textContent='Le compte de '+p.name+' et ses accès seront supprimés.';q('#removeDialog').showModal();},'btn small danger');del.setAttribute('aria-label','Supprimer '+p.name);del.style.marginLeft='8px';actions.append(change,del);tr.append(actions);body.append(tr);});table.append(body);wrap.append(table);content.append(wrap);
+function personName(p){return [p.firstName,p.lastName].filter(Boolean).join(' ');}
+async function reloadPeople(message=''){people=await api('/api/users');if(currentUniverse==='Collaborateurs'){renderPeople();q('#feedback').textContent=message;}}
+function renderPeople(){
+  const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
+  content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
+  if(isAdmin)content.append(node('p','Complétez les téléphones et, si besoin, créez les accès personnels depuis « Modifier ». Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));
+  if(isAdmin)renderPeopleImport(content);
+  for(const active of [true,false]){
+    const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
+    section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
+    if(!list.length){section.append(node('p',active?'Aucun collaborateur actif.':'Aucun collaborateur inactif.','empty'));content.append(section);continue;}
+    const wrap=node('div','','tablewrap'),table=node('table','','people-table'),head=node('thead'),header=node('tr');
+    ['Prénom','Nom','Téléphone',...(isAdmin?['Gestion']:[])].forEach(text=>{const th=node('th',text);th.scope='col';header.append(th);});head.append(header);table.append(head);
+    const body=node('tbody');
+    for(const p of list){
+      const tr=node('tr','','person-row'+(p.isSelf?' own-person':''));tr.dataset.personId=p.id;
+      const first=node('td'),last=node('td',p.lastName),phone=node('td',p.phone||'À renseigner','person-phone');
+      if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
+      tr.append(first,last,phone);
+      if(isAdmin){
+        const actions=node('td','','actions');const edit=button('Modifier',()=>openEditor(p.id));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
+        if(p.role!=='admin'){
+          if(active){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
+          else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);}
+        }
+        tr.append(actions);
+      }
+      body.append(tr);
+    }
+    table.append(body);wrap.append(table);section.append(wrap);content.append(section);
+  }
 }
-function openEditor(id=null){editId=id;q('#form').reset();q('#editor-error').textContent='';q('#dialogtitle').textContent=id===null?'Ajouter un collaborateur':'Modifier le collaborateur';q('#temporary-password').required=id===null;q('#password-help').textContent=id===null?'12 caractères minimum. À communiquer au salarié par un canal personnel.':'Laissez vide pour conserver le mot de passe. Remplissez pour attribuer un nouveau mot de passe provisoire.';if(id!==null){const p=people.find(p=>p.id===id);q('#fullname').value=p.name;q('#job').value=p.job;q('#email').value=p.email;document.querySelectorAll('[name=right]').forEach(c=>c.checked=p.rights.includes(c.value));}q('#editor').showModal();q('#fullname').focus();}
+async function openMyPayroll(){
+  q('#my-payroll-dialog')?.remove();const dialog=node('dialog');dialog.id='my-payroll-dialog';dialog.setAttribute('aria-labelledby','my-payroll-title');
+  const title=node('h2','Mes bulletins de paie');title.id='my-payroll-title';dialog.append(title);const text=node('p','Chargement…');dialog.append(text,button('Fermer',()=>dialog.close()));document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+  try{const data=await api('/api/collaborateurs/me/payroll');if(!dialog.open)return;text.textContent=data.name+' · Connectez-vous à mySilae avec vos identifiants personnels pour consulter vos bulletins.';
+    const link=node('a','Accéder à mes bulletins sur mySilae','btn primary payroll-link');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';text.after(link,node('p','La consultation des bulletins dans le portail pourra être activée avec votre prestataire de paie.','field-note'));
+  }catch(e){text.textContent=e.message;}
+}
+function openEditor(id=null){
+  if(session.user.role!=='admin')return;editId=id;q('#form').reset();q('#editor-error').textContent='';q('#dialogtitle').textContent=id===null?'Ajouter un collaborateur':'Modifier le collaborateur';
+  const p=people.find(p=>p.id===id);q('#first-name').value=p?.firstName||'';q('#last-name').value=p?.lastName||'';q('#phone').value=p?.phone||'';q('#birthday').value=p?.birthday||'';q('#job').value=p?.job||'';q('#email').value=p?.email||'';
+  q('#account-options').classList.toggle('hidden',p?.role==='admin');q('#account-options').open=!!p?.email&&p?.role!=='admin';
+  q('#email').required=false;q('#temporary-password').required=false;
+  q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'La fiche peut être enregistrée sans accès de connexion. Pour créer un accès personnel, renseignez un e-mail et un mot de passe provisoire de 12 caractères minimum.';
+  document.querySelectorAll('[name=right]').forEach(c=>c.checked=p?.rights?.includes(c.value)||false);
+  q('#editor').showModal();q('#first-name').focus();
+}
 q('#add').onclick=()=>openEditor();q('#cancel').onclick=()=>q('#editor').close();q('#editor').addEventListener('close',()=>q('#temporary-password').value='');
-q('#form').onsubmit=async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',{name:q('#fullname').value,job:q('#job').value,email:q('#email').value,password:q('#temporary-password').value,rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});q('#form').reset();q('#editor').close();people=await api('/api/users');renderPeople();q('#feedback').textContent='Compte enregistré. Les modifications de droits s’appliquent immédiatement.';}catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}};
-q('#keep').onclick=()=>q('#removeDialog').close();q('#confirmRemove').onclick=async()=>{const btn=q('#confirmRemove');btn.disabled=true;try{await api('/api/users/'+removeId,'DELETE');q('#removeDialog').close();people=await api('/api/users');renderPeople();q('#feedback').textContent='Compte supprimé.';}catch(e){q('#removeDialog').close();q('#feedback').textContent=e.message;}finally{btn.disabled=false;}};
+q('#form').onsubmit=async e=>{
+  e.preventDefault();const btn=e.submitter;btn.disabled=true;
+  const existing=people.find(p=>p.id===editId),data={firstName:q('#first-name').value,lastName:q('#last-name').value,phone:q('#phone').value,birthday:q('#birthday').value,job:q('#job').value,active:existing?.active!==false};
+  if(existing?.role!=='admin')Object.assign(data,{email:q('#email').value,password:q('#temporary-password').value,rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
+  try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',data);q('#form').reset();q('#editor').close();await reloadPeople('Fiche enregistrée.');}
+  catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}
+};
+q('#keep').onclick=()=>q('#removeDialog').close();q('#confirmRemove').onclick=async()=>{
+  const btn=q('#confirmRemove');btn.disabled=true;try{await api('/api/users/'+removeId,'DELETE');q('#removeDialog').close();await reloadPeople('Collaborateur déplacé dans les inactifs.');}catch(e){q('#removeDialog').close();q('#feedback').textContent=e.message;}finally{btn.disabled=false;}
+};
+function parsePeopleCSV(text){
+  const rows=[];let row=[],field='',quoted=false;text=text.replace(/^\uFEFF/,'');const delimiter=text.split(/\r?\n/)[0].includes(';')?';':',';
+  for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}else if(!quoted&&c===delimiter){row.push(field);field='';}else if(!quoted&&(c==='\n'||c==='\r')){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(v=>v.trim()))rows.push(row);row=[];field='';}else field+=c;}
+  if(quoted)throw Error('Guillemets incomplets dans le CSV.');row.push(field);if(row.some(v=>v.trim()))rows.push(row);
+  const headers=(rows.shift()||[]).map(normalizeSearch),column=name=>headers.indexOf(name);if(column('prenom')<0||column('nom')<0)throw Error('Le CSV doit contenir les colonnes Prénom et Nom.');
+  const people=rows.map(r=>{const value=n=>(r[column(n)]||'').trim();const status=normalizeSearch(value('actif'));if(status&&!['oui','non','true','false','1','0'].includes(status))throw Error('La colonne Actif doit contenir Oui ou Non.');return {firstName:value('prenom'),lastName:value('nom'),phone:value('telephone'),birthday:value('date de naissance'),job:value('fonction'),active:!['non','false','0'].includes(status)};});
+  if(!people.length||people.length>100||people.some(p=>!p.firstName||!p.lastName))throw Error('Le fichier doit contenir de 1 à 100 personnes avec prénom et nom complets.');return people;
+}
+function renderPeopleImport(content){
+  const area=node('details','','people-import');area.append(node('summary','Importer une liste de collaborateurs'),node('p','CSV : Prénom, Nom, Téléphone, Date de naissance (AAAA-MM-JJ), Fonction, Actif (Oui / Non). Les informations de connexion existantes sont conservées.','field-note'));
+  const label=node('label','Choisir le fichier CSV','field'),file=node('input');file.type='file';file.id='people-csv';file.accept='.csv,text/csv';label.htmlFor=file.id;
+  const status=node('p','','field-note');status.setAttribute('role','status');let pending=[];
+  const submit=button('Importer ces collaborateurs',async()=>{submit.disabled=true;file.disabled=true;try{const result=await api('/api/collaborateurs/import','POST',{people:pending});await reloadPeople(result.count+' fiches importées : '+result.active+' actives, '+result.inactive+' inactives.');}catch(e){status.textContent=e.message;file.disabled=false;submit.disabled=false;}},'btn primary');submit.disabled=true;
+  file.onchange=async()=>{pending=[];submit.disabled=true;status.textContent='';try{const selected=file.files[0];if(!selected)return;if(selected.size>15000)throw Error('Le fichier est trop volumineux.');pending=parsePeopleCSV(await selected.text());status.textContent=pending.length+' fiches prêtes : '+pending.filter(p=>p.active).length+' actives, '+pending.filter(p=>!p.active).length+' inactives.';submit.disabled=false;}catch(e){status.textContent=e.message;}};
+  area.append(label,file,status,submit);content.append(area);
+}
 async function runCalendarAction(action){try{q('#feedback').textContent='Veuillez patienter…';await action();q('#feedback').textContent='';if(currentUniverse==='Agenda')await renderCalendar();}catch(e){q('#feedback').textContent=e.message;}}
 async function renderCalendar(){
   const data=await api('/api/calendar');if(currentUniverse!=='Agenda')return;const content=q('#content');content.replaceChildren();
@@ -135,7 +202,7 @@ setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
 let draftTileOrder=[],draftHiddenTiles=new Set();
 function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
-function tileAllowed(name){return session.user.role==='admin'||(name!=='Collaborateurs'&&(['Fun','Outils de calculs rapides'].includes(name)||session.user.rights.includes(name)));}
+function tileAllowed(name){return session.user.role==='admin'||(['Fun','Outils de calculs rapides','Collaborateurs'].includes(name)||session.user.rights.includes(name));}
 function tilePreferences(){
   let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
   if(Array.isArray(saved))return {order:saved,hidden:[]};
@@ -383,16 +450,18 @@ async function refreshHomeExtras(){
   if(!session||session.user.mustChange||homeExtrasPending)return;
   const userId=session.user.id;homeExtrasPending=true;
   try{
-    let joke=null;try{joke=await api('/api/fun/joke');}catch{}
-    const news=await api('/api/publications');
+    const results=await Promise.allSettled([api('/api/fun/joke'),api('/api/publications'),api('/api/collaborateurs/celebrations')]);
+    const joke=results[0].status==='fulfilled'?results[0].value:null,news=results[1].status==='fulfilled'?results[1].value:[],celebrations=results[2].status==='fulfilled'?results[2].value:null;
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
+      if(tile.dataset.universe==='Collaborateurs')return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
       badge.append(node('span',count?'●':'○','news-dot'),node('span',count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue'));
       tile.append(badge);
     });
+    renderCelebrations(celebrations);
     const fun=q('.grid [data-universe="Fun"]');fun.querySelector('.daily-joke')?.remove();
     const block=node('span','','daily-joke');block.append(node('strong','😄 La blague du jour'));
     block.append(node('span',joke?.text||'La blague du jour arrive bientôt.'));
@@ -401,7 +470,7 @@ async function refreshHomeExtras(){
   }catch{}finally{homeExtrasPending=false;}
 }
 async function renderPublications(name){
-  if(!session)return;const userId=session.user.id;
+  if(!session||name==='Collaborateurs')return;const userId=session.user.id;
   try{
     const items=await api('/api/publications/'+encodeURIComponent(name));
     if(session?.user.id!==userId||currentUniverse!==name)return;
@@ -529,4 +598,17 @@ function editScheduleDay(person,day,entry,data){
     if(pairs.some(pair=>pair.some(value=>!value))){status.textContent='Renseignez le début et la fin de chaque créneau.';return;}
     save.disabled=true;clear.disabled=true;try{await api('/api/schedule/'+data.week+'/day','PUT',{userId:person.id,day,kind:kind.value,slots:pairs,revision:data.revision});dialog.close();await renderSchedule();q('#feedback').textContent='Journée enregistrée dans le brouillon.';}catch(e){status.textContent=e.message;save.disabled=false;clear.disabled=!entry;}
   };dialog.showModal();kind.focus();
+}
+
+function renderCelebrations(data){
+  const tile=q('.grid [data-universe="Collaborateurs"]');tile.querySelector('.tile-celebrations')?.remove();
+  const block=node('span','','tile-celebrations');block.append(node('strong','🎉 Fêtes et anniversaires du jour'));
+  if(!data)block.append(node('span','Les célébrations sont momentanément indisponibles.'));
+  else{
+    block.append(node('span',data.feastsAvailable?'Bonne fête : '+data.feasts.join(', '):'Fêtes momentanément indisponibles.'));
+    if(data.nameDays.length)block.append(node('span','🌷 '+data.nameDays.join(', ')));
+    block.append(node('span',data.birthdays.length?'🎂 '+data.birthdays.join(', '):'🎂 Aucun anniversaire dans l’équipe aujourd’hui.'));
+    block.append(node('small',data.day.split('-').reverse().join('/')+' · Calendrier Nominis'));
+  }
+  tile.append(block);
 }

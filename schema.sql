@@ -3,6 +3,16 @@ CREATE TABLE IF NOT EXISTS users (
  email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'employee' CHECK(role IN ('admin','employee')),
  rights JSONB NOT NULL DEFAULT '[]', must_change BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Staff directory entries can exist before a personal login is configured.
+ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS directory_key TEXT UNIQUE;
+UPDATE users SET first_name=split_part(name,' ',1),last_name=trim(substr(name,length(split_part(name,' ',1))+1)) WHERE first_name='';
 CREATE TABLE IF NOT EXISTS sessions (
  id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  csrf TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, oauth_state TEXT, oauth_expires TIMESTAMPTZ, oauth_verifier TEXT

@@ -28,5 +28,5 @@ export function decrypt(value,secret) {
   cipher.setAuthTag(tag);
   return JSON.parse(Buffer.concat([cipher.update(data),cipher.final()]).toString('utf8'));
 }
-export const canAccess=(user,universe)=>(!!user&&['Fun','Outils de calculs rapides'].includes(universe))||user?.role==='admin'||user?.rights?.includes(universe);
+export const canAccess=(user,universe)=>(!!user&&['Fun','Outils de calculs rapides','Collaborateurs'].includes(universe))||user?.role==='admin'||user?.rights?.includes(universe);
 
