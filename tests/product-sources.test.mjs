@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProductSources,productPayload,shoppingOffers,summarizeOffers } from '../product-sources.mjs';
+import { createProductSources,productPayload,shoppingOffers,summarizeOffers,offerMatchesProduct } from '../product-sources.mjs';
 const beauty={status:'success',result:{id:'product_found'},product:{product_name:'Crème',brands:'Marque',quantity:'50 ml',image_front_url:'https://images.openbeautyfacts.org/images/products/123/front.jpg'}};
 test('import Beauty Facts v3 et photos limitées aux domaines de la base',()=>{
  assert.equal(productPayload(beauty,'Open Beauty Facts').found,true);
@@ -21,7 +21,7 @@ test('Google Shopping reste désactivé sans clé et ne lance aucun appel factur
  const sources=createProductSources({origin:'https://test.example',fetchImpl:async()=>assert.fail()});const result=await sources.prices('1234567890123');assert.equal(result.googleConfigured,false);assert.deepEqual(result.google,[]);
 });
 test('Shopping connecté : pays France, recherche EAN et clé seulement côté serveur',async()=>{
- let calls=0;const sources=createProductSources({origin:'https://test.example',serpKey:'private-test-key',fetchImpl:async url=>{calls++;const u=new URL(url);assert.equal(u.searchParams.get('gl'),'fr');assert.equal(u.searchParams.get('q'),'1234567890123');assert.equal(u.searchParams.get('api_key'),'private-test-key');return {ok:true,json:async()=>({shopping_results:[{title:'Produit',source:'Site',price:'5 €',extracted_price:5,link:'https://example.test/produit'}]})};}});
+ let calls=0;const sources=createProductSources({origin:'https://test.example',serpKey:'private-test-key',fetchImpl:async url=>{if(url.includes('openbeautyfacts')||url.includes('openfoodfacts'))return {ok:true,json:async()=>beauty};calls++;const u=new URL(url);assert.equal(u.searchParams.get('gl'),'fr');assert.equal(u.searchParams.get('q'),'1234567890123 Marque 50 ml');assert.equal(u.searchParams.get('api_key'),'private-test-key');return {ok:true,json:async()=>({shopping_results:[{title:'Produit 50 ml',gtin:'1234567890123',source:'Site',price:'5 €',extracted_price:5,link:'https://example.test/produit'}]})};}});
  const result=await sources.prices('1234567890123');assert.equal(result.google[0].price,5);assert.ok(!JSON.stringify(result).includes('private-test-key'));await sources.prices('1234567890123');assert.equal(calls,1);
 });
 test('régression EAN 3337875597449 : réponse v3 success, nom et photo anglaise',async()=>{
@@ -38,4 +38,21 @@ test('photo relayée : URL issue de la fiche, type image uniquement et redirecti
   const image=await service.image('3337875597449');assert.equal(image.type,'image/jpeg');assert.deepEqual([...image.bytes],[1,2,3]);assert.equal(calls[1].options.redirect,'error');
   const invalid=createProductSources({origin:'https://portal.example',fetchImpl:async(url)=>url.includes('/api/v3/')?new Response(JSON.stringify({status:1,product:{image_front_url:'https://images.openbeautyfacts.org/images/products/333/front.jpg'}})):new Response('<html>error</html>',{headers:{'content-type':'text/html'}})});
   await assert.rejects(()=>invalid.image('3337875597449'),e=>e.status===502);
+});
+
+test('correspondance EAN stricte : nom, marque et format identiques ne suffisent pas',()=>{
+ const p={found:true,name:'CeraVe Crème hydratante visage',brand:'CeraVe',quantity:'52ml'},ean='3337875597449';
+ const match=offer=>offerMatchesProduct(offer,p,ean);
+ assert.equal(match({title:'CeraVe Crème hydratante visage 52 ml'}),false);
+ assert.equal(match({title:'CeraVe crème 52 ml EAN '+ean}),true);
+ assert.equal(match({title:'CeraVe crème 52ml',gtin:ean}),true);
+ assert.equal(match({title:'CeraVe crème EAN '+ean,gtin:'3337875597448'}),false);
+ assert.equal(match({title:'Lots '+ean+' / 3337875597448'}),false);
+ for(const title of ['CeraVe crème 50ml','CeraVe crème','CeraVe crème 2x52ml','CeraVe crème 52ml + gel 236ml','CeraVe crème 52g'])assert.equal(match({title,gtin:ean}),false,title);
+ assert.equal(match({title:'CeraVe crème 0,052 l',gtin:ean}),true);
+});
+test('intitulé français prioritaire et traduction explicite de la désignation néerlandaise',()=>{
+ const p={status:1,product:{product_name_fr:'Nom français',product_name:'CeraVe Hydraterende Gezichtscrème'}};
+ assert.equal(productPayload(p,'Beauty').name,'Nom français');assert.equal(productPayload(p,'Beauty').nameLanguage,'fr');
+ delete p.product.product_name_fr;assert.equal(productPayload(p,'Beauty').name,'CeraVe Crème hydratante visage');assert.equal(productPayload(p,'Beauty').nameLanguage,'fr-translated');
 });
