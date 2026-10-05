@@ -45,7 +45,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   const wrap=el('div','','tablewrap'),table=el('table','','permission-matrix'),head=el('thead'),headRow=el('tr');
   ['Univers','Consulter / accéder','Modifier le contenu'].forEach(text=>{const th=el('th',text);th.scope='col';headRow.append(th);});head.append(headRow);table.append(head);
   const body=el('tbody'),rights=new Map(),editRights=new Map();
-  const allowed=p.permissionsConfigured?p.rights||[]:[...new Set([...(p.rights||[]),'Collaborateurs','Fun','Outils de calculs rapides'])];
+  const allowed=p.permissionsConfigured?p.rights||[]:[...new Set([...(p.rights||[]),'Collaborateurs','Fun','Outils de calculs rapides','Actualités'])];
   const modifiable=p.permissionsConfigured?p.editRights||[]:['Fun'];
   for(const universe of universes){
     const tr=el('tr'),name=el('th',universe);name.scope='row';tr.append(name);

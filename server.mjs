@@ -1,3 +1,4 @@
+import {registerNews,purgeNews,unreadNews} from './news.mjs';
 import {registerEmployeeImport} from './employee-import.mjs';
 import express from 'express';
 import { importProcedureDocuments } from './procedure-import.mjs';
@@ -56,13 +57,15 @@ export function createApp(db,config) {
   }
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
+  registerNews({app,db,auth,ready,csrf,viewUniverse,fail});
   const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
-  const allowedPublications=user=>universes.filter(name=>name!=='Collaborateurs'&&canAccess(user,name));
+  const allowedPublications=user=>universes.filter(name=>!['Collaborateurs','Actualités'].includes(name)&&canAccess(user,name));
   app.get('/api/publications',auth,ready,async(req,res)=>{
     const allowed=allowedPublications(req.auth);
     const {rows}=await db.query(`SELECT p.universe,COUNT(*) FILTER(WHERE p.id>COALESCE(r.last_id,0))::int AS unread,
       MAX(p.id)::text AS latest FROM publications p LEFT JOIN publication_reads r ON r.user_id=$1 AND r.universe=p.universe
       WHERE p.universe=ANY($2::text[]) GROUP BY p.universe`,[req.auth.id,allowed]);
+    if(canAccess(req.auth,'Actualités'))rows.push({universe:'Actualités',unread:await unreadNews(db,req.auth.id)});
     res.json(rows);
   });
   app.get('/api/publications/:name',auth,ready,async(req,res)=>{
@@ -276,6 +279,7 @@ export function createApp(db,config) {
 
 export async function initialize(db,config){
   await db.query(await readFile(new URL('./schema.sql',import.meta.url),'utf8'));
+  await purgeNews(db);
   await importProcedureDocuments(db,config.procedureImport);
   const initialMusic=JSON.parse(await readFile(new URL('./music-seed.json',import.meta.url),'utf8'));
   const seed=initialMusic.map(t=>({...t,trackKey:musicKey(t.artist,t.title)}));
@@ -297,7 +301,8 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync,dailyJoke}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await dailyJoke();}catch{console.error('Blague du jour à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await dailyJoke();}catch{console.error('Blague du jour à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }
+

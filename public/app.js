@@ -51,7 +51,7 @@ function renderCalendarResults(data,container){
 }
 
 const q=s=>document.querySelector(s);
-let session=null,people=[],editId=null,removeId=null,currentUniverse=null;
+let session=null,people=[],editId=null,removeId=null,currentUniverse=null,universeViewRequest=0;
 function node(tag,text='',cls=''){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}
 async function api(path,method='GET',data){
   const options={method,headers:{}};
@@ -76,7 +76,7 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'L’annuaire de l’équipe et votre accès personnel aux bulletins de paie.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les nouvelles et annonces de la pharmacie.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
+const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'L’annuaire de l’équipe et votre accès personnel aux bulletins de paie.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les messages courts de l’équipe, envoyés et reçus.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
 document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
 q('#back').onclick=()=>showHome();
 q('#portal-home').onclick=e=>{if(session&&!session.user.mustChange){e.preventDefault();showHome();}};
@@ -95,9 +95,10 @@ function setUniverseHeading(name){
   heading.append(node('span',name));
 }
 async function openUniverse(name){
+  const viewRequest=++universeViewRequest;
   q('#universe-publications')?.remove();
   currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';setPeopleAddActions(name==='Collaborateurs'&&session.user.role==='admin');q('#content').replaceChildren(node('div','Chargement…','empty'));
-  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Procédures'){const module=await import('/procedures.js');if(currentUniverse===name)await module.renderProcedures({container:q('#content'),api,canEdit:canEditUniverse('Procédures')});}else if(name==='Contacts utiles'){const module=await import('/contacts.js');if(currentUniverse===name)await module.renderContacts({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Actualités'){const userId=session.user.id,module=await import('/news.js');if(currentUniverse===name)await module.renderNews({container:q('#content'),api,isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId,onChanged:()=>void refreshHomeExtras()});}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Procédures'){const module=await import('/procedures.js');if(currentUniverse===name)await module.renderProcedures({container:q('#content'),api,canEdit:canEditUniverse('Procédures')});}else if(name==='Contacts utiles'){const module=await import('/contacts.js');if(currentUniverse===name)await module.renderContacts({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
   if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
@@ -232,7 +233,7 @@ setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
 let draftTileOrder=[],draftHiddenTiles=new Set();
 function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
-function tileAllowed(name){return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs'].includes(name)||session.user.rights.includes(name)));}
+function tileAllowed(name){return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs','Actualités'].includes(name)||session.user.rights.includes(name)));}
 function canEditUniverse(name){return session.user.role==='admin'||(tileAllowed(name)&&(session.user.permissionsConfigured?session.user.editRights?.includes(name):name==='Fun'));}
 function tilePreferences(){
   let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
@@ -491,7 +492,8 @@ async function refreshHomeExtras(){
       if(['Collaborateurs','Contacts utiles'].includes(tile.dataset.universe))return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
-      badge.append(node('span',count?'●':'○','news-dot'),node('span',count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue'));
+      const label=tile.dataset.universe==='Actualités'?(count?count+' message'+(count>1?'s':'')+' non vu'+(count>1?'s':''):'Aucun message non vu'):(count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue');
+      badge.append(node('span',count?'●':'○','news-dot'),node('span',label));
       tile.append(badge);
     });
     renderCelebrations(celebrations);
@@ -503,7 +505,7 @@ async function refreshHomeExtras(){
   }catch{}finally{homeExtrasPending=false;}
 }
 async function renderPublications(name){
-  if(!session||name==='Collaborateurs')return;const userId=session.user.id;
+  if(!session||['Collaborateurs','Actualités'].includes(name))return;const userId=session.user.id;
   try{
     const items=await api('/api/publications/'+encodeURIComponent(name));
     if(session?.user.id!==userId||currentUniverse!==name)return;

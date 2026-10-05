@@ -74,3 +74,30 @@ CREATE TABLE IF NOT EXISTS procedure_documents (
 ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS file_name TEXT;
 ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS file_type TEXT;
 ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS file_content BYTEA;
+
+
+CREATE TABLE IF NOT EXISTS team_messages (
+ id SERIAL PRIMARY KEY,
+ sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ sender_name TEXT NOT NULL,
+ text TEXT NOT NULL CHECK(char_length(text) BETWEEN 1 AND 500),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS team_message_recipients (
+ message_id INTEGER NOT NULL REFERENCES team_messages(id) ON DELETE CASCADE,
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ seen BOOLEAN NOT NULL DEFAULT FALSE,
+ archived BOOLEAN NOT NULL DEFAULT FALSE,
+ PRIMARY KEY(message_id,user_id)
+);
+CREATE INDEX IF NOT EXISTS team_messages_created_at ON team_messages(created_at);
+CREATE INDEX IF NOT EXISTS team_message_recipients_user ON team_message_recipients(user_id,message_id DESC);
+
+-- Enable the new personal messaging space once for existing active staff.
+-- Subsequent administrator changes remain effective on future restarts.
+WITH migration AS (
+ INSERT INTO settings(key,value) VALUES('team_news_access_v1','enabled')
+ ON CONFLICT(key) DO NOTHING RETURNING key
+)
+UPDATE users SET rights=rights||'["Actualités"]'::jsonb
+WHERE active=TRUE AND NOT (rights ? 'Actualités') AND EXISTS(SELECT 1 FROM migration);
