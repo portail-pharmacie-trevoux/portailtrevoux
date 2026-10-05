@@ -96,19 +96,20 @@ function setUniverseHeading(name){
 }
 async function openUniverse(name){
   q('#universe-publications')?.remove();
-  currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';q('#add').classList.toggle('hidden',name!=='Collaborateurs'||session.user.role!=='admin');q('#content').replaceChildren(node('div','Chargement…','empty'));
+  currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';setPeopleAddActions(name==='Collaborateurs'&&session.user.role==='admin');q('#content').replaceChildren(node('div','Chargement…','empty'));
   try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Procédures'){const module=await import('/procedures.js');if(currentUniverse===name)await module.renderProcedures({container:q('#content'),api,canEdit:canEditUniverse('Procédures')});}else if(name==='Contacts utiles'){const module=await import('/contacts.js');if(currentUniverse===name)await module.renderContacts({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
   if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
 function personName(p){return [p.firstName,p.lastName?.toLocaleUpperCase('fr-FR')].filter(Boolean).join(' ');}
 async function reloadPeople(message=''){people=await api('/api/users');if(currentUniverse==='Collaborateurs'){renderPeople();q('#feedback').textContent=message;}}
+function setPeopleAddActions(show){q('#people-add-actions').classList.toggle('hidden',!show);}
 function renderPeople(){
-  employeeRecordRequest++;q('#add').classList.toggle('hidden',session.user.role!=='admin');
+  employeeRecordRequest++;setPeopleAddActions(session.user.role==='admin');
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
   content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
   if(isAdmin)content.append(node('p','Complétez les téléphones et, si besoin, créez les accès personnels depuis « Modifier ». Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));
-  if(isAdmin){renderPeopleImport(content);renderEmployeeDocument(content);renderEmployeeScan(content);}
+  if(isAdmin){renderEmployeeScan(content);renderPeopleImport(content);renderEmployeeDocument(content);}
   for(const active of [true,false]){
     const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
@@ -120,7 +121,129 @@ function renderPeople(){
       const tr=node('tr','','person-row'+(p.isSelf?' own-person':''));tr.dataset.personId=p.id;
       const first=node('td'),last=node('td',p.lastName.toLocaleUpperCase('fr-FR')),phone=node('td',p.phone||'À renseigner','person-phone');
       if(isAdmin){const open=button(p.firstName,()=>openEmployeeRecord(p),'person-open');open.setAttribute('aria-label','Ouvrir la fiche de '+personName(p));first.append(open);const surname=button(p.lastName.toLocaleUpperCase('fr-FR'),()=>openEmployeeRecord(p),'person-open');surname.setAttribute('aria-label','Consulter la fiche de '+personName(p));last.replaceChildren(surname);}
-      else if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-…4118 tokens truncated…dden.has(tile.dataset.universe)));
+      else if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
+      tr.append(first,last,phone);
+      if(isAdmin){
+        const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
+        if(p.role!=='admin'){
+          if(active){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
+          else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);const permanent=button('Supprimer définitivement',async()=>{
+            if(!confirm('Supprimer définitivement '+personName(p)+' ? Sa fiche confidentielle, ses accès et ses entrées de planning seront effacés du portail. Cette action est irréversible.'))return;
+            permanent.disabled=true;restore.disabled=true;try{await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id});await reloadPeople('Collaborateur supprimé définitivement.');}catch(e){error(e);permanent.disabled=false;restore.disabled=false;}
+          },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));actions.append(permanent);}
+        }
+        tr.append(actions);
+      }
+      body.append(tr);
+    }
+    table.append(body);wrap.append(table);section.append(wrap);content.append(section);
+  }
+}
+let employeeRecordRequest=0;
+async function openEmployeeRecord(person){
+  if(session?.user.role!=='admin')return;
+  const request=++employeeRecordRequest,userId=session.user.id;const valid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
+  setPeopleAddActions(false);q('#feedback').textContent='';q('#content').replaceChildren(node('p','Chargement de la fiche…','field-note'));
+  try{const module=await import('/employee-record.js');if(!valid())return;await module.renderEmployeeRecord({container:q('#content'),api,person,onClose:()=>reloadPeople(),onSaved:async(result,message)=>{await reloadPeople(message);},onPayroll:openMyPayroll,universes:initialTileOrder,isCurrent:valid});}
+  catch(e){if(valid()){q('#content').replaceChildren(node('p',e.message,'error'),button('Retour à l’annuaire',()=>reloadPeople()));}}
+}
+async function openMyPayroll(){
+  q('#my-payroll-dialog')?.remove();const dialog=node('dialog');dialog.id='my-payroll-dialog';dialog.setAttribute('aria-labelledby','my-payroll-title');
+  const title=node('h2','Mes bulletins de paie');title.id='my-payroll-title';dialog.append(title);const text=node('p','Chargement…');dialog.append(text,button('Fermer',()=>dialog.close()));document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+  try{const data=await api('/api/collaborateurs/me/payroll');if(!dialog.open)return;text.textContent=data.name+' · Connectez-vous à mySilae avec vos identifiants personnels pour consulter vos bulletins.';
+    const link=node('a','Accéder à mes bulletins sur mySilae','btn primary payroll-link');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';text.after(link,node('p','La consultation des bulletins dans le portail pourra être activée avec votre prestataire de paie.','field-note'));
+  }catch(e){text.textContent=e.message;}
+}
+function openEditor(id=null){
+  if(session.user.role!=='admin')return;editId=id;q('#form').reset();q('#editor-error').textContent='';q('#dialogtitle').textContent=id===null?'Ajouter un collaborateur':'Modifier le collaborateur';
+  const p=people.find(p=>p.id===id);q('#first-name').value=p?.firstName||'';q('#last-name').value=p?.lastName||'';q('#phone').value=p?.phone||'';q('#birthday').value=p?.birthday||'';q('#job').value=p?.job||'';q('#email').value=p?.email||'';
+  q('#account-options').classList.toggle('hidden',p?.role==='admin');q('#account-options').open=!!p?.email&&p?.role!=='admin';
+  q('#email').required=false;q('#temporary-password').required=false;
+  q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'La fiche peut être enregistrée sans accès de connexion. Pour créer un accès personnel, renseignez un e-mail et un mot de passe provisoire de 12 caractères minimum.';
+  document.querySelectorAll('[name=right]').forEach(c=>c.checked=p?.rights?.includes(c.value)||false);
+  q('#editor').showModal();q('#first-name').focus();
+}
+q('#add').onclick=()=>openEditor();q('#cancel').onclick=()=>q('#editor').close();q('#editor').addEventListener('close',()=>q('#temporary-password').value='');
+q('#form').onsubmit=async e=>{
+  e.preventDefault();const btn=e.submitter;btn.disabled=true;
+  const existing=people.find(p=>p.id===editId),data={firstName:q('#first-name').value,lastName:q('#last-name').value,phone:q('#phone').value,birthday:q('#birthday').value,job:q('#job').value,active:existing?.active!==false};
+  if(existing?.role!=='admin')Object.assign(data,{email:q('#email').value,password:q('#temporary-password').value,rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
+  try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',data);q('#form').reset();q('#editor').close();await reloadPeople('Fiche enregistrée.');}
+  catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}
+};
+q('#keep').onclick=()=>q('#removeDialog').close();q('#confirmRemove').onclick=async()=>{
+  const btn=q('#confirmRemove');btn.disabled=true;try{await api('/api/users/'+removeId,'DELETE');q('#removeDialog').close();await reloadPeople('Collaborateur déplacé dans les inactifs.');}catch(e){q('#removeDialog').close();q('#feedback').textContent=e.message;}finally{btn.disabled=false;}
+};
+function parsePeopleCSV(text){
+  const rows=[];let row=[],field='',quoted=false;text=text.replace(/^\uFEFF/,'');const delimiter=text.split(/\r?\n/)[0].includes(';')?';':',';
+  for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}else if(!quoted&&c===delimiter){row.push(field);field='';}else if(!quoted&&(c==='\n'||c==='\r')){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(v=>v.trim()))rows.push(row);row=[];field='';}else field+=c;}
+  if(quoted)throw Error('Guillemets incomplets dans le CSV.');row.push(field);if(row.some(v=>v.trim()))rows.push(row);
+  const headers=(rows.shift()||[]).map(normalizeSearch),column=name=>headers.indexOf(name);if(column('prenom')<0||column('nom')<0)throw Error('Le CSV doit contenir les colonnes Prénom et Nom.');
+  const people=rows.map(r=>{const value=n=>(r[column(n)]||'').trim();const status=normalizeSearch(value('actif'));if(status&&!['oui','non','true','false','1','0'].includes(status))throw Error('La colonne Actif doit contenir Oui ou Non.');return {firstName:value('prenom'),lastName:value('nom'),phone:value('telephone'),birthday:value('date de naissance'),job:value('fonction'),active:!['non','false','0'].includes(status)};});
+  if(!people.length||people.length>100||people.some(p=>!p.firstName||!p.lastName))throw Error('Le fichier doit contenir de 1 à 100 personnes avec prénom et nom complets.');return people;
+}
+function renderEmployeeScan(content){
+  const area=node('section','','people-import hidden'),body=node('div');area.id='employee-scan-panel';area.append(node('h3','Ajouter un collaborateur à partir d’une fiche de renseignements'),button('Fermer',()=>area.classList.add('hidden')),body);content.append(area);let loaded=false;
+  q('#add-from-sheet').onclick=async()=>{area.classList.remove('hidden');if(loaded)return;loaded=true;const userId=session.user.id;const valid=()=>currentUniverse==='Collaborateurs'&&session?.user.id===userId&&area.isConnected;
+    try{const module=await import('/employee-import.js');if(!valid())return;await module.renderEmployeeImport({container:body,api,people,isCurrent:valid,onReview:async(person,draft)=>{
+      const record=await import('/employee-record.js');if(!valid())return;
+      const request=++employeeRecordRequest;const reviewValid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
+      const cleanup=()=>URL.revokeObjectURL(draft.sourceUrl);setPeopleAddActions(false);
+      await record.renderEmployeeRecord({container:q('#content'),api,person,draft,universes:initialTileOrder,isCurrent:reviewValid,onPayroll:openMyPayroll,onClose:()=>{cleanup();reloadPeople();},onSaved:async(result,message)=>{cleanup();await reloadPeople(message);}});
+    }});}catch(e){loaded=false;body.replaceChildren(node('p',e.message,'error'));}
+  };
+}
+function renderEmployeeDocument(content){
+  const area=node('details','','people-import');
+  const download=node('a','Télécharger le PDF vierge','btn primary');download.href='/api/collaborateurs/registration-form';download.download='fiche-inscription-salarie.pdf';
+  area.append(node('summary','Générer une fiche de renseignements'),node('p','Fiche à imprimer et à remplir à la main par le salarié : informations d’inscription et liste des justificatifs à transmettre selon sa situation.','field-note'),download);content.append(area);
+}
+function renderPeopleImport(content){
+  const area=node('details','','people-import');area.append(node('summary','Importer une liste de collaborateurs'),node('p','CSV : Prénom, Nom, Téléphone, Date de naissance (AAAA-MM-JJ), Fonction, Actif (Oui / Non). Les informations de connexion existantes sont conservées.','field-note'));
+  const label=node('label','Choisir le fichier CSV','field'),file=node('input');file.type='file';file.id='people-csv';file.accept='.csv,text/csv';label.htmlFor=file.id;
+  const status=node('p','','field-note');status.setAttribute('role','status');let pending=[];
+  const submit=button('Importer ces collaborateurs',async()=>{submit.disabled=true;file.disabled=true;try{const result=await api('/api/collaborateurs/import','POST',{people:pending});await reloadPeople(result.count+' fiches importées : '+result.active+' actives, '+result.inactive+' inactives.');}catch(e){status.textContent=e.message;file.disabled=false;submit.disabled=false;}},'btn primary');submit.disabled=true;
+  file.onchange=async()=>{pending=[];submit.disabled=true;status.textContent='';try{const selected=file.files[0];if(!selected)return;if(selected.size>15000)throw Error('Le fichier est trop volumineux.');pending=parsePeopleCSV(await selected.text());status.textContent=pending.length+' fiches prêtes : '+pending.filter(p=>p.active).length+' actives, '+pending.filter(p=>!p.active).length+' inactives.';submit.disabled=false;}catch(e){status.textContent=e.message;}};
+  area.append(label,file,status,submit);content.append(area);
+}
+async function runCalendarAction(action){try{q('#feedback').textContent='Veuillez patienter…';await action();q('#feedback').textContent='';if(currentUniverse==='Agenda')await renderCalendar();}catch(e){q('#feedback').textContent=e.message;}}
+async function renderCalendar(){
+  const data=await api('/api/calendar');if(currentUniverse!=='Agenda')return;const content=q('#content');content.replaceChildren();
+  if(session.user.role==='admin'){
+    const status=await api('/api/google/status');if(currentUniverse!=='Agenda')return;
+    const tools=node('details','','calendar-tools');tools.open=!status.connected;tools.append(node('summary','Paramètres de l’agenda'));
+    if(!status.configured){tools.append(node('p','Ajoutez les identifiants Google dans les paramètres Render pour activer la connexion.','admin-hint'),node('p','Adresse de retour à renseigner dans Google : '+status.callback,'admin-hint'));}
+    else tools.append(button(status.connected?'Renouveler l’autorisation Google':'Connecter Google Agenda',()=>runCalendarAction(async()=>{const result=await api('/api/google/connect','POST');window.location.assign(result.url);}),'btn primary'));
+    if(status.connected){
+      try{const calendars=await api('/api/google/calendars');if(currentUniverse!=='Agenda')return;const label=node('label','Agenda à afficher');label.htmlFor='calendar-choice';const select=node('select','','calendar-select');select.id='calendar-choice';select.append(new Option('Choisir un agenda',''));calendars.forEach(c=>select.append(new Option(c.name,c.id)));select.value=status.calendarId;tools.append(label,select,button('Enregistrer cet agenda',()=>runCalendarAction(async()=>{if(!select.value)throw Error('Choisissez un agenda.');await api('/api/google/calendar','POST',{id:select.value});})));}
+      catch(e){tools.append(node('p',e.message,'calendar-warning'));}
+      tools.append(button('Actualiser maintenant',()=>runCalendarAction(()=>api('/api/google/sync','POST'))),button('Déconnecter Google',()=>{if(confirm('Déconnecter Google et retirer les événements du portail ?'))runCalendarAction(()=>api('/api/google/disconnect','POST'));},'btn small danger'));
+    }
+    content.append(tools);
+  }
+  content.append(node('h3',data.name));
+  if(data.syncedAt)content.append(node('p','Dernière synchronisation : '+new Date(data.syncedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' · Actualisation toutes les 15 minutes.','status-line'));
+  if(data.error)content.append(node('p',data.error+' Les événements affichés peuvent ne pas être à jour.','calendar-warning'));
+  const results=node('section','','agenda-results');content.append(results);renderCalendarResults(data,results);
+}
+setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda')renderCalendar().catch(error);},15*60000);
+(async()=>{try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('youtube=')){await openUniverse('Fun');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation YouTube annulée.';else q('#feedback').textContent='YouTube connecté. Cliquez sur son logo pour choisir votre playlist.';history.replaceState(null,'','/');}}catch{showLogin();}})();
+
+const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
+let draftTileOrder=[],draftHiddenTiles=new Set();
+function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
+function tileAllowed(name){return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs'].includes(name)||session.user.rights.includes(name)));}
+function canEditUniverse(name){return session.user.role==='admin'||(tileAllowed(name)&&(session.user.permissionsConfigured?session.user.editRights?.includes(name):name==='Fun'));}
+function tilePreferences(){
+  let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
+  const order=Array.isArray(saved)?saved:Array.isArray(saved?.order)?saved.order:[];
+  // Migrate the former first row once, while preserving custom orders and hidden tiles.
+  if((saved?.version||0)<2&&order.indexOf('Procédures')===3&&order.indexOf('Actualités')>3){const index=order.indexOf('Actualités');[order[3],order[index]]=[order[index],order[3]];}
+  return {order,hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
+}
+function applyTileVisibility(){
+  const hidden=new Set(tilePreferences().hidden);
+  document.querySelectorAll('.grid [data-universe]').forEach(tile=>tile.classList.toggle('hidden',!tileAllowed(tile.dataset.universe)||hidden.has(tile.dataset.universe)));
 }
 function applyTileOrder(){
   const saved=tilePreferences().order;

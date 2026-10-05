@@ -153,3 +153,7 @@ button.schedule-day:hover{border-color:var(--brand);filter:brightness(.98)}
 .employee-import-review{border:1px solid #d8bc72;background:#fff9e8;border-radius:12px;padding:20px;margin-bottom:20px}
 .employee-import-review h4{margin:0 0 12px}
 .employee-import-review .error{font-size:14px}
+
+.people-add-actions{display:flex;flex-direction:column;gap:10px;align-items:stretch;max-width:420px;flex-shrink:0}
+.people-add-actions .btn{white-space:normal;text-align:center;width:100%}
+@media(max-width:750px){.panel .top{flex-wrap:wrap}.people-add-actions{max-width:none;width:100%}}
