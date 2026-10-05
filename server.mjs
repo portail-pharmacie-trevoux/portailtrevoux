@@ -1,4 +1,5 @@
 import express from 'express';
+import { importProcedureDocuments } from './procedure-import.mjs';
 import { registerProcedures } from './procedures.mjs';
 import { registerContacts } from './contacts.mjs';
 import { registerCollaborateurs } from './collaborateurs.mjs';
@@ -270,6 +271,7 @@ export function createApp(db,config) {
 
 export async function initialize(db,config){
   await db.query(await readFile(new URL('./schema.sql',import.meta.url),'utf8'));
+  await importProcedureDocuments(db,config.procedureImport);
   const initialMusic=JSON.parse(await readFile(new URL('./music-seed.json',import.meta.url),'utf8'));
   const seed=initialMusic.map(t=>({...t,trackKey:musicKey(t.artist,t.title)}));
   await db.query(`INSERT INTO music_tracks(artist,title,track_key,contributor,source)
@@ -283,7 +285,7 @@ export async function initialize(db,config){
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const env=process.env,config={serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
+  const env=process.env,config={procedureImport:env.PROCEDURES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
