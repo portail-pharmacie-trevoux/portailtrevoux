@@ -157,3 +157,5 @@ button.schedule-day:hover{border-color:var(--brand);filter:brightness(.98)}
 .people-add-actions{display:flex;flex-direction:column;gap:10px;align-items:stretch;max-width:420px;flex-shrink:0}
 .people-add-actions .btn{white-space:normal;text-align:center;width:100%}
 @media(max-width:750px){.panel .top{flex-wrap:wrap}.people-add-actions{max-width:none;width:100%}}
+
+.portal-logo-lockup{display:block;position:relative;width:430px;max-width:100%}.portal-logo-lockup .portal-logo{width:100%;clip-path:polygon(0 0,100% 0,100% 62%,28% 62%,28% 100%,0 100%)}.portal-slogan{position:absolute;left:29%;top:66%;width:71%;font-size:12px;font-weight:600;line-height:1.25;color:#006052;white-space:nowrap}@media(max-width:800px){.portal-logo-lockup{width:340px}.portal-slogan{font-size:9.5px}}@media(max-width:560px){.portal-logo-lockup{width:330px}.portal-slogan{font-size:9.2px}}
