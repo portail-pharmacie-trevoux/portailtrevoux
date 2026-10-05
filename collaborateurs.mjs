@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { readEmployeeDetails, saveEmployeeDetails, validateEmployeeDetails } from './employee-details.mjs';
 import { hashPassword, passwordValid, universes, digest, canAccess } from './security.mjs';
 
@@ -43,6 +44,10 @@ export function createFeastCalendar({fetchImpl=fetch,now=()=>new Date()}={}) {
   };
 }
 export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar()}) {
+  app.get('/api/collaborateurs/registration-form',auth,ready,admin,async(req,res)=>{
+    const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
+    res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
+  });
   const all=async()=>(await db.query('SELECT * FROM users ORDER BY active DESC,last_name,first_name')).rows;
   const view=(person,req)=>publicPerson(person,req.auth.role==='admin',req.auth.id);
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
@@ -141,3 +146,4 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}
   });
 }
+

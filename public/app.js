@@ -108,7 +108,7 @@ function renderPeople(){
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
   content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
   if(isAdmin)content.append(node('p','Complétez les téléphones et, si besoin, créez les accès personnels depuis « Modifier ». Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));
-  if(isAdmin)renderPeopleImport(content);
+  if(isAdmin){renderPeopleImport(content);renderEmployeeDocument(content);}
   for(const active of [true,false]){
     const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
@@ -177,6 +177,11 @@ function parsePeopleCSV(text){
   const headers=(rows.shift()||[]).map(normalizeSearch),column=name=>headers.indexOf(name);if(column('prenom')<0||column('nom')<0)throw Error('Le CSV doit contenir les colonnes Prénom et Nom.');
   const people=rows.map(r=>{const value=n=>(r[column(n)]||'').trim();const status=normalizeSearch(value('actif'));if(status&&!['oui','non','true','false','1','0'].includes(status))throw Error('La colonne Actif doit contenir Oui ou Non.');return {firstName:value('prenom'),lastName:value('nom'),phone:value('telephone'),birthday:value('date de naissance'),job:value('fonction'),active:!['non','false','0'].includes(status)};});
   if(!people.length||people.length>100||people.some(p=>!p.firstName||!p.lastName))throw Error('Le fichier doit contenir de 1 à 100 personnes avec prénom et nom complets.');return people;
+}
+function renderEmployeeDocument(content){
+  const area=node('details','','people-import');
+  const download=node('a','Télécharger le PDF vierge','btn primary');download.href='/api/collaborateurs/registration-form';download.download='fiche-inscription-salarie.pdf';
+  area.append(node('summary','Générer un document salarié'),node('p','Fiche à imprimer et à remplir à la main par le salarié : informations d’inscription et liste des justificatifs à transmettre selon sa situation.','field-note'),download);content.append(area);
 }
 function renderPeopleImport(content){
   const area=node('details','','people-import');area.append(node('summary','Importer une liste de collaborateurs'),node('p','CSV : Prénom, Nom, Téléphone, Date de naissance (AAAA-MM-JJ), Fonction, Actif (Oui / Non). Les informations de connexion existantes sont conservées.','field-note'));
@@ -624,3 +629,4 @@ function renderCelebrations(data){
   }
   tile.append(block);
 }
+

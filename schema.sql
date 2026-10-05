@@ -71,3 +71,6 @@ CREATE TABLE IF NOT EXISTS procedure_documents (
  description TEXT NOT NULL DEFAULT '', keywords TEXT NOT NULL DEFAULT '', url TEXT NOT NULL,
  active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS file_type TEXT;
+ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS file_content BYTEA;

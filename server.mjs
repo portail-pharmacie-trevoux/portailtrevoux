@@ -27,7 +27,9 @@ export function createApp(db,config) {
     if(secure)res.set('Strict-Transport-Security','max-age=31536000');
     next();
   });
-  app.use(express.json({limit:'16kb'}));
+  const jsonBody=express.json({limit:'16kb'});
+  // Parse larger file uploads only after checking their session and edit rights.
+  app.use((req,res,next)=>req.method==='POST'&&req.path==='/api/procedures/import'?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -51,7 +53,7 @@ export function createApp(db,config) {
   async function publish(universe,title,key=null) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
-  registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish});
+  registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
   const allowedPublications=user=>universes.filter(name=>name!=='Collaborateurs'&&canAccess(user,name));
@@ -263,6 +265,7 @@ export function createApp(db,config) {
   app.use((error,req,res,next)=>{
     if(error.code==='23505')return res.status(409).json({error:'Cette adresse e-mail est déjà utilisée.'});
     const status=error.status||500;
+    if(status===413)return res.status(413).json({error:'Le fichier dépasse la limite de 10 Mo.'});
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message});
   });
@@ -296,4 +299,3 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }
-
