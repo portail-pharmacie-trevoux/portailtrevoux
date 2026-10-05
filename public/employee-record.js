@@ -38,7 +38,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     {key:'password',label:'Nouveau mot de passe provisoire (facultatif)',type:'password'}
   ],{email:p.email||'',password:''},basicInputs,false);
   basicInputs.get('password').input.minLength=12;basicInputs.get('password').input.autocomplete='new-password';
-  account.append(el('p','La fiche peut exister sans compte de connexion. Pour créer un accès, renseignez un e-mail et un mot de passe provisoire de 12 caractères minimum. Laissez le mot de passe vide pour conserver un accès existant.','field-note'));
+  account.append(el('p','Renseignez une adresse e-mail, puis utilisez « Envoyer demande de connexion » dans l’annuaire. Le salarié choisira lui-même son mot de passe. Le mot de passe provisoire reste facultatif (12 caractères minimum).','field-note'));
   if(isAdministrator){account.classList.add('hidden');basicInputs.get('email').input.disabled=true;basicInputs.get('password').input.disabled=true;}
   const permissions=el('section','','employee-permissions');permissions.id='employee-permissions';
   permissions.append(el('h3','Accès et modification des univers'),el('p','Consulter donne accès à l’univers. Modifier autorise les changements dans son contenu. Cocher Modifier active aussi Consulter.','field-note'));

@@ -101,3 +101,16 @@ WITH migration AS (
 )
 UPDATE users SET rights=rights||'["Actualités"]'::jsonb
 WHERE active=TRUE AND NOT (rights ? 'Actualités') AND EXISTS(SELECT 1 FROM migration);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invitation_sent_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS employee_invitations (
+ token_hash TEXT PRIMARY KEY,
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ email TEXT NOT NULL,
+ expires_at TIMESTAMPTZ NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ sent_at TIMESTAMPTZ,
+ used_at TIMESTAMPTZ,
+ requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS employee_invitations_user_id ON employee_invitations(user_id);

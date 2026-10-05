@@ -1,4 +1,5 @@
 import {registerNews,purgeNews,unreadNews} from './news.mjs';
+import {createInvitationMailer,registerInvitations,gmailSendScope,sameMailAccount} from './invitations.mjs';
 import {registerEmployeeImport} from './employee-import.mjs';
 import express from 'express';
 import { importProcedureDocuments } from './procedure-import.mjs';
@@ -87,6 +88,8 @@ export function createApp(db,config) {
   app.get('/api/fun/joke',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await dailyJoke()));
   registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModify,fail});
   const callback=origin+'/auth/google/callback';
+  const mailSender=config.mailEmail||'pharmacie.trevoux@gmail.com';
+  const mailer=config.invitationMailer||createInvitationMailer({getSetting,setSetting,secret,clientId:config.googleId,clientSecret:config.googleSecret,sender:mailSender,fail,fetchImpl:config.mailFetch});
   const cookieOptions={httpOnly:true,secure,sameSite:'lax',path:'/',maxAge:8*60*60*1000};
   async function newSession(user,res){
     const raw=token(),session=digest(raw),csrfToken=token();
@@ -94,6 +97,7 @@ export function createApp(db,config) {
     res.cookie('trevoux_session',raw,cookieOptions);
     return {user:cleanUser(user),csrf:csrfToken};
   }
+  registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession});
   app.get('/health',async(req,res)=>{await db.query('SELECT 1');res.json({ok:true});});
   app.post('/api/login',async(req,res)=>{
     const email=typeof req.body.email==='string'?req.body.email.trim().toLowerCase():'';
@@ -177,6 +181,14 @@ export function createApp(db,config) {
     await db.query("DELETE FROM settings WHERE key IN ('youtube_tokens','youtube_channel_id','youtube_channel_name','youtube_playlist_id','youtube_playlist_name')");
     res.json({ok:true});
   });
+  app.post('/api/mail/connect',auth,ready,admin,csrf,async(req,res)=>{
+    if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google du portail doit être complétée.');
+    const state='mail_'+token(),verifier=token();
+    await db.query("UPDATE sessions SET oauth_state=$1,oauth_expires=now()+interval '10 minutes',oauth_verifier=$2 WHERE id=$3",[digest(state),verifier,req.auth.session_id]);
+    const params=new URLSearchParams({client_id:config.googleId,redirect_uri:callback,response_type:'code',scope:'openid email '+gmailSendScope,access_type:'offline',prompt:'consent',login_hint:mailSender,state,code_challenge:Buffer.from(digest(verifier),'hex').toString('base64url'),code_challenge_method:'S256'});
+    res.json({url:'https://accounts.google.com/o/oauth2/v2/auth?'+params});
+  });
+  app.post('/api/mail/disconnect',auth,ready,admin,csrf,async(req,res)=>{await db.query("DELETE FROM settings WHERE key='mail_tokens'");res.json({ok:true});});
   app.post('/api/google/connect',auth,ready,admin,csrf,async(req,res)=>{
     if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
     const state=token(),verifier=token();
@@ -188,8 +200,8 @@ export function createApp(db,config) {
     const state=typeof req.query.state==='string'?req.query.state:'';
     const {rows}=await db.query('UPDATE sessions SET oauth_state=NULL,oauth_expires=NULL,oauth_verifier=NULL WHERE id=$1 AND oauth_state=$2 AND oauth_expires>now() RETURNING $3::text AS verifier',[req.auth.session_id,digest(state),(await db.query('SELECT oauth_verifier FROM sessions WHERE id=$1',[req.auth.session_id])).rows[0]?.oauth_verifier]);
     if(!state||!rows[0])throw fail(400,'Autorisation expirée. Relancez la connexion Google.');
-    const forYouTube=state.startsWith('youtube_');
-    if(req.query.error)return res.redirect(forYouTube?'/?youtube=refused':'/?google=refused');
+    const forYouTube=state.startsWith('youtube_'),forMail=state.startsWith('mail_');
+    if(req.query.error)return res.redirect(forMail?'/?mail=refused':forYouTube?'/?youtube=refused':'/?google=refused');
     if(typeof req.query.code!=='string')throw fail(400,'Autorisation Google invalide.');
     const result=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,code:req.query.code,grant_type:'authorization_code',redirect_uri:callback,code_verifier:rows[0].verifier}),signal:AbortSignal.timeout(20000)});
     if(!result.ok)throw fail(400,'Connexion Google impossible. Vérifiez les réglages puis réessayez.');
@@ -197,8 +209,13 @@ export function createApp(db,config) {
     if(forYouTube){await youtube.connect(tokens);return res.redirect('/?youtube=connected');}
     const identity=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token},signal:AbortSignal.timeout(20000)});
     const profile=identity.ok?await identity.json():{};
-    if(!profile.email_verified||profile.email?.toLowerCase()!==config.googleEmail.toLowerCase())throw fail(403,'Connectez le compte Google de la pharmacie.');
+    if(!profile.email_verified||(forMail?!sameMailAccount(profile.email,mailSender):profile.email?.toLowerCase()!==config.googleEmail.toLowerCase()))throw fail(403,'Connectez le compte Google de la pharmacie.');
     const scopes=new Set((tokens.scope||'').split(' '));
+    if(forMail){
+      if(!scopes.has(gmailSendScope)||!tokens.refresh_token)throw fail(400,'Autorisez l’envoi des e-mails depuis la pharmacie.');
+      tokens.sender=mailSender;tokens.expires_at=Date.now()+tokens.expires_in*1000;
+      await setSetting('mail_tokens',encrypt(tokens,secret));return res.redirect('/?mail=connected');
+    }
     if(!scopes.has('https://www.googleapis.com/auth/calendar.events.readonly')||!scopes.has('https://www.googleapis.com/auth/calendar.calendarlist.readonly'))throw fail(400,'Autorisez la lecture des agendas et des événements.');
     if(!tokens.refresh_token)throw fail(400,'Autorisation automatique absente. Relancez la connexion Google.');
     tokens.expires_at=Date.now()+tokens.expires_in*1000;
@@ -294,7 +311,7 @@ export async function initialize(db,config){
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const env=process.env,config={openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
+  const env=process.env,config={mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});

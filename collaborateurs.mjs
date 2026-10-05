@@ -1,3 +1,4 @@
+import {invitationAddress} from './invitations.mjs';
 import { readFile } from 'node:fs/promises';
 import { readEmployeeDetails, saveEmployeeDetails, validateEmployeeDetails } from './employee-details.mjs';
 import { hashPassword, passwordValid, universes, digest, canAccess } from './security.mjs';
@@ -11,7 +12,7 @@ const dateText=d=>d instanceof Date?d.toISOString().slice(0,10):String(d||'').sl
 export function publicPerson(p,isAdmin,selfId) {
   const base={id:p.id,firstName:p.first_name,lastName:p.last_name,phone:p.phone,active:p.active,isSelf:p.id===selfId};
   // Keep the full name for administrator pages opened before the directory update.
-  return isAdmin?{...base,name:p.first_name&&p.last_name?p.first_name+' '+p.last_name.toLocaleUpperCase('fr-FR'):p.name,job:p.job,birthday:dateText(p.birthday),email:p.email||'',rights:p.rights,editRights:p.edit_rights||[],permissionsConfigured:!!p.permissions_configured,role:p.role}:base;
+  return isAdmin?{...base,name:p.first_name&&p.last_name?p.first_name+' '+p.last_name.toLocaleUpperCase('fr-FR'):p.name,job:p.job,birthday:dateText(p.birthday),email:p.email||'',rights:p.rights,editRights:p.edit_rights||[],permissionsConfigured:!!p.permissions_configured,role:p.role,passwordConfigured:!!p.password_hash&&!p.must_change,invitationSentAt:p.invitation_sent_at||null}:base;
 }
 export function validatePerson(data,fail) {
   const text=(key,max=100)=>{const v=data[key]??'';if(typeof v!=='string'||v.length>max)throw fail(400,'Champ invalide : '+key);return v.trim();};
@@ -57,7 +58,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
   const all=async()=>(await db.query('SELECT * FROM users ORDER BY active DESC,last_name,first_name')).rows;
   const view=(person,req)=>publicPerson(person,req.auth.role==='admin',req.auth.id);
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
-  app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>res.json((await all()).map(p=>view(p,req))));
+  app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all();if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
   app.get('/api/collaborateurs/celebrations',auth,ready,directoryAccess,async(req,res)=>{
     const calendar=await feastCalendar(),day=calendar.day,people=(await all()).filter(p=>p.active);
     res.json({day,feasts:calendar.feasts,feastsAvailable:calendar.available,
@@ -75,7 +76,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     if(!Array.isArray(rights)||rights.some(r=>!universes.includes(r)))throw fail(400,'Droits invalides.');
     if(!Array.isArray(editRights)||editRights.some(r=>!universes.includes(r)||r==='Collaborateurs'||!rights.includes(r)))throw fail(400,'La modification nécessite un droit de consultation. La gestion des collaborateurs reste réservée à l’administrateur.');
     if(existing?.email&&!email)throw fail(400,'Archivez le collaborateur pour désactiver son accès.');
-    if((email&&!existing?.password_hash)||data.password){if(!passwordValid(data.password))throw fail(400,'Le mot de passe provisoire doit comporter au moins 12 caractères.');}
+    if(data.password){if(!passwordValid(data.password))throw fail(400,'Le mot de passe provisoire doit comporter au moins 12 caractères.');}
     if(!email&&data.password)throw fail(400,'Renseignez une adresse e-mail pour créer un accès.');
     return {email:email.trim().toLowerCase()||null,rights:[...new Set(rights)],editRights:[...new Set(editRights)],configured,hash:data.password?await hashPassword(data.password):existing?.password_hash||null};
   }
@@ -91,7 +92,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
   }
   app.post('/api/users',auth,ready,admin,csrf,async(req,res)=>{
     const d=validatePerson(req.body,fail),a=await account(req.body),role=requestedEmployeeRole(req.body,null,fail),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);
-    if(role==='admin'&&(!d.active||!a.email||!a.hash))throw fail(400,'Pour donner les droits administrateur, créez un accès de connexion et gardez le collaborateur actif.');
+    if(role==='admin'&&(!d.active||!a.email))throw fail(400,'Pour donner les droits administrateur, renseignez une adresse de connexion et gardez le collaborateur actif.');
     const person=await transaction(async client=>{
       const {rows}=await client.query(`INSERT INTO users(name,first_name,last_name,phone,birthday,job,active,email,password_hash,rights,edit_rights,permissions_configured,role)
         VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured,role]);
@@ -111,7 +112,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
         return (await client.query('UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6 WHERE id=$7 RETURNING *',[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,id])).rows[0];
       }
       const a=await account(req.body,existing);
-      if(role==='admin'&&(!d.active||!a.email||!a.hash))throw fail(400,'Pour donner les droits administrateur, créez un accès de connexion et gardez le collaborateur actif.');
+      if(role==='admin'&&(!d.active||!a.email))throw fail(400,'Pour donner les droits administrateur, renseignez une adresse de connexion et gardez le collaborateur actif.');
       const {rows}=await client.query(`UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6,active=$7,email=$8,password_hash=$9,rights=$10::jsonb,
         edit_rights=$11::jsonb,permissions_configured=$12,must_change=CASE WHEN $13 THEN TRUE ELSE must_change END,role=$15 WHERE id=$14 RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured,!!req.body.password,id,role]);
       if(role!==existing.role||!d.active||a.email!==existing.email||a.hash!==existing.password_hash||JSON.stringify(a.rights)!==JSON.stringify(existing.rights)||JSON.stringify(a.editRights)!==JSON.stringify(existing.edit_rights)||a.configured!==existing.permissions_configured)await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);

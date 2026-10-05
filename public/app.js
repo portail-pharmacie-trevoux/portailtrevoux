@@ -110,7 +110,7 @@ function renderPeople(){
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
   content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
   if(isAdmin)content.append(node('p','Complétez les téléphones et, si besoin, créez les accès personnels depuis « Modifier ». Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));
-  if(isAdmin){renderEmployeeScan(content);renderPeopleImport(content);renderEmployeeDocument(content);}
+  if(isAdmin){renderEmployeeScan(content);renderPeopleImport(content);renderEmployeeDocument(content);renderInvitationMail(content);}
   for(const active of [true,false]){
     const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
@@ -126,6 +126,19 @@ function renderPeople(){
       tr.append(first,last,phone);
       if(isAdmin){
         const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
+        if(active&&!p.passwordConfigured){
+          const invite=button('Envoyer demande de connexion',async()=>{
+            if(!confirm('Envoyer le mail de bienvenue à '+personName(p)+' sur '+p.invitationEmail+' ? Le salarié choisira lui-même son mot de passe.'))return;
+            invite.disabled=true;q('#feedback').textContent='Envoi de l’invitation…';
+            try{const result=await api('/api/users/'+p.id+'/invitation','POST',{email:p.invitationEmail});await reloadPeople('Invitation envoyée à '+result.email+'. Le lien est valable 72 heures.');}
+            catch(e){if(currentUniverse==='Collaborateurs'){q('#feedback').textContent=e.message;const panel=q('#invitation-mail');if(panel)panel.open=true;invite.disabled=false;}}
+          },'btn small primary');
+          invite.setAttribute('aria-label','Envoyer demande de connexion à '+personName(p));
+          invite.disabled=!p.invitationEmail;invite.title=p.invitationEmail?'Envoyer à '+p.invitationEmail:'Renseignez une adresse e-mail dans la fiche du collaborateur.';
+          const invitation=node('div','','person-invitation');invitation.append(invite,node('small',p.invitationEmail||'E-mail à renseigner','field-note'));
+          if(p.invitationSentAt)invitation.append(node('small','Dernière invitation : '+new Date(p.invitationSentAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'}),'field-note'));
+          actions.append(invitation);
+        }
         if(p.role!=='admin'){
           if(active){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
           else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);const permanent=button('Supprimer définitivement',async()=>{
@@ -140,6 +153,25 @@ function renderPeople(){
     table.append(body);wrap.append(table);section.append(wrap);content.append(section);
   }
 }
+
+function renderInvitationMail(content){
+  const panel=node('details','','invitation-mail');panel.id='invitation-mail';panel.append(node('summary','Messagerie des invitations'),node('p','Expéditeur : pharmacie.trevoux@gmail.com','field-note'));
+  const state=node('p','Vérification de la connexion Gmail…','field-note'),controls=node('div','','news-selection-actions');panel.append(state,controls);content.append(panel);
+  const userId=session.user.id;
+  api('/api/mail/status').then(status=>{
+    if(session?.user.id!==userId||!panel.isConnected)return;
+    panel.open=!status.connected;state.textContent=status.connected?'Gmail est connecté. Vous pouvez envoyer les invitations depuis la ligne de chaque collaborateur.':'Connectez le compte Gmail de la pharmacie et autorisez l’envoi des mails pour activer les invitations.';
+    if(!status.configured){state.textContent='La configuration Google du portail doit être complétée avant de connecter Gmail.';return;}
+    const connect=button(status.connected?'Renouveler l’autorisation Gmail':'Connecter Gmail pour les invitations',async()=>{
+      connect.disabled=true;try{const result=await api('/api/mail/connect','POST',{});window.location.assign(result.url);}catch(e){state.textContent=e.message;connect.disabled=false;}
+    },'btn primary');controls.append(connect);
+    if(status.connected)controls.append(button('Déconnecter cette messagerie',async()=>{
+      if(!confirm('Désactiver l’envoi des invitations par Gmail ?'))return;
+      try{await api('/api/mail/disconnect','POST',{});await reloadPeople('Messagerie des invitations déconnectée.');}catch(e){state.textContent=e.message;}
+    },'btn small danger'));
+  }).catch(e=>{if(panel.isConnected)state.textContent=e.message;});
+}
+
 let employeeRecordRequest=0;
 async function openEmployeeRecord(person){
   if(session?.user.role!=='admin')return;
@@ -160,7 +192,7 @@ function openEditor(id=null){
   const p=people.find(p=>p.id===id);q('#first-name').value=p?.firstName||'';q('#last-name').value=p?.lastName||'';q('#phone').value=p?.phone||'';q('#birthday').value=p?.birthday||'';q('#job').value=p?.job||'';q('#email').value=p?.email||'';
   q('#account-options').classList.toggle('hidden',p?.role==='admin');q('#account-options').open=!!p?.email&&p?.role!=='admin';
   q('#email').required=false;q('#temporary-password').required=false;
-  q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'La fiche peut être enregistrée sans accès de connexion. Pour créer un accès personnel, renseignez un e-mail et un mot de passe provisoire de 12 caractères minimum.';
+  q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'Renseignez un e-mail, puis envoyez une demande de connexion depuis l’annuaire. Le salarié choisira son mot de passe. Le mot de passe provisoire est facultatif.';
   document.querySelectorAll('[name=right]').forEach(c=>c.checked=p?.rights?.includes(c.value)||false);
   q('#editor').showModal();q('#first-name').focus();
 }
@@ -228,7 +260,10 @@ async function renderCalendar(){
   const results=node('section','','agenda-results');content.append(results);renderCalendarResults(data,results);
 }
 setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda')renderCalendar().catch(error);},15*60000);
-(async()=>{try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('youtube=')){await openUniverse('Fun');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation YouTube annulée.';else q('#feedback').textContent='YouTube connecté. Cliquez sur son logo pour choisir votre playlist.';history.replaceState(null,'','/');}}catch{showLogin();}})();
+(async()=>{
+ const invitation=location.hash.match(/^#invitation=([-\w]{43})$/)?.[1];
+ if(invitation){history.replaceState(null,'',location.pathname);await Promise.resolve();showLogin();try{const module=await import('/invitation.js');await module.renderInvitation({container:q('#login'),token:invitation,api,onComplete:result=>{session=result;afterLogin();}});}catch(e){q('#global-message').textContent=e.message;}return;}
+ try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('mail=')){await openUniverse('Collaborateurs');q('#feedback').textContent=location.search.includes('refused')?'Autorisation Gmail annulée.':'Gmail connecté. Vous pouvez envoyer les demandes de connexion.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('youtube=')){await openUniverse('Fun');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation YouTube annulée.';else q('#feedback').textContent='YouTube connecté. Cliquez sur son logo pour choisir votre playlist.';history.replaceState(null,'','/');}}catch{showLogin();}})();
 
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
 let draftTileOrder=[],draftHiddenTiles=new Set();
@@ -240,210 +275,7 @@ function tilePreferences(){
   const order=Array.isArray(saved)?saved:Array.isArray(saved?.order)?saved.order:[];
   // Migrate the former first row once, while preserving custom orders and hidden tiles.
   if((saved?.version||0)<2&&order.indexOf('Procédures')===3&&order.indexOf('Actualités')>3){const index=order.indexOf('Actualités');[order[3],order[index]]=[order[index],order[3]];}
-  return {order,hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
-}
-function applyTileVisibility(){
-  const hidden=new Set(tilePreferences().hidden);
-  document.querySelectorAll('.grid [data-universe]').forEach(tile=>tile.classList.toggle('hidden',!tileAllowed(tile.dataset.universe)||hidden.has(tile.dataset.universe)));
-}
-function applyTileOrder(){
-  const saved=tilePreferences().order;
-  const order=[...new Set([...saved.filter(n=>initialTileOrder.includes(n)),...initialTileOrder])];
-  const grid=q('.grid');order.forEach(name=>{const tile=[...grid.children].find(b=>b.dataset.universe===name);if(tile)grid.append(tile);});applyTileVisibility();
-}
-function renderTileOrder(focusName,focusDirection){
-  const list=q('#tile-order-list');list.replaceChildren();
-  draftTileOrder.forEach((name,index)=>{
-    const row=node('div','','tile-order-row'),label=node('span',name),actions=node('div','','tile-order-actions');
-    const visibility=node('label','','tile-visibility'),check=node('input');check.type='checkbox';check.checked=!draftHiddenTiles.has(name);check.setAttribute('aria-label','Afficher '+name);
-    check.onchange=()=>{if(check.checked)draftHiddenTiles.delete(name);else draftHiddenTiles.add(name);q('#tile-order-status').textContent=name+(check.checked?' sera affiché.':' sera masqué.');};
-    visibility.append(check,node('span','Afficher'));actions.append(visibility);
-    ['up','down'].forEach(direction=>{
-      const offset=direction==='up'?-1:1;
-      const control=button(direction==='up'?'↑':'↓',()=>{
-        const target=index+offset;[draftTileOrder[index],draftTileOrder[target]]=[draftTileOrder[target],draftTileOrder[index]];
-        renderTileOrder(name,direction);q('#tile-order-status').textContent=name+' : position '+(target+1);
-      });
-      control.setAttribute('aria-label',(direction==='up'?'Monter ':'Descendre ')+name);
-      control.dataset.name=name;control.dataset.direction=direction;control.disabled=index+offset<0||index+offset>=draftTileOrder.length;actions.append(control);
-    });row.append(label,actions);list.append(row);
-  });
-  if(focusName){const controls=[...list.querySelectorAll('button')];const focused=controls.find(b=>b.dataset.name===focusName&&b.dataset.direction===focusDirection&&!b.disabled)||controls.find(b=>b.dataset.name===focusName&&!b.disabled);focused?.focus();}
-}
-q('#organize-tiles').onclick=()=>{
-  draftTileOrder=[...document.querySelectorAll('.grid [data-universe]')].filter(b=>tileAllowed(b.dataset.universe)).map(b=>b.dataset.universe);
-  draftHiddenTiles=new Set(tilePreferences().hidden.filter(name=>initialTileOrder.includes(name)));
-  q('#tile-order-status').textContent='';renderTileOrder();q('#tile-order-dialog').showModal();
-};
-q('#tile-order-cancel').onclick=()=>q('#tile-order-dialog').close();
-q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(tileAllowed);draftHiddenTiles.clear();renderTileOrder();q('#tile-order-status').textContent='Ordre initial et toutes vos tuiles affichées.';};
-q('#tile-order-save').onclick=()=>{
-  try{localStorage.setItem(tileOrderKey(),JSON.stringify({version:2,order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
-  catch{q('#tile-order-status').textContent='Ce navigateur ne permet pas de mémoriser votre ordre.';}
-};
-
-async function renderMusic(){
-  let tracks=await api('/api/music');if(currentUniverse!=='Fun')return;
-  const selectedTracks=new Set();
-  const editable=canEditUniverse('Fun'),content=q('#content');content.replaceChildren();
-  const intro=node('div','','music-intro');intro.append(node('h3','La musique de toute l’équipe'),node('p','Ajoutez vos morceaux préférés à la sélection partagée de la pharmacie.'));
-  const form=node('form','','music-form');
-  const artistLabel=node('label','Artiste'),artist=node('input');artist.type='text';artist.id='music-artist';artist.maxLength=200;artist.required=true;artist.placeholder='Ex. : Adele';artistLabel.htmlFor=artist.id;
-  const titleLabel=node('label','Titre'),title=node('input');title.type='text';title.id='music-title';title.maxLength=200;title.required=true;title.placeholder='Ex. : Hometown Glory';titleLabel.htmlFor=title.id;
-  const artistField=node('div'),titleField=node('div');artistField.append(artistLabel,artist);titleField.append(titleLabel,title);
-  const submit=node('button','Ajouter à la sélection','btn primary');submit.type='submit';
-  const message=node('p','','music-feedback');message.setAttribute('role','status');
-  form.append(artistField,titleField,submit);content.append(intro);if(editable)content.append(form);else content.append(node('p','Vous consultez la sélection musicale. L’ajout et la suppression de titres nécessitent un droit de modification.','field-note'));content.append(message);
-  content.append(node('p','Cette liste rassemble les choix de l’équipe. Cochez vos titres puis choisissez une plateforme. Deezer télécharge le CSV et ouvre Tune My Music : chargez-y le fichier téléchargé. YouTube permet de vérifier les vidéos puis de les ajouter directement à la playlist connectée.','status-line'));
-  const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
-  const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
-
-  const exportButton=button('',()=>{
-    const chosen=tracks.filter(t=>selectedTracks.has(t.id));if(!chosen.length)return;
-    window.open('https://www.tunemymusic.com/transfer/file-to-deezer','_blank','noopener,noreferrer');
-    const csvCell=value=>'"'+String(value).replace(/"/g,'""')+'"';
-    const csv='\uFEFF'+[['Artist','Title'],...chosen.map(t=>[t.artist,t.title])].map(row=>row.map(csvCell).join(',')).join('\r\n');
-    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-    const a=node('a');a.href=url;a.download='Playlist_PORTAIL_PLUS.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  });
-  exportButton.className='btn small music-platform-button deezer-button';exportButton.innerHTML="<svg aria-hidden=\"true\" focusable=\"false\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path fill=\"currentColor\" d=\"M.693 10.024c.381 0 .693-1.256.693-2.807 0-1.55-.312-2.807-.693-2.807C.312 4.41 0 5.666 0 7.217s.312 2.808.693 2.808ZM21.038 1.56c-.364 0-.684.805-.91 2.096C19.765 1.446 19.184 0 18.526 0c-.78 0-1.464 2.036-1.784 5-.312-2.158-.788-3.536-1.325-3.536-.745 0-1.386 2.704-1.62 6.472-.442-1.932-1.083-3.145-1.793-3.145s-1.35 1.213-1.793 3.145c-.242-3.76-.874-6.463-1.628-6.463-.537 0-1.013 1.378-1.325 3.535C6.938 2.036 6.262 0 5.474 0c-.658 0-1.247 1.447-1.602 3.665-.217-1.291-.546-2.105-.91-2.105-.675 0-1.221 2.807-1.221 6.272 0 3.466.546 6.273 1.221 6.273.277 0 .537-.476.736-1.273.32 2.928.996 4.938 1.776 4.938.606 0 1.143-1.204 1.507-3.11.251 3.622.875 6.195 1.602 6.195.46 0 .875-1.023 1.187-2.677C10.142 21.6 11 24 12.004 24c1.005 0 1.863-2.4 2.235-5.822.312 1.654.727 2.677 1.186 2.677.728 0 1.352-2.573 1.603-6.195.364 1.906.9 3.11 1.507 3.11.78 0 1.455-2.01 1.775-4.938.208.797.46 1.273.737 1.273.675 0 1.22-2.807 1.22-6.273-.008-3.457-.553-6.272-1.23-6.272ZM23.307 10.024c.381 0 .693-1.256.693-2.807 0-1.55-.312-2.807-.693-2.807-.381 0-.693 1.256-.693 2.807s.312 2.808.693 2.808Z\"/></svg>";
-  exportButton.title='Deezer : créer le CSV des titres cochés et ouvrir Tune My Music';exportButton.setAttribute('aria-label',exportButton.title);
-  const youtubePanel=node('section','','youtube-panel hidden');
-  const youtubeTransfer=button('',async()=>{await renderYouTubePanel(youtubePanel,tracks.filter(t=>selectedTracks.has(t.id)));},'btn small music-platform-button youtube-button');
-  youtubeTransfer.innerHTML="<svg aria-hidden=\"true\" focusable=\"false\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path fill=\"currentColor\" d=\"M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z\"/></svg>";
-  youtubeTransfer.title='Ajouter directement les titres cochés à YouTube';youtubeTransfer.setAttribute('aria-label',youtubeTransfer.title);
-  const selectionCount=node('span','','status-line');selectionCount.setAttribute('role','status');
-  function updateSelection(){
-    const total=tracks.filter(t=>selectedTracks.has(t.id)).length;
-    selectionCount.textContent=total+' titre'+(total!==1?'s':'')+' coché'+(total!==1?'s':'');
-    exportButton.disabled=!total;
-  }
-  function filteredTracks(){
-    const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
-    return tracks.filter(t=>terms.every(term=>normalizeSearch(t.artist+' '+t.title).includes(term)));
-  }
-  const selectAll=button('Tout cocher',()=>{filteredTracks().forEach(t=>selectedTracks.add(t.id));display();});
-  const selectNone=button('Tout décocher',()=>{selectedTracks.clear();display();});
-  const selectionTools=node('div','','music-selection-tools');selectionTools.append(selectAll,selectNone,node('span','« Tout cocher » sélectionne tous les résultats de la recherche, y compris les lignes non affichées.','field-note'));
-  toolbar.append(selectionTools);
-  const actions=node('div','','agenda-navigation');actions.append(exportButton,youtubeTransfer,selectionCount);
-  if(!editable){youtubeTransfer.classList.add('hidden');}content.append(actions,youtubePanel,toolbar,count,list,more);
-  if(session.user.role==='admin'){
-    const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
-    const label=node('label','Fichier CSV avec les colonnes Artist et Title'),file=node('input');file.type='file';file.accept='.csv,text/csv';file.id='music-csv-import';label.htmlFor=file.id;
-    const state=node('p','','status-line');state.setAttribute('role','status');
-    let pending=[];
-    const importButton=button('Importer dans le portail',async()=>{
-      importButton.disabled=true;file.disabled=true;let added=0,duplicates=0,done=0;
-      try{
-        for(let i=0;i<pending.length;i+=25){
-          const batch=pending.slice(i,i+25);const result=await api('/api/music/import','POST',{tracks:batch});added+=result.added;duplicates+=result.duplicates;done+=batch.length;state.textContent=done+' / '+pending.length+' morceaux traités…';
-        }
-        tracks=await api('/api/music');if(currentUniverse!=='Fun')return;display();state.textContent=added+' morceaux importés, '+duplicates+' doublons déjà présents.';pending=[];file.value='';
-      }catch(e){state.textContent=e.message+' '+done+' morceaux traités. Vous pouvez relancer : les doublons sont ignorés.';}finally{file.disabled=false;importButton.disabled=!pending.length;}
-    });importButton.disabled=true;
-    file.onchange=async()=>{
-      pending=[];importButton.disabled=true;state.textContent='';
-      try{const selected=file.files[0];if(!selected)return;if(selected.size>2000000)throw Error('Le fichier CSV est trop volumineux.');pending=parseMusicCSV(await selected.text());state.textContent=pending.length+' morceaux prêts à être importés.';importButton.disabled=false;}catch(e){state.textContent=e.message;}
-    };
-    importPanel.append(label,file,state,importButton);content.insertBefore(importPanel,toolbar);
-  }
-
-  function display(){
-    const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
-    const visible=filteredTracks();updateSelection();
-    count.textContent=visible.length+' morceau'+(visible.length!==1?'x':'')+(terms.length?' trouvé'+(visible.length!==1?'s':''):' dans la sélection');
-    list.replaceChildren();
-    visible.slice(0,limit).forEach(t=>{
-      const row=node('div','','music-row');row.setAttribute('role','listitem');
-      const check=node('input','','music-row-check');check.type='checkbox';check.checked=selectedTracks.has(t.id);check.setAttribute('aria-label','Exporter '+t.title+' de '+t.artist);
-      check.onchange=()=>{if(check.checked)selectedTracks.add(t.id);else selectedTracks.delete(t.id);updateSelection();};
-      const song=node('span',t.title,'music-row-title'),artistName=node('span',t.artist,'music-row-artist');
-      const added=node('time','','music-row-date'),addedDate=new Date(t.created_at);
-      if(t.created_at&&!Number.isNaN(addedDate.getTime())){added.dateTime=addedDate.toISOString();added.textContent='Ajouté le '+addedDate.toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});}else added.textContent='Date inconnue';
-      const actions=node('div','','music-row-actions');
-      const link=node('a','Deezer','btn small');link.href='https://www.deezer.com/search/'+encodeURIComponent(t.artist+' '+t.title);link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label','Rechercher '+t.title+' de '+t.artist+' sur Deezer');
-      const remove=button('Supprimer',async()=>{
-        if(!confirm('Retirer « '+t.title+' » de '+t.artist+' de la sélection partagée de l’équipe ?'))return;
-        remove.disabled=true;message.textContent='';
-        try{
-          await api('/api/music/'+t.id,'DELETE');
-          if(currentUniverse!=='Fun')return;
-          tracks=tracks.filter(track=>track.id!==t.id);selectedTracks.delete(t.id);display();message.textContent='« '+t.title+' » a été retiré de la sélection.';
-        }catch(e){message.textContent=e.message;}finally{remove.disabled=false;}
-      },'btn small danger');
-      remove.setAttribute('aria-label','Supprimer '+t.title+' de '+t.artist+' de la sélection');
-      actions.append(link);if(editable)actions.append(remove);row.append(check,song,artistName,added,actions);list.append(row);
-    });
-    if(!visible.length)list.append(node('div','Aucun morceau ne correspond à votre recherche.','empty'));
-    more.classList.toggle('hidden',visible.length<=limit);
-  }
-  search.oninput=()=>{limit=40;display();};
-  form.onsubmit=async event=>{
-    event.preventDefault();submit.disabled=true;message.textContent='';
-    try{
-      const track=await api('/api/music','POST',{artist:artist.value,title:title.value});
-      if(currentUniverse!=='Fun')return;
-      tracks.unshift(track);form.reset();search.value='';limit=40;display();message.textContent='Votre morceau a été ajouté à la sélection partagée.';artist.focus();
-    }catch(e){message.textContent=e.message;}finally{submit.disabled=false;}
-  };
-  display();
-}
-
-function parseMusicCSV(text){
-  const rows=[];let row=[],field='',quoted=false;
-  text=text.replace(/^\uFEFF/,'');
-  for(let i=0;i<text.length;i++){
-    const c=text[i];
-    if(c==='"'){
-      if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;
-    }else if(!quoted&&c===','){row.push(field);field='';}
-    else if(!quoted&&(c==='\n'||c==='\r')){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(v=>v.trim()))rows.push(row);row=[];field='';}
-    else field+=c;
-  }
-  if(quoted)throw Error('Le fichier CSV contient des guillemets incomplets.');
-  row.push(field);if(row.some(v=>v.trim()))rows.push(row);
-  const headers=(rows.shift()||[]).map(v=>v.trim().toLowerCase());
-  const ai=headers.findIndex(v=>['artist','artiste','artist name'].includes(v)),ti=headers.findIndex(v=>['title','titre','track name'].includes(v));
-  if(ai<0||ti<0)throw Error('Choisissez un CSV contenant les colonnes Artist et Title.');
-  const tracks=rows.map(r=>({artist:(r[ai]||'').trim(),title:(r[ti]||'').trim()}));
-  if(!tracks.length||tracks.length>2000||tracks.some(t=>!t.artist||!t.title||t.artist.length>200||t.title.length>200))throw Error('Le fichier doit contenir de 1 à 2 000 morceaux avec artiste et titre complets.');
-  return tracks;
-}
-
-async function renderYouTubePanel(panel,chosen){
-  panel.classList.remove('hidden');panel.replaceChildren(node('p','Chargement de YouTube…','status-line'));
-  try{
-    const status=await api('/api/youtube/status');if(currentUniverse!=='Fun')return;
-    panel.replaceChildren(node('h3','Ajouter les titres cochés à YouTube'));
-    const state=node('p','','status-line');state.setAttribute('role','status');
-    panel.append(node('p',status.connected?'Chaîne connectée : '+status.channel:'YouTube n’est pas encore connecté.'));
-    if(session.user.role==='admin'){
-      const settings=node('details','','calendar-tools');settings.open=!status.connected||!status.playlistId;settings.append(node('summary','Compte et playlist YouTube'));
-      settings.append(node('p','Activez YouTube Data API v3 dans le projet Google Cloud de l’agenda. La connexion réutilise vos identifiants Google et l’adresse de retour déjà configurée.','field-note'));
-      const connect=button(status.connected?'Reconnecter YouTube':'Connecter YouTube',async()=>{
-        connect.disabled=true;
-        try{const result=await api('/api/youtube/connect','POST');window.location.assign(result.url);}catch(e){state.textContent=e.message;connect.disabled=false;}
-      });connect.disabled=!status.configured;settings.append(connect);
-      if(!status.configured)settings.append(node('p','Ajoutez les identifiants Google dans Render.','field-note'));
-      if(status.connected){
-        try{
-          const playlists=await api('/api/youtube/playlists');if(currentUniverse!=='Fun')return;
-          const label=node('label','Playlist à alimenter'),select=node('select','','calendar-select');select.id='youtube-playlist-choice';label.htmlFor=select.id;select.append(new Option('Choisir une playlist',''));playlists.forEach(p=>select.append(new Option(p.name,p.id)));select.value=status.playlistId;
-          const save=button('Utiliser cette playlist',async()=>{save.disabled=true;try{if(!select.value)throw Error('Choisissez une playlist.');await api('/api/youtube/playlist','POST',{id:select.value});await renderYouTubePanel(panel,chosen);}catch(e){state.textContent=e.message;save.disabled=false;}});settings.append(label,select,save);
-        }catch(e){settings.append(node('p',e.message,'error'));}
-        const newLabel=node('label','Ou créer une playlist privée'),newName=node('input');newName.type='text';newName.maxLength=150;newName.id='youtube-new-playlist';newName.value='PORTAIL + — Pharmacie de Trévoux';newLabel.htmlFor=newName.id;
-        const create=button('Créer cette playlist privée',async()=>{create.disabled=true;try{await api('/api/youtube/playlists','POST',{title:newName.value});await renderYouTubePanel(panel,chosen);}catch(e){state.textContent=e.message;create.disabled=false;}});settings.append(newLabel,newName,create);
-        const disconnect=button('Déconnecter YouTube du portail',async()=>{disconnect.disabled=true;try{await api('/api/youtube/disconnect','POST');await renderYouTubePanel(panel,chosen);}catch(e){state.textContent=e.message;disconnect.disabled=false;}});settings.append(disconnect);
-      }panel.append(settings);
-    }
-    panel.append(state);
-    if(!status.connected||!status.playlistId){if(session.user.role!=='admin')panel.append(node('p','Demandez à l’administrateur de connecter YouTube et de choisir la playlist.'));return;}
-    const playlist=node('a',status.playlistName,'btn small');playlist.href='https://www.youtube.com/playlist?list='+encodeURIComponent(status.playlistId);playlist.target='_blank';playlist.rel='noopener noreferrer';panel.append(node('p','Playlist choisie :'),playlist);
-    if(!chosen.length){panel.append(node('p','Cochez les titres dans la liste puis cliquez à nouveau sur le logo YouTube.'));return;}
-    panel.append(node('p',chosen.length+' titres sélectionnés. Recherchez les vidéos, vérifiez les versions proposées puis validez leur ajout. Les vidéos déjà présentes seront ignorées.'));
-    const results=node('div','','youtube-matches'),choices=[];
-    const add=button('Ajouter les vidéos vérifiées à la playlist',async()=>{
+  return…5296 tokens truncated…u00e9es à la playlist',async()=>{
       const pending=choices.filter(c=>c.select.value&&!c.done);if(!pending.length)return;
       add.disabled=true;prepare.disabled=true;let added=0,duplicates=0;
       choices.forEach(c=>c.select.disabled=true);
