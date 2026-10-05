@@ -1,7 +1,7 @@
 import { randomBytes, scrypt as rawScrypt, timingSafeEqual, createHash, createCipheriv, createDecipheriv } from 'node:crypto';
 import { promisify } from 'node:util';
 const scrypt = promisify(rawScrypt);
-export const universes = ['Collaborateurs','Emplois du temps','Agenda','Procédures','Laboratoires','Challenges','Actualités','Formations','Contacts utiles','Ressources humaines','Fun','Passerelle groupement','Outils de calculs rapides'];
+export const universes = ['Collaborateurs','Emplois du temps','Agenda','Procédures','Laboratoires','Challenges','Actualités','Formations','Contacts utiles','Ressources humaines','Fun','Passerelle groupement','Outils de calculs rapides',"Outils d'aide aux commandes"];
 export function passwordValid(p) { return typeof p === 'string' && p.length >= 12 && Buffer.byteLength(p) <= 256; }
 export async function hashPassword(password) {
   const salt=randomBytes(16).toString('hex');
