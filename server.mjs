@@ -1,3 +1,4 @@
+import {registerEmployeeImport} from './employee-import.mjs';
 import express from 'express';
 import { importProcedureDocuments } from './procedure-import.mjs';
 import { registerProcedures } from './procedures.mjs';
@@ -29,7 +30,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&req.path==='/api/procedures/import'?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&['/api/procedures/import','/api/collaborateurs/scan'].includes(req.path)?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -116,6 +117,7 @@ export function createApp(db,config) {
     await db.query('DELETE FROM sessions WHERE user_id=$1',[req.auth.id]);
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
+  registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeScanFetch,uploadParser:express.json({limit:'15mb'})});
   registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar});
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');
@@ -288,7 +290,7 @@ export async function initialize(db,config){
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const env=process.env,config={procedureImport:env.PROCEDURES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
+  const env=process.env,config={openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});

@@ -145,3 +145,11 @@ button.schedule-day:hover{border-color:var(--brand);filter:brightness(.98)}
 
 /* Documents de référence de l’officine */
 .procedure-tools{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin:22px 0}.procedure-tools>div:first-child{flex:1;min-width:230px}.procedure-tools label{display:block;font-weight:600;margin-bottom:8px}.procedure-tools input,.procedure-tools select{padding:12px;border:1px solid #cbd8df;border-radius:8px;font:inherit;width:100%}.procedure-group{margin-top:28px}.procedure-group h3{font-size:18px;color:var(--brand)}.procedure-row{display:flex;gap:20px;justify-content:space-between;align-items:center;padding:17px 0;border-bottom:1px solid #e1e7ed}.procedure-row>div:first-child{flex:1;min-width:0}.procedure-row h4{font-size:16px;margin:0 0 7px}.procedure-row p{margin:0 0 6px;white-space:pre-line}.procedure-row small{color:var(--muted)}.procedure-actions{display:flex;gap:8px;flex-wrap:wrap}.procedure-actions a{text-decoration:none}@media(max-width:700px){.procedure-tools>div{width:100%}.procedure-row{align-items:flex-start;flex-direction:column}.procedure-actions{width:100%}.procedure-tools>button{width:100%}}
+
+.employee-scan-form{display:grid;gap:12px;max-width:800px;margin-top:20px}
+.employee-scan-form input:not([type=checkbox]),.employee-scan-form select{width:100%;padding:11px 12px;border:1px solid #cbd8df;border-radius:8px;font:inherit}
+.employee-scan-form input[type=checkbox]{width:18px;height:18px;vertical-align:middle;margin-right:8px}
+.employee-scan-form .btn{justify-self:start}
+.employee-import-review{border:1px solid #d8bc72;background:#fff9e8;border-radius:12px;padding:20px;margin-bottom:20px}
+.employee-import-review h4{margin:0 0 12px}
+.employee-import-review .error{font-size:14px}

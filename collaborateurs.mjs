@@ -23,6 +23,12 @@ export function validatePerson(data,fail) {
   if(data.active!==undefined&&typeof data.active!=='boolean')throw fail(400,'Statut invalide.');
   return {firstName,lastName,phone,birthday,job,active:data.active!==false,name:firstName+' '+lastName};
 }
+export function requestedEmployeeRole(data,existing,fail){
+  if(data.administratorRights===undefined)return existing?.role||'employee';
+  if(typeof data.administratorRights!=='boolean')throw fail(400,'Droits administrateur invalides.');
+  if(existing?.role==='admin'&&!data.administratorRights)throw fail(400,'Ce compte administrateur est protégé.');
+  return data.administratorRights?'admin':'employee';
+}
 export function createFeastCalendar({fetchImpl=fetch,now=()=>new Date()}={}) {
   let cache=null,pending=null;
   return async()=>{
@@ -84,10 +90,11 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}
   }
   app.post('/api/users',auth,ready,admin,csrf,async(req,res)=>{
-    const d=validatePerson(req.body,fail),a=await account(req.body),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);
+    const d=validatePerson(req.body,fail),a=await account(req.body),role=requestedEmployeeRole(req.body,null,fail),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);
+    if(role==='admin'&&(!d.active||!a.email||!a.hash))throw fail(400,'Pour donner les droits administrateur, créez un accès de connexion et gardez le collaborateur actif.');
     const person=await transaction(async client=>{
-      const {rows}=await client.query(`INSERT INTO users(name,first_name,last_name,phone,birthday,job,active,email,password_hash,rights,edit_rights,permissions_configured)
-        VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured]);
+      const {rows}=await client.query(`INSERT INTO users(name,first_name,last_name,phone,birthday,job,active,email,password_hash,rights,edit_rights,permissions_configured,role)
+        VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured,role]);
       if(details!==undefined)await saveEmployeeDetails(client,rows[0].id,details,0,secret,req.auth.id,fail);
       return rows[0];
     });res.status(201).json(view(person,req));
@@ -97,15 +104,17 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const d=validatePerson(req.body,fail),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);
     const person=await transaction(async client=>{
       const existing=(await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!existing)throw fail(404,'Collaborateur introuvable.');
+      const role=requestedEmployeeRole(req.body,existing,fail);
       // Save the private record and public contact fields atomically, with conflict protection.
       if(details!==undefined)await saveEmployeeDetails(client,id,details,req.body.detailsRevision,secret,req.auth.id,fail);
       if(existing.role==='admin'){
         return (await client.query('UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6 WHERE id=$7 RETURNING *',[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,id])).rows[0];
       }
       const a=await account(req.body,existing);
+      if(role==='admin'&&(!d.active||!a.email||!a.hash))throw fail(400,'Pour donner les droits administrateur, créez un accès de connexion et gardez le collaborateur actif.');
       const {rows}=await client.query(`UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6,active=$7,email=$8,password_hash=$9,rights=$10::jsonb,
-        edit_rights=$11::jsonb,permissions_configured=$12,must_change=CASE WHEN $13 THEN TRUE ELSE must_change END WHERE id=$14 RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured,!!req.body.password,id]);
-      if(!d.active||a.email!==existing.email||a.hash!==existing.password_hash||JSON.stringify(a.rights)!==JSON.stringify(existing.rights)||JSON.stringify(a.editRights)!==JSON.stringify(existing.edit_rights)||a.configured!==existing.permissions_configured)await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);
+        edit_rights=$11::jsonb,permissions_configured=$12,must_change=CASE WHEN $13 THEN TRUE ELSE must_change END,role=$15 WHERE id=$14 RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured,!!req.body.password,id,role]);
+      if(role!==existing.role||!d.active||a.email!==existing.email||a.hash!==existing.password_hash||JSON.stringify(a.rights)!==JSON.stringify(existing.rights)||JSON.stringify(a.editRights)!==JSON.stringify(existing.edit_rights)||a.configured!==existing.permissions_configured)await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);
       return rows[0];
     });res.json(view(person,req));
   });
@@ -114,6 +123,22 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const {rows}=await db.query("UPDATE users SET active=FALSE WHERE id=$1 AND role='employee' RETURNING id",[id]);
     if(!rows[0])throw fail(404,'Collaborateur introuvable ou compte administrateur protégé.');
     await db.query('DELETE FROM sessions WHERE user_id=$1',[id]);res.json({ok:true});
+  });
+  app.delete('/api/users/:id/permanent',auth,ready,admin,csrf,async(req,res)=>{
+    const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||req.body?.confirmation!==id)throw fail(400,'Confirmez le collaborateur à supprimer.');
+    await transaction(async client=>{
+      const person=(await client.query('SELECT id,active,role FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];
+      if(!person)throw fail(404,'Collaborateur introuvable.');
+      if(person.active||person.role==='admin')throw fail(409,'Seul un collaborateur inactif sans droits administrateur peut être supprimé définitivement.');
+      // Remove JSON planning entries as well as relational records, atomically.
+      await client.query(`UPDATE schedule_weeks SET
+        draft=COALESCE((SELECT jsonb_object_agg(key,value) FROM jsonb_each(draft) WHERE value->>'userId' IS DISTINCT FROM $1::text),'{}'::jsonb),
+        published=CASE WHEN published IS NULL THEN NULL ELSE COALESCE((SELECT jsonb_object_agg(key,value) FROM jsonb_each(published) WHERE value->>'userId' IS DISTINCT FROM $1::text),'{}'::jsonb) END,
+        revision=revision+1,published_revision=CASE WHEN published_revision=revision THEN published_revision+1 ELSE published_revision END
+        WHERE EXISTS(SELECT 1 FROM jsonb_each(draft) WHERE value->>'userId'=$1::text)
+          OR EXISTS(SELECT 1 FROM jsonb_each(COALESCE(published,'{}'::jsonb)) WHERE value->>'userId'=$1::text)`,[id]);
+      await client.query("DELETE FROM users WHERE id=$1 AND active=FALSE AND role='employee'",[id]);
+    });res.json({ok:true});
   });
   app.post('/api/users/:id/restore',auth,ready,admin,csrf,async(req,res)=>{
     const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Profil invalide.');
