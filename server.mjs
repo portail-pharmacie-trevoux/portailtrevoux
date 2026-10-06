@@ -1,3 +1,5 @@
+import {createYoutrust} from './youtrust.mjs';
+import {registerHRDocuments} from './hr-documents.mjs';
 import {registerNews,purgeNews,unreadNews} from './news.mjs';
 import {createInvitationMailer,registerInvitations,gmailSendScope,sameMailAccount} from './invitations.mjs';
 import {registerEmployeeImport} from './employee-import.mjs';
@@ -32,7 +34,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&['/api/procedures/import','/api/collaborateurs/scan'].includes(req.path)?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&['/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -59,6 +61,8 @@ export function createApp(db,config) {
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   registerNews({app,db,auth,ready,csrf,viewUniverse,fail});
+  const youtrust=config.youtrustClient||createYoutrust({getSetting,setSetting,deleteSetting:key=>db.query('DELETE FROM settings WHERE key=$1',[key]),secret,origin,fail,config,fetchImpl:config.youtrustFetch});
+  registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,secret,publish,uploadParser:express.json({limit:'15mb'}),youtrust});
   const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
   const allowedPublications=user=>universes.filter(name=>!['Collaborateurs','Actualités'].includes(name)&&canAccess(user,name));
   app.get('/api/publications',auth,ready,async(req,res)=>{
@@ -311,7 +315,7 @@ export async function initialize(db,config){
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const env=process.env,config={mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
+  const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});

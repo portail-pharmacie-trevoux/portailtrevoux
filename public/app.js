@@ -76,7 +76,7 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'L’annuaire de l’équipe et votre accès personnel aux bulletins de paie.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les messages courts de l’équipe, envoyés et reçus.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les informations pratiques pour les collaborateurs.'};
+const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'L’annuaire de l’équipe et votre accès personnel aux bulletins de paie.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'Les messages courts de l’équipe, envoyés et reçus.','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les documents internes de la pharmacie et leur signature en ligne.'};
 descriptions["Outils d'aide aux commandes"]='commandes programmées';
 document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
 q('#back').onclick=()=>showHome();
@@ -97,9 +97,10 @@ function setUniverseHeading(name){
 }
 async function openUniverse(name){
   const viewRequest=++universeViewRequest;
+  q('#hr-import-action')?.remove();
   q('#universe-publications')?.remove();
   currentUniverse=name;q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';setPeopleAddActions(name==='Collaborateurs'&&session.user.role==='admin');q('#content').replaceChildren(node('div','Chargement…','empty'));
-  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Actualités'){const userId=session.user.id,module=await import('/news.js');if(currentUniverse===name)await module.renderNews({container:q('#content'),api,isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId,onChanged:()=>void refreshHomeExtras()});}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Procédures'){const module=await import('/procedures.js');if(currentUniverse===name)await module.renderProcedures({container:q('#content'),api,canEdit:canEditUniverse('Procédures')});}else if(name==='Contacts utiles'){const module=await import('/contacts.js');if(currentUniverse===name)await module.renderContacts({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Actualités'){const userId=session.user.id,module=await import('/news.js');if(currentUniverse===name)await module.renderNews({container:q('#content'),api,isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId,onChanged:()=>void refreshHomeExtras()});}else if(name==='Ressources humaines'){const userId=session.user.id,module=await import('/hr-documents.js');if(currentUniverse===name)await module.renderHRDocuments({container:q('#content'),heading:q('#detail .top'),api,isAdmin:session.user.role==='admin',isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Procédures'){const module=await import('/procedures.js');if(currentUniverse===name)await module.renderProcedures({container:q('#content'),api,canEdit:canEditUniverse('Procédures')});}else if(name==='Contacts utiles'){const module=await import('/contacts.js');if(currentUniverse===name)await module.renderContacts({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
   if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
@@ -137,204 +138,7 @@ function renderPeople(){
           invite.setAttribute('aria-label','Envoyer demande de connexion à '+personName(p));
           invite.disabled=!p.invitationEmail;invite.title=p.invitationEmail?'Envoyer à '+p.invitationEmail:'Renseignez une adresse e-mail dans la fiche du collaborateur.';
           const invitation=node('div','','person-invitation');invitation.append(invite,node('small',p.invitationEmail||'E-mail à renseigner','field-note'));
-          if(p.invitationSentAt)invitation.append(node('small','Dernière invitation : '+new Date(p.invitationSentAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'}),'field-note'));
-          actions.append(invitation);
-        }
-        if(p.role!=='admin'){
-          if(active){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
-          else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);const permanent=button('Supprimer définitivement',async()=>{
-            if(!confirm('Supprimer définitivement '+personName(p)+' ? Sa fiche confidentielle, ses accès et ses entrées de planning seront effacés du portail. Cette action est irréversible.'))return;
-            permanent.disabled=true;restore.disabled=true;try{await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id});await reloadPeople('Collaborateur supprimé définitivement.');}catch(e){error(e);permanent.disabled=false;restore.disabled=false;}
-          },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));actions.append(permanent);}
-        }
-        tr.append(actions);
-      }
-      body.append(tr);
-    }
-    table.append(body);wrap.append(table);section.append(wrap);content.append(section);
-  }
-}
-
-function renderInvitationMail(content){
-  const panel=node('details','','invitation-mail');panel.id='invitation-mail';panel.append(node('summary','Messagerie des invitations'),node('p','Expéditeur : pharmacie.trevoux@gmail.com','field-note'));
-  const state=node('p','Vérification de la connexion Gmail…','field-note'),controls=node('div','','news-selection-actions');panel.append(state,controls);content.append(panel);
-  const userId=session.user.id;
-  api('/api/mail/status').then(status=>{
-    if(session?.user.id!==userId||!panel.isConnected)return;
-    panel.open=!status.connected;state.textContent=status.connected?'Gmail est connecté. Vous pouvez envoyer les invitations depuis la ligne de chaque collaborateur.':'Connectez le compte Gmail de la pharmacie et autorisez l’envoi des mails pour activer les invitations.';
-    if(!status.configured){state.textContent='La configuration Google du portail doit être complétée avant de connecter Gmail.';return;}
-    const connect=button(status.connected?'Renouveler l’autorisation Gmail':'Connecter Gmail pour les invitations',async()=>{
-      connect.disabled=true;try{const result=await api('/api/mail/connect','POST',{});window.location.assign(result.url);}catch(e){state.textContent=e.message;connect.disabled=false;}
-    },'btn primary');controls.append(connect);
-    if(status.connected)controls.append(button('Déconnecter cette messagerie',async()=>{
-      if(!confirm('Désactiver l’envoi des invitations par Gmail ?'))return;
-      try{await api('/api/mail/disconnect','POST',{});await reloadPeople('Messagerie des invitations déconnectée.');}catch(e){state.textContent=e.message;}
-    },'btn small danger'));
-  }).catch(e=>{if(panel.isConnected)state.textContent=e.message;});
-}
-
-let employeeRecordRequest=0;
-async function openEmployeeRecord(person){
-  if(session?.user.role!=='admin')return;
-  const request=++employeeRecordRequest,userId=session.user.id;const valid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
-  setPeopleAddActions(false);q('#feedback').textContent='';q('#content').replaceChildren(node('p','Chargement de la fiche…','field-note'));
-  try{const module=await import('/employee-record.js');if(!valid())return;await module.renderEmployeeRecord({container:q('#content'),api,person,onClose:()=>reloadPeople(),onSaved:async(result,message)=>{await reloadPeople(message);},onPayroll:openMyPayroll,universes:initialTileOrder,isCurrent:valid});}
-  catch(e){if(valid()){q('#content').replaceChildren(node('p',e.message,'error'),button('Retour à l’annuaire',()=>reloadPeople()));}}
-}
-async function openMyPayroll(){
-  q('#my-payroll-dialog')?.remove();const dialog=node('dialog');dialog.id='my-payroll-dialog';dialog.setAttribute('aria-labelledby','my-payroll-title');
-  const title=node('h2','Mes bulletins de paie');title.id='my-payroll-title';dialog.append(title);const text=node('p','Chargement…');dialog.append(text,button('Fermer',()=>dialog.close()));document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
-  try{const data=await api('/api/collaborateurs/me/payroll');if(!dialog.open)return;text.textContent=data.name+' · Connectez-vous à mySilae avec vos identifiants personnels pour consulter vos bulletins.';
-    const link=node('a','Accéder à mes bulletins sur mySilae','btn primary payroll-link');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';text.after(link,node('p','La consultation des bulletins dans le portail pourra être activée avec votre prestataire de paie.','field-note'));
-  }catch(e){text.textContent=e.message;}
-}
-function openEditor(id=null){
-  if(session.user.role!=='admin')return;editId=id;q('#form').reset();q('#editor-error').textContent='';q('#dialogtitle').textContent=id===null?'Ajouter un collaborateur':'Modifier le collaborateur';
-  const p=people.find(p=>p.id===id);q('#first-name').value=p?.firstName||'';q('#last-name').value=p?.lastName||'';q('#phone').value=p?.phone||'';q('#birthday').value=p?.birthday||'';q('#job').value=p?.job||'';q('#email').value=p?.email||'';
-  q('#account-options').classList.toggle('hidden',p?.role==='admin');q('#account-options').open=!!p?.email&&p?.role!=='admin';
-  q('#email').required=false;q('#temporary-password').required=false;
-  q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'Renseignez un e-mail, puis envoyez une demande de connexion depuis l’annuaire. Le salarié choisira son mot de passe. Le mot de passe provisoire est facultatif.';
-  document.querySelectorAll('[name=right]').forEach(c=>c.checked=p?.rights?.includes(c.value)||false);
-  q('#editor').showModal();q('#first-name').focus();
-}
-q('#add').onclick=()=>openEditor();q('#cancel').onclick=()=>q('#editor').close();q('#editor').addEventListener('close',()=>q('#temporary-password').value='');
-q('#form').onsubmit=async e=>{
-  e.preventDefault();const btn=e.submitter;btn.disabled=true;
-  const existing=people.find(p=>p.id===editId),data={firstName:q('#first-name').value,lastName:q('#last-name').value,phone:q('#phone').value,birthday:q('#birthday').value,job:q('#job').value,active:existing?.active!==false};
-  if(existing?.role!=='admin')Object.assign(data,{email:q('#email').value,password:q('#temporary-password').value,rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
-  try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',data);q('#form').reset();q('#editor').close();await reloadPeople('Fiche enregistrée.');}
-  catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}
-};
-q('#keep').onclick=()=>q('#removeDialog').close();q('#confirmRemove').onclick=async()=>{
-  const btn=q('#confirmRemove');btn.disabled=true;try{await api('/api/users/'+removeId,'DELETE');q('#removeDialog').close();await reloadPeople('Collaborateur déplacé dans les inactifs.');}catch(e){q('#removeDialog').close();q('#feedback').textContent=e.message;}finally{btn.disabled=false;}
-};
-function parsePeopleCSV(text){
-  const rows=[];let row=[],field='',quoted=false;text=text.replace(/^\uFEFF/,'');const delimiter=text.split(/\r?\n/)[0].includes(';')?';':',';
-  for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}else if(!quoted&&c===delimiter){row.push(field);field='';}else if(!quoted&&(c==='\n'||c==='\r')){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(v=>v.trim()))rows.push(row);row=[];field='';}else field+=c;}
-  if(quoted)throw Error('Guillemets incomplets dans le CSV.');row.push(field);if(row.some(v=>v.trim()))rows.push(row);
-  const headers=(rows.shift()||[]).map(normalizeSearch),column=name=>headers.indexOf(name);if(column('prenom')<0||column('nom')<0)throw Error('Le CSV doit contenir les colonnes Prénom et Nom.');
-  const people=rows.map(r=>{const value=n=>(r[column(n)]||'').trim();const status=normalizeSearch(value('actif'));if(status&&!['oui','non','true','false','1','0'].includes(status))throw Error('La colonne Actif doit contenir Oui ou Non.');return {firstName:value('prenom'),lastName:value('nom'),phone:value('telephone'),birthday:value('date de naissance'),job:value('fonction'),active:!['non','false','0'].includes(status)};});
-  if(!people.length||people.length>100||people.some(p=>!p.firstName||!p.lastName))throw Error('Le fichier doit contenir de 1 à 100 personnes avec prénom et nom complets.');return people;
-}
-function renderEmployeeScan(content){
-  const area=node('section','','people-import hidden'),body=node('div');area.id='employee-scan-panel';area.append(node('h3','Ajouter un collaborateur à partir d’une fiche de renseignements'),button('Fermer',()=>area.classList.add('hidden')),body);content.append(area);let loaded=false;
-  q('#add-from-sheet').onclick=async()=>{area.classList.remove('hidden');if(loaded)return;loaded=true;const userId=session.user.id;const valid=()=>currentUniverse==='Collaborateurs'&&session?.user.id===userId&&area.isConnected;
-    try{const module=await import('/employee-import.js');if(!valid())return;await module.renderEmployeeImport({container:body,api,people,isCurrent:valid,onReview:async(person,draft)=>{
-      const record=await import('/employee-record.js');if(!valid())return;
-      const request=++employeeRecordRequest;const reviewValid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
-      const cleanup=()=>URL.revokeObjectURL(draft.sourceUrl);setPeopleAddActions(false);
-      await record.renderEmployeeRecord({container:q('#content'),api,person,draft,universes:initialTileOrder,isCurrent:reviewValid,onPayroll:openMyPayroll,onClose:()=>{cleanup();reloadPeople();},onSaved:async(result,message)=>{cleanup();await reloadPeople(message);}});
-    }});}catch(e){loaded=false;body.replaceChildren(node('p',e.message,'error'));}
-  };
-}
-function renderEmployeeDocument(content){
-  const area=node('details','','people-import');
-  const download=node('a','Télécharger le PDF vierge','btn primary');download.href='/api/collaborateurs/registration-form';download.download='fiche-inscription-salarie.pdf';
-  area.append(node('summary','Générer une fiche de renseignements'),node('p','Fiche à imprimer et à remplir à la main par le salarié : informations d’inscription et liste des justificatifs à transmettre selon sa situation.','field-note'),download);content.append(area);
-}
-function renderPeopleImport(content){
-  const area=node('details','','people-import');area.append(node('summary','Importer une liste de collaborateurs'),node('p','CSV : Prénom, Nom, Téléphone, Date de naissance (AAAA-MM-JJ), Fonction, Actif (Oui / Non). Les informations de connexion existantes sont conservées.','field-note'));
-  const label=node('label','Choisir le fichier CSV','field'),file=node('input');file.type='file';file.id='people-csv';file.accept='.csv,text/csv';label.htmlFor=file.id;
-  const status=node('p','','field-note');status.setAttribute('role','status');let pending=[];
-  const submit=button('Importer ces collaborateurs',async()=>{submit.disabled=true;file.disabled=true;try{const result=await api('/api/collaborateurs/import','POST',{people:pending});await reloadPeople(result.count+' fiches importées : '+result.active+' actives, '+result.inactive+' inactives.');}catch(e){status.textContent=e.message;file.disabled=false;submit.disabled=false;}},'btn primary');submit.disabled=true;
-  file.onchange=async()=>{pending=[];submit.disabled=true;status.textContent='';try{const selected=file.files[0];if(!selected)return;if(selected.size>15000)throw Error('Le fichier est trop volumineux.');pending=parsePeopleCSV(await selected.text());status.textContent=pending.length+' fiches prêtes : '+pending.filter(p=>p.active).length+' actives, '+pending.filter(p=>!p.active).length+' inactives.';submit.disabled=false;}catch(e){status.textContent=e.message;}};
-  area.append(label,file,status,submit);content.append(area);
-}
-async function runCalendarAction(action){try{q('#feedback').textContent='Veuillez patienter…';await action();q('#feedback').textContent='';if(currentUniverse==='Agenda')await renderCalendar();}catch(e){q('#feedback').textContent=e.message;}}
-async function renderCalendar(){
-  const data=await api('/api/calendar');if(currentUniverse!=='Agenda')return;const content=q('#content');content.replaceChildren();
-  if(session.user.role==='admin'){
-    const status=await api('/api/google/status');if(currentUniverse!=='Agenda')return;
-    const tools=node('details','','calendar-tools');tools.open=!status.connected;tools.append(node('summary','Paramètres de l’agenda'));
-    if(!status.configured){tools.append(node('p','Ajoutez les identifiants Google dans les paramètres Render pour activer la connexion.','admin-hint'),node('p','Adresse de retour à renseigner dans Google : '+status.callback,'admin-hint'));}
-    else tools.append(button(status.connected?'Renouveler l’autorisation Google':'Connecter Google Agenda',()=>runCalendarAction(async()=>{const result=await api('/api/google/connect','POST');window.location.assign(result.url);}),'btn primary'));
-    if(status.connected){
-      try{const calendars=await api('/api/google/calendars');if(currentUniverse!=='Agenda')return;const label=node('label','Agenda à afficher');label.htmlFor='calendar-choice';const select=node('select','','calendar-select');select.id='calendar-choice';select.append(new Option('Choisir un agenda',''));calendars.forEach(c=>select.append(new Option(c.name,c.id)));select.value=status.calendarId;tools.append(label,select,button('Enregistrer cet agenda',()=>runCalendarAction(async()=>{if(!select.value)throw Error('Choisissez un agenda.');await api('/api/google/calendar','POST',{id:select.value});})));}
-      catch(e){tools.append(node('p',e.message,'calendar-warning'));}
-      tools.append(button('Actualiser maintenant',()=>runCalendarAction(()=>api('/api/google/sync','POST'))),button('Déconnecter Google',()=>{if(confirm('Déconnecter Google et retirer les événements du portail ?'))runCalendarAction(()=>api('/api/google/disconnect','POST'));},'btn small danger'));
-    }
-    content.append(tools);
-  }
-  content.append(node('h3',data.name));
-  if(data.syncedAt)content.append(node('p','Dernière synchronisation : '+new Date(data.syncedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' · Actualisation toutes les 15 minutes.','status-line'));
-  if(data.error)content.append(node('p',data.error+' Les événements affichés peuvent ne pas être à jour.','calendar-warning'));
-  const results=node('section','','agenda-results');content.append(results);renderCalendarResults(data,results);
-}
-setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda')renderCalendar().catch(error);},15*60000);
-(async()=>{
- const invitation=location.hash.match(/^#invitation=([-\w]{43})$/)?.[1];
- if(invitation){history.replaceState(null,'',location.pathname);await Promise.resolve();showLogin();try{const module=await import('/invitation.js');await module.renderInvitation({container:q('#login'),token:invitation,api,onComplete:result=>{session=result;afterLogin();}});}catch(e){q('#global-message').textContent=e.message;}return;}
- try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('mail=')){await openUniverse('Collaborateurs');q('#feedback').textContent=location.search.includes('refused')?'Autorisation Gmail annulée.':'Gmail connecté. Vous pouvez envoyer les demandes de connexion.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('youtube=')){await openUniverse('Fun');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation YouTube annulée.';else q('#feedback').textContent='YouTube connecté. Cliquez sur son logo pour choisir votre playlist.';history.replaceState(null,'','/');}}catch{showLogin();}})();
-
-const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
-let draftTileOrder=[],draftHiddenTiles=new Set();
-function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
-function tileAllowed(name){return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs','Actualités'].includes(name)||session.user.rights.includes(name)));}
-function canEditUniverse(name){return session.user.role==='admin'||(tileAllowed(name)&&(session.user.permissionsConfigured?session.user.editRights?.includes(name):name==='Fun'));}
-function tilePreferences(){
-  let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
-  let order=Array.isArray(saved)?saved:Array.isArray(saved?.order)?saved.order:[];
-  // Migrate the former first row once, while preserving custom orders and hidden tiles.
-  if((saved?.version||0)<2&&order.indexOf('Procédures')===3&&order.indexOf('Actualités')>3){const index=order.indexOf('Actualités');[order[3],order[index]]=[order[index],order[3]];}
-  if((saved?.version||0)<3){
-    const bottom=['Fun','Passerelle groupement','Outils de calculs rapides',"Outils d'aide aux commandes"];
-    order=[...order.filter(name=>!bottom.includes(name)),...initialTileOrder.filter(name=>!order.includes(name)&&!bottom.includes(name)),...bottom];
-  }
-  return {order,hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
-}
-function applyTileVisibility(){
-  const hidden=new Set(tilePreferences().hidden);
-  document.querySelectorAll('.grid [data-universe]').forEach(tile=>tile.classList.toggle('hidden',!tileAllowed(tile.dataset.universe)||hidden.has(tile.dataset.universe)));
-}
-function applyTileOrder(){
-  const saved=tilePreferences().order;
-  const order=[...new Set([...saved.filter(n=>initialTileOrder.includes(n)),...initialTileOrder])];
-  const grid=q('.grid');order.forEach(name=>{const tile=[...grid.children].find(b=>b.dataset.universe===name);if(tile)grid.append(tile);});applyTileVisibility();
-}
-function renderTileOrder(focusName,focusDirection){
-  const list=q('#tile-order-list');list.replaceChildren();
-  draftTileOrder.forEach((name,index)=>{
-    const row=node('div','','tile-order-row'),label=node('span',name),actions=node('div','','tile-order-actions');
-    const visibility=node('label','','tile-visibility'),check=node('input');check.type='checkbox';check.checked=!draftHiddenTiles.has(name);check.setAttribute('aria-label','Afficher '+name);
-    check.onchange=()=>{if(check.checked)draftHiddenTiles.delete(name);else draftHiddenTiles.add(name);q('#tile-order-status').textContent=name+(check.checked?' sera affiché.':' sera masqué.');};
-    visibility.append(check,node('span','Afficher'));actions.append(visibility);
-    ['up','down'].forEach(direction=>{
-      const offset=direction==='up'?-1:1;
-      const control=button(direction==='up'?'↑':'↓',()=>{
-        const target=index+offset;[draftTileOrder[index],draftTileOrder[target]]=[draftTileOrder[target],draftTileOrder[index]];
-        renderTileOrder(name,direction);q('#tile-order-status').textContent=name+' : position '+(target+1);
-      });
-      control.setAttribute('aria-label',(direction==='up'?'Monter ':'Descendre ')+name);
-      control.dataset.name=name;control.dataset.direction=direction;control.disabled=index+offset<0||index+offset>=draftTileOrder.length;actions.append(control);
-    });row.append(label,actions);list.append(row);
-  });
-  if(focusName){const controls=[...list.querySelectorAll('button')];const focused=controls.find(b=>b.dataset.name===focusName&&b.dataset.direction===focusDirection&&!b.disabled)||controls.find(b=>b.dataset.name===focusName&&!b.disabled);focused?.focus();}
-}
-q('#organize-tiles').onclick=()=>{
-  draftTileOrder=[...document.querySelectorAll('.grid [data-universe]')].filter(b=>tileAllowed(b.dataset.universe)).map(b=>b.dataset.universe);
-  draftHiddenTiles=new Set(tilePreferences().hidden.filter(name=>initialTileOrder.includes(name)));
-  q('#tile-order-status').textContent='';renderTileOrder();q('#tile-order-dialog').showModal();
-};
-q('#tile-order-cancel').onclick=()=>q('#tile-order-dialog').close();
-q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(tileAllowed);draftHiddenTiles.clear();renderTileOrder();q('#tile-order-status').textContent='Ordre initial et toutes vos tuiles affichées.';};
-q('#tile-order-save').onclick=()=>{
-  try{localStorage.setItem(tileOrderKey(),JSON.stringify({version:3,order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
-  catch{q('#tile-order-status').textContent='Ce navigateur ne permet pas de mémoriser votre ordre.';}
-};
-
-async function renderMusic(){
-  let tracks=await api('/api/music');if(currentUniverse!=='Fun')return;
-  const selectedTracks=new Set();
-  const editable=canEditUniverse('Fun'),content=q('#content');content.replaceChildren();
-  const intro=node('div','','music-intro');intro.append(node('h3','La musique de toute l’équipe'),node('p','Ajoutez vos morceaux préférés à la sélection partagée de la pharmacie.'));
-  const form=node('form','','music-form');
-  const artistLabel=node('label','Artiste'),artist=node('input');artist.type='text';artist.id='music-artist';artist.maxLength=200;artist.required=true;artist.placeholder='Ex. : Adele';artistLabel.htmlFor=artist.id;
-  const titleLabel=node('label','Titre'),title=node('input');title.type='text';title.id='music-title';title.maxLength=200;title.required=true;title.placeholder='Ex. : Hometown Glory';titleLabel.htmlFor=title.id;
-  const artistField=node('div'),titleField=node('div');artistField.append(artistLabel,artist);titleField.append(titleLabel,title);
-  const submit=node('button','Ajouter à la sélection','btn primary');submit.type='submit';
-  const message=node('p','','music-feedback');message.setAttribute('role','status');
-  form.append(artistField,titleField,submit);content.append(intro);if(editable)content.append(form);else content.append(node('p','Vous consultez la sélection musicale. L’ajout et la suppression de titres nécessitent un droit de modification.','field-note'));content.append(message);
-  content.append(node('p','Cette liste rassemble les choix de l’équipe. Cochez vos titres puis choisissez une plateforme. Deezer télécharge le CSV et ouvre Tune My Music : chargez-y le fichier téléchargé. YouTube permet de vérifier les vidéos puis de les ajouter directement à la playlist connectée.','status-line'));
+          if(p.invitationSentAt)invitation.append(node('small','Dernière invitation : '+new Date(p.invitationSentAt).toLocaleString('fr-FR',{timeZone:'Europe/P…6022 tokens truncated…’équipe. Cochez vos titres puis choisissez une plateforme. Deezer télécharge le CSV et ouvre Tune My Music : chargez-y le fichier téléchargé. YouTube permet de vérifier les vidéos puis de les ajouter directement à la playlist connectée.','status-line'));
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
   const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
 

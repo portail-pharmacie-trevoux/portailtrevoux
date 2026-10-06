@@ -45,14 +45,14 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   const wrap=el('div','','tablewrap'),table=el('table','','permission-matrix'),head=el('thead'),headRow=el('tr');
   ['Univers','Consulter / accéder','Modifier le contenu'].forEach(text=>{const th=el('th',text);th.scope='col';headRow.append(th);});head.append(headRow);table.append(head);
   const body=el('tbody'),rights=new Map(),editRights=new Map();
-  const allowed=p.permissionsConfigured?p.rights||[]:[...new Set([...(p.rights||[]),'Collaborateurs','Fun','Outils de calculs rapides','Actualités'])];
+  const allowed=p.permissionsConfigured?p.rights||[]:[...new Set([...(p.rights||[]),'Collaborateurs','Fun','Outils de calculs rapides','Actualités','Ressources humaines'])];
   const modifiable=p.permissionsConfigured?p.editRights||[]:['Fun'];
   for(const universe of universes){
     const tr=el('tr'),name=el('th',universe);name.scope='row';tr.append(name);
     const read=el('input');read.type='checkbox';read.checked=isAdministrator||allowed.includes(universe);read.disabled=isAdministrator;read.setAttribute('aria-label','Consulter '+universe);
     const readCell=el('td');readCell.append(read);tr.append(readCell);rights.set(universe,read);
     const editCell=el('td');
-    if(universe==='Collaborateurs'){editCell.append(el('span','Administrateur uniquement','permission-admin-only'));}
+    if(['Collaborateurs','Ressources humaines'].includes(universe)){editCell.append(el('span','Administrateur uniquement','permission-admin-only'));}
     else{const edit=el('input');edit.type='checkbox';edit.checked=isAdministrator||modifiable.includes(universe);edit.disabled=isAdministrator;edit.setAttribute('aria-label','Modifier '+universe);edit.onchange=()=>{if(edit.checked)read.checked=true;};read.onchange=()=>{if(!read.checked)edit.checked=false;};editCell.append(edit);editRights.set(universe,edit);}
     tr.append(editCell);body.append(tr);
   }

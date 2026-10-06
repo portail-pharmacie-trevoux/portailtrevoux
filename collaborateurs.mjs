@@ -74,7 +74,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const configured=data.editRights!==undefined||existing?.permissions_configured===true;
     if(typeof email!=='string'||email.length>254||(email&&!/^\S+@\S+\.\S+$/.test(email.trim())))throw fail(400,'Adresse e-mail invalide.');
     if(!Array.isArray(rights)||rights.some(r=>!universes.includes(r)))throw fail(400,'Droits invalides.');
-    if(!Array.isArray(editRights)||editRights.some(r=>!universes.includes(r)||r==='Collaborateurs'||!rights.includes(r)))throw fail(400,'La modification nécessite un droit de consultation. La gestion des collaborateurs reste réservée à l’administrateur.');
+    if(!Array.isArray(editRights)||editRights.some(r=>!universes.includes(r)||['Collaborateurs','Ressources humaines'].includes(r)||!rights.includes(r)))throw fail(400,'La modification nécessite un droit de consultation. La gestion des collaborateurs et des documents RH reste réservée à l’administrateur.');
     if(existing?.email&&!email)throw fail(400,'Archivez le collaborateur pour désactiver son accès.');
     if(data.password){if(!passwordValid(data.password))throw fail(400,'Le mot de passe provisoire doit comporter au moins 12 caractères.');}
     if(!email&&data.password)throw fail(400,'Renseignez une adresse e-mail pour créer un accès.');

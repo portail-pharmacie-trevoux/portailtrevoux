@@ -20,6 +20,8 @@ test('Google credentials survive encryption and reject tampering or the wrong ke
 test('employees need an explicit universe right; administrator can access all',()=>{
  assert.equal(canAccess({role:'employee',rights:['Agenda']},'Agenda'),true);
  assert.equal(canAccess({role:'employee',rights:[]},'Agenda'),false);
- assert.equal(canAccess({role:'employee',rights:['Agenda']},'Ressources humaines'),false);
+ assert.equal(canAccess({role:'employee',rights:['Agenda']},'Ressources humaines'),true,'Les documents RH collectifs sont accessibles par défaut');
+ assert.equal(canAccess({role:'employee',permissions_configured:true,rights:[]},'Ressources humaines'),false);
  assert.equal(canAccess({role:'admin',rights:[]},'Agenda'),true);
 });
+

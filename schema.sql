@@ -114,3 +114,27 @@ CREATE TABLE IF NOT EXISTS employee_invitations (
  requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS employee_invitations_user_id ON employee_invitations(user_id);
+
+CREATE TABLE IF NOT EXISTS hr_documents (
+ id SERIAL PRIMARY KEY, title TEXT NOT NULL CHECK(char_length(title) BETWEEN 1 AND 200),
+ file_name TEXT NOT NULL, file_type TEXT NOT NULL, file_content BYTEA NOT NULL,
+ file_hash TEXT NOT NULL, active BOOLEAN NOT NULL DEFAULT TRUE,
+ added_by INTEGER REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ removed_by INTEGER REFERENCES users(id) ON DELETE SET NULL, removed_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS hr_signature_requests (
+ id UUID PRIMARY KEY, document_id INTEGER NOT NULL REFERENCES hr_documents(id),
+ envelope_id TEXT, account_id TEXT NOT NULL, base_uri TEXT NOT NULL, environment TEXT NOT NULL CHECK(environment IN ('production','demo')),
+ recipients JSONB NOT NULL, status TEXT NOT NULL DEFAULT 'creating', error TEXT NOT NULL DEFAULT '',
+ created_by INTEGER REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_checked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS hr_signature_requests_document ON hr_signature_requests(document_id,created_at DESC);
+WITH migration AS (
+ INSERT INTO settings(key,value) VALUES('hr_documents_access_v1','enabled')
+ ON CONFLICT(key) DO NOTHING RETURNING key
+)
+UPDATE users SET rights=rights||'["Ressources humaines"]'::jsonb
+WHERE active=TRUE AND NOT (rights ? 'Ressources humaines') AND EXISTS(SELECT 1 FROM migration);
+-- Documents RH: a consultation right never grants employee management access.
+UPDATE users SET edit_rights=edit_rights-'Ressources humaines' WHERE edit_rights ? 'Ressources humaines';
