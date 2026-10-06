@@ -703,15 +703,16 @@ function renderHomeAgenda(data){
   block.setAttribute('aria-label','Rendez-vous du jour');
   const events=(data?.events||[]).filter(e=>{
     if(!e.start?.date&&!e.start?.dateTime)return false;
+    const title=normalizeSearch(e.title||'');if(!/\brdv\b|\brendez[ -]+vous\b|\bformations?\b/.test(title))return false;
     const days=eventDays(e);return days.start<=today&&days.end>=today;
   }).sort((a,b)=>Number(!a.start.date)-Number(!b.start.date)||(a.start.date||a.start.dateTime).localeCompare(b.start.date||b.start.dateTime));
   const label=e=>(e.start.date?'Journée':parisDay(e.start.dateTime)<today?'En cours':new Date(e.start.dateTime).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · '+(e.title||'Rendez-vous');
   if(!data||data.error)block.append(node('span','Rendez-vous momentanément indisponibles'));
   else if(!data.connected)block.append(node('span','Agenda à connecter'));
-  else if(!events.length)block.append(node('span','Aucun rendez-vous aujourd’hui'));
+  else if(!events.length)block.append(node('span','Aucun rendez-vous ni formation aujourd’hui'));
   else {
     block.title=events.map(label).join('\n');
-    events.slice(0,2).forEach((e,i)=>{const row=node('span',label(e)+(i===1&&events.length>2?' · +'+(events.length-2):''));row.title=label(e);block.append(row);});
+    events.slice(0,5).forEach((e,i)=>{const row=node('span',(normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ')+label(e)+(i===4&&events.length>5?' · +'+(events.length-5):''));row.title=label(e);block.append(row);});
     block.setAttribute('aria-label','Rendez-vous du jour : '+events.map(label).join('; '));
   }
   tile.append(block);
