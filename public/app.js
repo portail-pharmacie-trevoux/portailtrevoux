@@ -129,15 +129,21 @@ function renderPeople(){
       if(isAdmin){
         const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
         if(active&&!p.passwordConfigured){
+          const sendStatus=node('small','','invitation-status');sendStatus.setAttribute('role','status');sendStatus.setAttribute('aria-live','polite');
           const invite=button('Envoyer demande de connexion',async()=>{
             if(!confirm('Envoyer le mail de bienvenue à '+personName(p)+' sur '+p.invitationEmail+' ? Le salarié choisira lui-même son mot de passe.'))return;
-            invite.disabled=true;q('#feedback').textContent='Envoi de l’invitation…';
-            try{const result=await api('/api/users/'+p.id+'/invitation','POST',{email:p.invitationEmail});await reloadPeople('Invitation envoyée à '+result.email+'. Le lien est valable 72 heures.');}
-            catch(e){if(currentUniverse==='Collaborateurs'){q('#feedback').textContent=e.message;const panel=q('#invitation-mail');if(panel)panel.open=true;invite.disabled=false;}}
+            invite.disabled=true;invite.textContent='Envoi en cours…';sendStatus.className='invitation-status';sendStatus.textContent='Envoi de l’invitation…';q('#feedback').textContent=sendStatus.textContent;
+            try{
+              const result=await api('/api/users/'+p.id+'/invitation','POST',{email:p.invitationEmail});
+              const message='Invitation envoyée à '+result.email+'. Le lien est valable 72 heures.';
+              invite.textContent='Invitation envoyée';sendStatus.textContent=message;
+              try{await reloadPeople(message);const refreshed=document.querySelector('[data-invitation-user="'+p.id+'"] .invitation-status');if(refreshed)refreshed.textContent=message;}catch{q('#feedback').textContent=message;}
+            }
+            catch(e){if(currentUniverse==='Collaborateurs'){q('#feedback').textContent=e.message;sendStatus.className='invitation-status error';sendStatus.textContent=e.message;const panel=q('#invitation-mail');if(panel)panel.open=true;invite.disabled=false;invite.textContent='Envoyer demande de connexion';}}
           },'btn small primary');
           invite.setAttribute('aria-label','Envoyer demande de connexion à '+personName(p));
           invite.disabled=!p.invitationEmail;invite.title=p.invitationEmail?'Envoyer à '+p.invitationEmail:'Renseignez une adresse e-mail dans la fiche du collaborateur.';
-          const invitation=node('div','','person-invitation');invitation.append(invite,node('small',p.invitationEmail||'E-mail à renseigner','field-note'));
+          const invitation=node('div','','person-invitation');invitation.dataset.invitationUser=p.id;invitation.append(invite,node('small',p.invitationEmail||'E-mail à renseigner','field-note'),sendStatus);
           if(p.invitationSentAt)invitation.append(node('small','Dernière invitation : '+new Date(p.invitationSentAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'}),'field-note'));
           actions.append(invitation);
         }

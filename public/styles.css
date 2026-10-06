@@ -195,3 +195,5 @@ button.schedule-day:hover{border-color:var(--brand);filter:brightness(.98)}
 
 .tile .tile-agenda{display:flex;flex-direction:column;justify-content:center;width:100%;height:35px;min-height:35px;flex-shrink:0;margin-top:auto;padding-top:3px;border-top:1px solid #dde3ec;color:var(--muted);overflow:hidden}
 .tile .tile-agenda>span{display:block;width:100%;margin:0;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.person-invitation .invitation-status{display:block;max-width:300px;white-space:normal;line-height:1.4;font-size:12px}.person-invitation .invitation-status:empty{display:none}.person-invitation .invitation-status.error{color:#a32c32}
