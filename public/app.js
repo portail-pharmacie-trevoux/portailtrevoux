@@ -60,7 +60,7 @@ async function api(path,method='GET',data){
   if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Error(body.error||'Demande impossible.');}return body;
 }
 function error(e){q('#global-message').textContent=e.message;}
-function showLogin(){scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showLogin(){scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
@@ -525,18 +525,19 @@ async function refreshHomeExtras(){
   if(!session||session.user.mustChange||homeExtrasPending)return;
   const userId=session.user.id;homeExtrasPending=true;
   try{
-    const results=await Promise.allSettled([api('/api/fun/joke'),api('/api/publications'),api('/api/collaborateurs/celebrations')]);
+    const results=await Promise.allSettled([api('/api/fun/joke'),api('/api/publications'),api('/api/collaborateurs/celebrations'),tileAllowed('Agenda')?api('/api/calendar'):Promise.resolve(null)]);
     const joke=results[0].status==='fulfilled'?results[0].value:null,news=results[1].status==='fulfilled'?results[1].value:[],celebrations=results[2].status==='fulfilled'?results[2].value:null;
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
-      if(['Collaborateurs','Contacts utiles'].includes(tile.dataset.universe))return;
+      if(['Collaborateurs','Contacts utiles','Agenda'].includes(tile.dataset.universe))return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
       const label=tile.dataset.universe==='Actualités'?(count?count+' message'+(count>1?'s':'')+' non vu'+(count>1?'s':''):'Aucun message non vu'):(count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue');
       badge.append(node('span',count?'●':'○','news-dot'),node('span',label));
       tile.append(badge);
     });
+    renderHomeAgenda(results[3].status==='fulfilled'?results[3].value:null);
     renderCelebrations(celebrations);
     const fun=q('.grid [data-universe="Fun"]');fun.querySelector('.daily-joke')?.remove();
     const block=node('span','','daily-joke');block.append(node('strong','😄 La blague du jour'));
@@ -688,3 +689,24 @@ function renderCelebrations(data){
   tile.append(block);
 }
 
+
+function renderHomeAgenda(data){
+  const tile=q('.grid [data-universe="Agenda"]');tile.querySelector('.tile-agenda')?.remove();
+  if(!session||!tileAllowed('Agenda'))return;
+  const today=parisDay(),block=node('span','','tile-agenda');
+  block.setAttribute('aria-label','Rendez-vous du jour');
+  const events=(data?.events||[]).filter(e=>{
+    if(!e.start?.date&&!e.start?.dateTime)return false;
+    const days=eventDays(e);return days.start<=today&&days.end>=today;
+  }).sort((a,b)=>Number(!a.start.date)-Number(!b.start.date)||(a.start.date||a.start.dateTime).localeCompare(b.start.date||b.start.dateTime));
+  const label=e=>(e.start.date?'Journée':parisDay(e.start.dateTime)<today?'En cours':new Date(e.start.dateTime).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · '+(e.title||'Rendez-vous');
+  if(!data||data.error)block.append(node('span','Rendez-vous momentanément indisponibles'));
+  else if(!data.connected)block.append(node('span','Agenda à connecter'));
+  else if(!events.length)block.append(node('span','Aucun rendez-vous aujourd’hui'));
+  else {
+    block.title=events.map(label).join('\n');
+    events.slice(0,2).forEach((e,i)=>{const row=node('span',label(e)+(i===1&&events.length>2?' · +'+(events.length-2):''));row.title=label(e);block.append(row);});
+    block.setAttribute('aria-label','Rendez-vous du jour : '+events.map(label).join('; '));
+  }
+  tile.append(block);
+}
