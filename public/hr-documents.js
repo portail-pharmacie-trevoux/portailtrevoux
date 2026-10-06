@@ -12,7 +12,7 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
  const editor=el('div'),feedback=el('p','','status-line');feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
  const list=el('div','','hr-document-list'),history=el('section','','hr-signature-history');
  container.replaceChildren(note,editor,feedback,list,history);
- if(isAdmin){const add=button('Importer un document',()=>importDocument(),'btn primary');add.id='hr-import-action';heading.append(add);}
+ if(isAdmin){const drop=el('div','Glissez-déposez un PDF ici, ou cliquez pour choisir un document.','hr-dropzone');drop.tabIndex=0;drop.setAttribute('role','button');drop.onclick=()=>importDocument();drop.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();importDocument();}};drop.ondragover=e=>{e.preventDefault();drop.classList.add('dragging');};drop.ondragleave=()=>drop.classList.remove('dragging');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('dragging');const files=[...e.dataTransfer.files];if(files.length!==1){feedback.textContent='Déposez un seul document à la fois.';return;}importDocument(files[0]);};container.insertBefore(drop,editor);const add=button('Importer un document',()=>importDocument(),'btn primary');add.id='hr-import-action';heading.append(add);}
  const settings=isAdmin?el('details','','hr-settings'):null;
  if(settings){settings.append(el('summary','Connexion Youtrust'),el('p','Youtrust envoie les invitations de signature par e-mail. Connectez le compte de la pharmacie pour utiliser « Envoyer pour signature ».','field-note'));container.append(settings);void loadConnection();}
  async function reload(message=''){
@@ -21,32 +21,41 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
  }
  function display(){
   list.replaceChildren();if(!documents.length){list.append(el('p','Aucun document importé. Les règlements, chartes et accords internes apparaîtront ici.','empty'));return;}
-  const wrap=el('div','','tablewrap'),table=el('table','','hr-table'),head=el('thead'),titles=el('tr');
-  ['Document','Ajouté le','Actions'].forEach(title=>{const th=el('th',title);th.scope='col';titles.append(th);});head.append(titles);table.append(head);const body=el('tbody');
+  const grid=el('div','','hr-document-grid');
   documents.forEach(doc=>{
-   const row=el('tr');row.dataset.documentId=doc.id;const name=el('td'),when=el('td',date(doc.created_at)),actions=el('td','','hr-actions');
-   name.append(el('strong',doc.title),el('small',doc.file_name,'field-note'));
+   const card=el('article','','hr-document-card');card.dataset.documentId=doc.id;
+   const preview=el('div','','hr-document-preview');
+   if(doc.file_type==='application/pdf'){
+    const frame=el('iframe');frame.src='/api/hr/documents/'+doc.id+'/file?view=1#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH';frame.title='Aperçu de '+doc.title;frame.loading='lazy';frame.tabIndex=-1;preview.append(frame);
+   }else preview.append(el('span','DOCX','hr-document-icon'));
+   const name=el('h3',doc.title),actions=el('div','','hr-actions');
    actions.append(link(doc.file_type==='application/pdf'?'Consulter':'Télécharger le Word','/api/hr/documents/'+doc.id+'/file'+(doc.file_type==='application/pdf'?'?view=1':'')));
    if(doc.file_type==='application/pdf')actions.append(link('Télécharger','/api/hr/documents/'+doc.id+'/file'));
-   if(isAdmin){
-    actions.append(button('Supprimer',async()=>{
-     if(!confirm('Supprimer « '+doc.title+' » de la liste des documents RH ? Les demandes déjà envoyées dans Youtrust seront conservées.'))return;
-     try{await api('/api/hr/documents/'+doc.id,'DELETE',{});await reload('Document supprimé de la liste.');}catch(e){if(isCurrent())feedback.textContent=e.message;}
-    },'btn small danger'),button('Envoyer pour signature',()=>signatureForm(doc),'btn small primary'));
-   }
-   row.append(name,when,actions);body.append(row);
-  });table.append(body);wrap.append(table);list.append(wrap);
+   if(isAdmin){actions.append(button('Renommer',()=>renameDocument(doc)),button('Supprimer',async()=>{
+    if(!confirm('Supprimer « '+doc.title+' » de la liste des documents RH ? Les demandes déjà envoyées dans Youtrust seront conservées.'))return;
+    try{await api('/api/hr/documents/'+doc.id,'DELETE',{});await reload('Document supprimé de la liste.');}catch(e){if(isCurrent())feedback.textContent=e.message;}
+   },'btn small danger'),button('Envoyer pour signature',()=>signatureForm(doc),'btn small primary'));}
+   card.append(preview,name,el('small',doc.file_name,'field-note'),el('small','Ajouté le '+date(doc.created_at),'field-note'),actions);grid.append(card);
+  });list.append(grid);
  }
- function importDocument(){
+ function renameDocument(doc){
+  editor.replaceChildren();const form=el('form','','hr-form'),label=el('label','Nom affiché du document'),input=el('input');input.id='hr-rename';label.htmlFor=input.id;input.type='text';input.value=doc.title;input.maxLength=200;input.required=true;
+  const error=el('p','','error'),save=el('button','Enregistrer le nom','btn primary');save.type='submit';
+  form.append(el('h3','Renommer le document'),label,input,error,button('Annuler',()=>editor.replaceChildren()),save);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});editor.scrollIntoView?.({behavior:'smooth',block:'center'});
+  form.onsubmit=async e=>{e.preventDefault();if(saving||!isCurrent())return;saving=true;save.disabled=true;try{await api('/api/hr/documents/'+doc.id,'PATCH',{title:input.value});if(!isCurrent())return;editor.replaceChildren();await reload('Nom du document enregistré.');}catch(e){if(isCurrent())error.textContent=e.message;}finally{saving=false;save.disabled=false;}};
+ }
+
+ function importDocument(droppedFile=null){
   if(!isCurrent())return;editor.replaceChildren();const form=el('form','','hr-form'),title=el('h3','Importer un document RH');
   const label=el('label','Titre du document');label.htmlFor='hr-title';const input=el('input');input.id='hr-title';input.type='text';input.required=true;input.maxLength=200;
-  const fileLabel=el('label','Document PDF ou Word (.docx)');fileLabel.htmlFor='hr-file';const file=el('input');file.id='hr-file';file.type='file';file.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';file.required=true;
-  file.onchange=()=>{if(file.files[0]&&!input.value)input.value=file.files[0].name.replace(/\.(pdf|docx)$/i,'').slice(0,200);};
+  const fileLabel=el('label','Document PDF ou Word (.docx)');fileLabel.htmlFor='hr-file';const file=el('input');file.id='hr-file';file.type='file';file.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';file.required=!droppedFile;
+  let selectedFile=droppedFile;if(selectedFile)input.value=selectedFile.name.replace(/\.(pdf|docx)$/i,'').slice(0,200);
+  const chosen=el('p',selectedFile?'Fichier déposé : '+selectedFile.name:'','field-note');file.onchange=()=>{selectedFile=file.files[0];if(selectedFile){input.value=selectedFile.name.replace(/\.(pdf|docx)$/i,'').slice(0,200);chosen.textContent='Fichier choisi : '+selectedFile.name;}};
   const error=el('p','','error');error.setAttribute('role','alert');const actions=el('div','','dialog-actions'),cancel=button('Annuler',()=>editor.replaceChildren()),submit=el('button','Importer le document','btn primary');submit.type='submit';actions.append(cancel,submit);
-  form.append(title,label,input,fileLabel,file,el('p','10 Mo maximum. Le document sera accessible à toute l’équipe.','field-note'),error,actions);editor.append(form);input.focus();
+  form.append(title,label,input,fileLabel,file,chosen,el('p','10 Mo maximum. Le document sera accessible à toute l’équipe.','field-note'),error,actions);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});
   form.onsubmit=async e=>{
    e.preventDefault();if(saving||!isCurrent())return;saving=true;submit.disabled=true;cancel.disabled=true;error.textContent='';
-   try{const selected=file.files[0];if(!selected||! /\.(pdf|docx)$/i.test(selected.name)||!selected.size||selected.size>10*1024*1024)throw Error('Choisissez un document PDF ou Word contenant des données, de 10 Mo maximum.');
+   try{const selected=selectedFile||file.files[0];if(!selected||! /\.(pdf|docx)$/i.test(selected.name)||!selected.size||selected.size>10*1024*1024)throw Error('Choisissez un document PDF ou Word contenant des données, de 10 Mo maximum.');
     const fileData=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(Error('Le fichier n’a pas pu être lu.'));reader.readAsDataURL(selected);});
     await api('/api/hr/documents/import','POST',{title:input.value,fileName:selected.name,fileData});if(!isCurrent())return;editor.replaceChildren();await reload('Document importé.');
    }catch(e){if(isCurrent())error.textContent=e.message;}finally{saving=false;submit.disabled=false;cancel.disabled=false;}

@@ -23,7 +23,13 @@ export function registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,f
   const row=(await db.query('SELECT file_name,file_type,file_content FROM hr_documents WHERE id=$1 AND active=TRUE',[documentId(req.params.id)])).rows[0];
   if(!row)throw fail(404,'Document introuvable.');res.type(row.file_type);
   if(row.file_type==='application/pdf'&&req.query.view==='1')res.set('Content-Disposition',"inline; filename*=UTF-8''"+encodeURIComponent(row.file_name));else res.attachment(row.file_name);
+  if(row.file_type==='application/pdf'&&req.query.view==='1')res.set('Content-Security-Policy',"default-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'");
   res.send(row.file_content);
+ });
+ app.patch('/api/hr/documents/:id',...guard,async(req,res)=>{
+  const title=req.body?.title;if(typeof title!=='string'||!title.trim()||title.trim().length>200)throw fail(400,'Renseignez un nom de 200 caractères maximum.');
+  const {rows}=await db.query('UPDATE hr_documents SET title=$2 WHERE id=$1 AND active=TRUE RETURNING id,title,file_name,file_type,created_at',[documentId(req.params.id),title.trim()]);
+  if(!rows[0])throw fail(404,'Document introuvable.');res.json(rows[0]);
  });
  app.delete('/api/hr/documents/:id',...guard,async(req,res)=>{
   const {rows}=await db.query('UPDATE hr_documents SET active=FALSE,removed_at=now(),removed_by=$2 WHERE id=$1 AND active=TRUE RETURNING id',[documentId(req.params.id),req.auth.id]);
