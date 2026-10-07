@@ -1,4 +1,4 @@
-import {importLaboratories} from './laboratory-import.mjs';
+import {importLaboratories,importLaboratoryLogos} from './laboratory-import.mjs';
 import {registerLaboratories} from './laboratories.mjs';
 import {createYoutrust} from './youtrust.mjs';
 import {registerHRDocuments} from './hr-documents.mjs';
@@ -306,6 +306,7 @@ export async function initialize(db,config){
   await purgeNews(db);
   await importProcedureDocuments(db,config.procedureImport);
   await importLaboratories(db,config.laboratoryImport);
+  await importLaboratoryLogos(db,config.laboratoryLogosImport);
   const initialMusic=JSON.parse(await readFile(new URL('./music-seed.json',import.meta.url),'utf8'));
   const seed=initialMusic.map(t=>({...t,trackKey:musicKey(t.artist,t.title)}));
   await db.query(`INSERT INTO music_tracks(artist,title,track_key,contributor,source)
@@ -319,7 +320,7 @@ export async function initialize(db,config){
   }
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,laboratoryImport:env.LABORATORIES_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
+  const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,laboratoryImport:env.LABORATORIES_IMPORT_JSON,laboratoryLogosImport:env.LABORATORY_LOGOS_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});

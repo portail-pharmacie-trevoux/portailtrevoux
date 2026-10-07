@@ -49,3 +49,35 @@ export async function importLaboratories(db,raw) {
   await client.query('COMMIT');
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }
+
+export function parseLaboratoryLogos(raw) {
+ const batch=JSON.parse(raw);
+ if(!batch||typeof batch.batchId!=='string'||! /^[\w-]{1,100}$/.test(batch.batchId)||!Array.isArray(batch.logos)||!batch.logos.length||batch.logos.length>100)throw Error('Lot de logos invalide.');
+ const seen=new Set();
+ const logos=batch.logos.map(item=>{
+  if(!Number.isSafeInteger(item.id)||item.id<1||seen.has(item.id)||typeof item.name!=='string'||!item.name.trim()||item.name.length>160||typeof item.fileData!=='string'||item.fileData.length>2800000||! /^[A-Za-z0-9+/]+={0,2}$/.test(item.fileData))throw Error('Logo invalide.');
+  seen.add(item.id);const bytes=Buffer.from(item.fileData,'base64');
+  if(bytes.length>2*1024*1024||!bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw Error('Logo PNG attendu.');
+  return {id:item.id,name:item.name.trim(),bytes};
+ });return {batchId:batch.batchId,logos};
+}
+
+export async function importLaboratoryLogos(db,raw) {
+ if(!raw)return;
+ const batch=parseLaboratoryLogos(raw),client=await db.connect();
+ try{
+  await client.query('BEGIN');await client.query("SELECT pg_advisory_xact_lock(hashtext('laboratory-logo-import'))");
+  const key='laboratory-logo-import:'+batch.batchId;
+  const marker=await client.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO NOTHING RETURNING key',[key,'pending']);
+  if(!marker.rows.length){await client.query('COMMIT');return;}
+  let added=0;
+  for(const item of batch.logos){
+   const match=await client.query('SELECT id FROM laboratories WHERE id=$1 AND name=$2',[item.id,item.name]);
+   if(!match.rows.length)throw Error('Fiche fournisseur introuvable.');
+   const result=await client.query("UPDATE laboratories SET logo_content=$3,logo_type='image/png',logo_version=logo_version+1,revision=revision+1,updated_at=now() WHERE id=$1 AND name=$2 AND logo_content IS NULL RETURNING id",[item.id,item.name,item.bytes]);
+   added+=result.rows.length;
+  }
+  await client.query('UPDATE settings SET value=$2 WHERE key=$1',[key,JSON.stringify({added,total:batch.logos.length})]);
+  await client.query('COMMIT');
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}
