@@ -138,3 +138,16 @@ UPDATE users SET rights=rights||'["Ressources humaines"]'::jsonb
 WHERE active=TRUE AND NOT (rights ? 'Ressources humaines') AND EXISTS(SELECT 1 FROM migration);
 -- Documents RH: a consultation right never grants employee management access.
 UPDATE users SET edit_rights=edit_rights-'Ressources humaines' WHERE edit_rights ? 'Ressources humaines';
+
+CREATE TABLE IF NOT EXISTS laboratories (
+ id SERIAL PRIMARY KEY, name TEXT NOT NULL, order_mode TEXT NOT NULL CHECK(order_mode IN ('pharmacie','groupement')),
+ responsible_id INTEGER REFERENCES users(id) ON DELETE SET NULL, details JSONB NOT NULL DEFAULT '{}',
+ revision INTEGER NOT NULL DEFAULT 1, updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM settings WHERE key='laboratories_team_access_v1') THEN
+  UPDATE users SET rights=rights || '["Laboratoires"]'::jsonb WHERE active=TRUE AND NOT rights ? 'Laboratoires';
+  INSERT INTO settings(key,value) VALUES('laboratories_team_access_v1','enabled');
+ END IF;
+END $$;

@@ -1,3 +1,4 @@
+import {registerLaboratories} from './laboratories.mjs';
 import {createYoutrust} from './youtrust.mjs';
 import {registerHRDocuments} from './hr-documents.mjs';
 import {registerNews,purgeNews,unreadNews} from './news.mjs';
@@ -53,6 +54,7 @@ export function createApp(db,config) {
   const csrf=(req,res,next)=>req.get('x-csrf-token')===req.auth?.csrf?next():next(fail(403,'Session à actualiser.'));
   const viewUniverse=name=>(req,res,next)=>canAccess(req.auth,name)?next():next(fail(403,'Accès refusé.'));
   const editUniverse=name=>(req,res,next)=>canModify(req.auth,name)?next():next(fail(403,'Cet univers est en consultation seule pour votre compte.'));
+  registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,publish});
   const getSetting=async key=>(await db.query('SELECT value FROM settings WHERE key=$1',[key])).rows[0]?.value;
   const setSetting=async(key,value)=>db.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[key,value]);
   async function publish(universe,title,key=null) {
