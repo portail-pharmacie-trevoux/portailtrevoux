@@ -31,11 +31,11 @@ export function decrypt(value,secret) {
 export function canAccess(user,universe) {
  if(!user)return false;if(user.role==='admin')return true;
  if(user.permissions_configured)return !!user.rights?.includes(universe);
- return ['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires'].includes(universe)||!!user.rights?.includes(universe);
+ return ['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires',"Outils d'aide aux commandes"].includes(universe)||!!user.rights?.includes(universe);
 }
 export function canModify(user,universe) {
  if(!user||!canAccess(user,universe))return false;if(user.role==='admin')return true;
- if(universe==='Laboratoires')return true;
+ if(['Laboratoires',"Outils d'aide aux commandes"].includes(universe))return true;
  if(['Collaborateurs','Ressources humaines'].includes(universe))return false;
  return user.permissions_configured?!!user.edit_rights?.includes(universe):universe==='Fun';
 }

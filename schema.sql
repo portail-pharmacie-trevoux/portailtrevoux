@@ -169,3 +169,10 @@ CREATE TABLE IF NOT EXISTS calendar_reminders (
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  PRIMARY KEY(user_id,calendar_id,event_id)
 );
+
+CREATE TABLE IF NOT EXISTS order_planning (
+ id SERIAL PRIMARY KEY, content TEXT NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1,
+ updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

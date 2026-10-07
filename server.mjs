@@ -1,3 +1,4 @@
+import {registerOrderPlanning} from './order-planning.mjs';
 import {registerCalendarReminders} from './calendar-reminders.mjs';
 import {importLaboratories,importLaboratoryLogos} from './laboratory-import.mjs';
 import {registerLaboratories} from './laboratories.mjs';
@@ -64,6 +65,7 @@ export function createApp(db,config) {
   }
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
+  registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret});
   registerNews({app,db,auth,ready,csrf,viewUniverse,fail});
   const youtrust=config.youtrustClient||createYoutrust({getSetting,setSetting,deleteSetting:key=>db.query('DELETE FROM settings WHERE key=$1',[key]),secret,origin,fail,config,fetchImpl:config.youtrustFetch});
   registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,secret,publish,uploadParser:express.json({limit:'15mb'}),youtrust});
