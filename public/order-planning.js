@@ -9,9 +9,13 @@ export async function renderOrderPlanning({container,api,canEdit,isCurrent}){
  for(const title of ['COMMANDE PASSÉE','COMMANDE DÉLIVRÉE']){const th=node('th',title);th.scope='col';header.append(th);}
  columns.forEach(([,title])=>{const th=node('th',title);th.scope='col';header.append(th);});if(canEdit){const th=node('th','GESTION');th.scope='col';header.append(th);}head.append(header);table.append(head,body);wrap.append(table);
  const notice=node('p',canEdit?'Une ligne par personne. Saisissez une première échéance pour démarrer le cycle. La fréquence reste modifiable. Ensuite, la prochaine commande se calcule à partir de la date de délivrance et de la fréquence en jours. Enregistrez chaque ligne après modification. Le panneau rouge indique une commande prévue dans les 7 jours. Les cases « Commande passée » et « Commande délivrée » enregistrent la date et vos initiales. La délivrance recalcule la prochaine échéance ; décocher retire la validation.':'Tableau des commandes programmées.','field-note');
+ const searchBox=node('label','Rechercher un nom ou un traitement','order-plan-search'),search=node('input');search.type='search';search.placeholder='Nom, prénom ou traitement…';search.setAttribute('aria-label','Rechercher un nom, un prénom ou un traitement');searchBox.append(search);
+ const normalize=value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr');
+ function filterRows(){const terms=normalize(search.value).trim().split(/\s+/).filter(Boolean);for(const row of body.children){const text=normalize(['NOM','PRÉNOM','TRAITEMENT'].map(key=>row.querySelector('[aria-label^="'+key+' ·"]')?.value||'').join(' '));row.classList.toggle('hidden',!terms.every(term=>text.includes(term)));}updateEmpty();}
+ search.addEventListener('input',filterRows);search.addEventListener('search',filterRows);
  const empty=node('p','Aucune commande programmée.','empty');
  function sortRows(){const items=[...body.children];items.sort((a,b)=>Number(a.dataset.suspended==='true')-Number(b.dataset.suspended==='true')||(a.querySelector('[aria-label^="DATE PROCHAINE"]')?.value||'9999').localeCompare(b.querySelector('[aria-label^="DATE PROCHAINE"]')?.value||'9999'));items.forEach(r=>body.append(r));}
- function updateEmpty(){empty.classList.toggle('hidden',!!body.children.length);}
+ function updateEmpty(){const visible=[...body.children].some(row=>!row.classList.contains('hidden'));empty.textContent=body.children.length?'Aucune commande ne correspond à votre recherche.':'Aucune commande programmée.';empty.classList.toggle('hidden',visible);}
  function addRow(record={mode:'grossiste'}){
   const row=node('tr','',''+(record.id?'':'order-plan-dirty')),inputs={},actions=node('td','','order-plan-actions'),status=node('span','','order-plan-status');status.setAttribute('role','status');let saved={...record},changed=false;
   const tracking=node('td','','order-plan-tracking'),warning=node('span','⚠\uFE0E','order-plan-warning'),checked=node('input'),checkLabel=node('label',''),stamp=node('span','','order-plan-stamp');
@@ -34,26 +38,26 @@ export async function renderOrderPlanning({container,api,canEdit,isCurrent}){
   const suspend=node('button','Suspendre','btn small');suspend.type='button';
   const save=node('button','Enregistrer','btn small primary'),remove=node('button',saved.id?'Supprimer':'Retirer','btn small');save.type=remove.type='button';save.disabled=!!saved.id;
   function dirty(){if(canEdit){changed=true;row.classList.add('order-plan-dirty');save.disabled=false;checked.disabled=true;delivered.disabled=true;suspend.disabled=true;status.textContent='À enregistrer';}}
-  for(const input of Object.values(inputs))input.addEventListener('input',dirty);
+  for(const input of Object.values(inputs))input.addEventListener('input',()=>{dirty();filterRows();});
   inputs.frequency.addEventListener('input',calculate);
   function busy(value){Object.values(inputs).forEach(i=>i.disabled=value||!canEdit);save.disabled=remove.disabled=value;suspend.disabled=value||!saved.id||changed;checked.disabled=delivered.disabled=value||!canEdit||!saved.id||changed;}
   save.onclick=async()=>{
    for(const input of Object.values(inputs))if(!input.reportValidity())return;
    const values=Object.fromEntries(Object.entries(inputs).map(([key,input])=>[key,key==='frequency'?(input.value?Number(input.value):null):input.value]));busy(true);status.textContent='Enregistrement…';
-   try{const result=await api('/api/order-planning'+(saved.id?'/'+saved.id:''),saved.id?'PUT':'POST',{...values,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';remove.textContent='Supprimer';status.textContent='Enregistré';busy(false);save.disabled=true;trackingState();sortRows();}
+   try{const result=await api('/api/order-planning'+(saved.id?'/'+saved.id:''),saved.id?'PUT':'POST',{...values,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';remove.textContent='Supprimer';status.textContent='Enregistré';busy(false);save.disabled=true;trackingState();sortRows();filterRows();}
    catch(error){if(!isCurrent())return;status.textContent=error.message;busy(false);checked.disabled=delivered.disabled=true;}
   };
   checked.onchange=async()=>{
    const enabled=checked.checked;busy(true);status.textContent='Validation…';
-   try{const result=await api('/api/order-planning/'+saved.id+'/confirmation','POST',{enabled,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';status.textContent=enabled?'Commande passée':'Validation retirée';busy(false);save.disabled=true;trackingState();sortRows();}
+   try{const result=await api('/api/order-planning/'+saved.id+'/confirmation','POST',{enabled,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';status.textContent=enabled?'Commande passée':'Validation retirée';busy(false);save.disabled=true;trackingState();sortRows();filterRows();}
    catch(error){if(!isCurrent())return;status.textContent=error.message;busy(false);trackingState();save.disabled=true;}
   };
   delivered.onchange=async()=>{
    const enabled=delivered.checked;busy(true);status.textContent='Validation…';
-   try{const result=await api('/api/order-planning/'+saved.id+'/delivery','POST',{enabled,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';status.textContent=enabled?'Commande délivrée':'Délivrance retirée';busy(false);save.disabled=true;trackingState();sortRows();}
+   try{const result=await api('/api/order-planning/'+saved.id+'/delivery','POST',{enabled,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';status.textContent=enabled?'Commande délivrée':'Délivrance retirée';busy(false);save.disabled=true;trackingState();sortRows();filterRows();}
    catch(error){if(!isCurrent())return;status.textContent=error.message;busy(false);trackingState();save.disabled=true;}
   };
-  suspend.onclick=async()=>{busy(true);status.textContent='Enregistrement…';try{saved=await api('/api/order-planning/'+saved.id+'/suspension','POST',{enabled:!saved.suspended,revision:saved.revision});if(!isCurrent())return;status.textContent=saved.suspended?'Commande suspendue':'Commande reprise';busy(false);save.disabled=true;trackingState();sortRows();}catch(e){status.textContent=e.message;busy(false);trackingState();save.disabled=!changed;}};
+  suspend.onclick=async()=>{busy(true);status.textContent='Enregistrement…';try{saved=await api('/api/order-planning/'+saved.id+'/suspension','POST',{enabled:!saved.suspended,revision:saved.revision});if(!isCurrent())return;status.textContent=saved.suspended?'Commande suspendue':'Commande reprise';busy(false);save.disabled=true;trackingState();sortRows();filterRows();}catch(e){status.textContent=e.message;busy(false);trackingState();save.disabled=!changed;}};
   trackingState();
   remove.onclick=()=>{
    if(!saved.id){row.remove();updateEmpty();return;}
@@ -62,14 +66,14 @@ export async function renderOrderPlanning({container,api,canEdit,isCurrent}){
    confirm.onclick=async()=>{confirm.disabled=true;try{await api('/api/order-planning/'+saved.id,'DELETE',{revision:saved.revision});dialog.close();if(isCurrent()){row.remove();updateEmpty();}}catch(e){error.textContent=e.message;confirm.disabled=false;}};
    buttons.append(cancel,confirm);dialog.append(title,text,error,buttons);document.body.append(dialog);dialog.showModal();
   };
-  if(canEdit){actions.append(save,suspend,remove,status);row.append(actions);}body.append(row);sortRows();updateEmpty();return row;
+  if(canEdit){actions.append(save,suspend,remove,status);row.append(actions);}body.append(row);sortRows();filterRows();return row;
  }
- if(canEdit){const add=node('button','Ajouter une ligne','btn primary');add.type='button';add.onclick=()=>{const row=addRow();row.querySelector('[aria-label^="NOM"]').focus();};const importButton=node('button','Importer un fichier Excel','btn primary');importButton.type='button';importButton.onclick=()=>openOrderImport({api,isCurrent,onImported:record=>addRow(record)});toolbar.append(add,importButton);}
+ if(canEdit){const add=node('button','Ajouter une ligne','btn primary');add.type='button';add.onclick=()=>{search.value='';filterRows();const row=addRow();row.querySelector('[aria-label^="NOM"]').focus();};const importButton=node('button','Importer un fichier Excel','btn primary');importButton.type='button';importButton.onclick=()=>openOrderImport({api,isCurrent,onImported:record=>addRow(record)});toolbar.append(add,importButton);}
  const exportButton=node('button','Exporter en Excel','btn primary'),exportStatus=node('span','','order-plan-status');exportButton.type='button';exportStatus.setAttribute('role','status');
  exportButton.onclick=async()=>{
   if(body.querySelector('.order-plan-dirty')){exportStatus.textContent='Enregistrez les lignes modifiées avant d’exporter.';return;}
   exportButton.disabled=true;exportStatus.textContent='Préparation du fichier…';
   try{const response=await fetch('/api/order-planning/export.xlsx',{credentials:'same-origin'});if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(error.error||'Impossible d’exporter le tableau.');}const blob=await response.blob();if(!isCurrent())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=response.headers.get('content-disposition')?.match(/filename=([^;]+)/)?.[1]||'commandes-programmees.xlsx';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);exportStatus.textContent='Fichier Excel téléchargé.';}catch(error){if(isCurrent())exportStatus.textContent=error.message;}finally{exportButton.disabled=false;}
  };toolbar.append(exportButton,exportStatus);
- rows.forEach(addRow);root.append(toolbar,notice,empty,wrap);container.replaceChildren(root);updateEmpty();
+ rows.forEach(addRow);root.append(toolbar,searchBox,notice,empty,wrap);container.replaceChildren(root);updateEmpty();
 }
