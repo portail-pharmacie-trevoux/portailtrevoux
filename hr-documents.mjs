@@ -8,20 +8,22 @@ export function registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,f
  const documentId=value=>{const id=Number(value);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Document invalide.');return id;};
  async function transaction(work){const client=db.connect?await db.connect():db;try{await client.query('BEGIN');const result=await work(client);await client.query('COMMIT');return result;}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}}
 
+ const canRead=(doc,user)=>user.role==='admin'||(doc.scope||'common')==='common'||Number(doc.owner_id)===user.id;
  async function recipients(client=db){
   const people=(await client.query('SELECT id,name,email FROM users WHERE active=TRUE ORDER BY last_name,first_name,id')).rows;
   return Promise.all(people.map(async person=>({...person,email:await invitationAddress(client,person,secret)})));
  }
- app.get('/api/hr/documents',auth,ready,access,async(req,res)=>res.json((await db.query('SELECT id,title,file_name,file_type,created_at FROM hr_documents WHERE active=TRUE ORDER BY created_at DESC,id DESC')).rows));
+ app.get('/api/hr/documents',auth,ready,access,async(req,res)=>res.json((await db.query('SELECT id,title,file_name,file_type,created_at,scope,owner_id,(SELECT name FROM users WHERE id=owner_id) AS owner_name FROM hr_documents WHERE active=TRUE AND ($1::boolean OR scope=\'common\' OR owner_id=$2) ORDER BY created_at DESC,id DESC',[req.auth.role==='admin',req.auth.id])).rows));
  app.post('/api/hr/documents/import',...guard,uploadParser,async(req,res)=>{
   const file=validateProcedureFile(req.body,fail),title=req.body?.title;
   if(typeof title!=='string'||!title.trim()||title.trim().length>200)throw fail(400,'Renseignez un titre de 200 caractères maximum.');
-  const {rows}=await db.query('INSERT INTO hr_documents(title,file_name,file_type,file_content,file_hash,added_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,title,file_name,file_type,created_at',[title.trim(),file.fileName,file.fileType,file.bytes,createHash('sha256').update(file.bytes).digest('hex'),req.auth.id]);
-  await publish('Ressources humaines','Document importé : '+title.trim());res.status(201).json(rows[0]);
+  const scope=req.body.scope??'common',ownerId=scope==='personal'?Number(req.body.ownerId):null;if(!['common','personal'].includes(scope)||scope==='personal'&&(!Number.isSafeInteger(ownerId)||ownerId<1))throw fail(400,'Choisissez le salarié destinataire du document personnel.');if(scope==='personal'&&!(await db.query('SELECT id FROM users WHERE id=$1 AND active=TRUE',[ownerId])).rows[0])throw fail(400,'Le destinataire doit être un collaborateur actif.');
+  const {rows}=await db.query('INSERT INTO hr_documents(title,file_name,file_type,file_content,file_hash,added_by,scope,owner_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,title,file_name,file_type,created_at,scope,owner_id',[title.trim(),file.fileName,file.fileType,file.bytes,createHash('sha256').update(file.bytes).digest('hex'),req.auth.id,scope,ownerId]);
+  if(scope==='common')await publish('Ressources humaines','Document importé : '+title.trim());res.status(201).json(rows[0]);
  });
  app.get('/api/hr/documents/:id/file',auth,ready,access,async(req,res)=>{
-  const row=(await db.query('SELECT file_name,file_type,file_content FROM hr_documents WHERE id=$1 AND active=TRUE',[documentId(req.params.id)])).rows[0];
-  if(!row)throw fail(404,'Document introuvable.');res.type(row.file_type);
+  const row=(await db.query('SELECT file_name,file_type,file_content,scope,owner_id FROM hr_documents WHERE id=$1 AND active=TRUE',[documentId(req.params.id)])).rows[0];
+  if(!row||!canRead(row,req.auth))throw fail(404,'Document introuvable.');res.type(row.file_type);
   if(row.file_type==='application/pdf'&&req.query.view==='1')res.set('Content-Disposition',"inline; filename*=UTF-8''"+encodeURIComponent(row.file_name));else res.attachment(row.file_name);
   if(row.file_type==='application/pdf'&&req.query.view==='1')res.set('Content-Security-Policy',"default-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'");
   res.send(row.file_content);
@@ -56,6 +58,7 @@ export function registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,f
   const context=await youtrust.context();
   const claim=await transaction(async client=>{
    const document=(await client.query('SELECT * FROM hr_documents WHERE id=$1 AND active=TRUE FOR UPDATE',[id])).rows[0];if(!document)throw fail(404,'Document introuvable.');
+   if(document.scope==='personal'&&(ids.length!==1||ids[0]!==Number(document.owner_id)))throw fail(403,'Un document personnel ne peut être envoyé qu’au salarié concerné.');
    const existing=(await client.query('SELECT id,document_id,status FROM hr_signature_requests WHERE id=$1',[body.requestKey])).rows[0];
    if(existing){if(existing.document_id!==id)throw fail(409,'Cette demande appartient à un autre document.');return {existing};}
    const targets=(await client.query('SELECT id,name,email,first_name,last_name FROM users WHERE id=ANY($1::int[]) AND active=TRUE ORDER BY id FOR SHARE',[ids])).rows;

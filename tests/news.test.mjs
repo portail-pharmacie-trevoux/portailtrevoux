@@ -10,8 +10,9 @@ test('Actualités est accessible par défaut, les droits personnalisés restent 
   assert.equal(canAccess({role:'employee',rights:[],permissions_configured:true},'Actualités'),false);
 });
 test('messages : texte court, caractères Unicode, destinataires explicites et dédoublonnés',()=>{
-  assert.deepEqual(validateMessage({text:' Bonjour ',recipients:[2,2,3]},fail),{text:'Bonjour',recipients:[2,3]});
+  assert.deepEqual(validateMessage({text:' Bonjour ',recipients:[2,2,3]},fail),{priority:'normal',text:'Bonjour',recipients:[2,3]});
   assert.equal(Array.from(validateMessage({text:'😀'.repeat(500),recipients:[2]},fail).text).length,500);
+  assert.equal(validateMessage({text:'Important',priority:'important',recipients:[2]},fail).priority,'important');assert.throws(()=>validateMessage({text:'Test',priority:'unknown',recipients:[2]},fail));
   for(const body of [{text:' ',recipients:[2]},{text:'x'.repeat(501),recipients:[2]},{text:'Bonjour',recipients:[]},{text:'Bonjour',recipients:['2']},{text:'Bonjour',recipients:[-1]}])assert.throws(()=>validateMessage(body,fail),e=>e.status===400);
 });
 test('purge : expiration à 30 jours, archives par destinataire et suppression des messages sans copie',async()=>{
@@ -28,10 +29,11 @@ test('messagerie : accès, envoi atomique aux actifs, boîte personnelle, cases 
     if(sql.startsWith('WITH targets')){
       assert.match(sql,/active=TRUE/);assert.match(sql,/FOR SHARE/);assert.match(sql,/COUNT\(\*\).*cardinality/s);
       if(args[0].some(id=>!active.has(id)))return {rows:[]};
-      const m={id:++nextId,sender:args[2],text:args[3],created_at:new Date().toISOString(),expires_at:new Date(Date.now()+30*86400000).toISOString()};messages.push(m);
+      const m={id:++nextId,sender:args[2],text:args[3],created_at:new Date().toISOString(),expires_at:new Date(Date.now()+30*86400000).toISOString(),sender_id:args[1],priority:args[4]};messages.push(m);
       args[0].forEach(id=>copies.push({message_id:m.id,user_id:id,seen:false,archived:false}));return {rows:[{id:m.id,sent:args[0].length}]};
     }
     if(sql.startsWith('DELETE FROM team_message'))return {rows:[]};
+    if(sql.includes("WHERE m.sender_id=$1")){assert.match(sql,/sender_id=\$1/);return {rows:messages.filter(m=>m.sender_id===args[0]).map(m=>({...m,recipients:copies.filter(c=>c.message_id===m.id).map(c=>({id:c.user_id,name:'Collaborateur '+c.user_id,seen:c.seen,seenAt:c.seen_at}))}))};}
     if(sql.startsWith('SELECT m.id')){
       assert.match(sql,/r.user_id=\$1/);assert.match(sql,/ORDER BY m.created_at DESC,m.id DESC/);
       return {rows:copies.filter(c=>c.user_id===args[0]).map(c=>({...messages.find(m=>m.id===c.message_id),seen:c.seen,archived:c.archived})).reverse()};
@@ -39,7 +41,7 @@ test('messagerie : accès, envoi atomique aux actifs, boîte personnelle, cases 
     if(sql.startsWith('UPDATE team_message_recipients')){
       assert.match(sql,/r.user_id=\$2/);assert.match(sql,/r.archived OR m.created_at>now\(\)-interval '30 days'/);
       const copy=copies.find(c=>c.message_id===args[0]&&c.user_id===args[1]);if(!copy)return {rows:[]};
-      if(args[2]!==null)copy.seen=args[2];if(args[3]!==null)copy.archived=args[3];return {rows:[copy]};
+      if(args[2]!==null){copy.seen=args[2];copy.seen_at=args[2]?new Date().toISOString():null;assert.match(sql,/seen_at=CASE/);}if(args[3]!==null)copy.archived=args[3];return {rows:[copy]};
     }
     if(sql.startsWith('SELECT p.universe'))return {rows:[]};
     if(sql.startsWith('SELECT COUNT(*)::int AS unread')){assert.match(sql,/r.user_id=\$1 AND NOT r.seen/);assert.match(sql,/r.archived OR m.created_at/);return {rows:[{unread:copies.filter(c=>c.user_id===args[0]&&!c.seen).length}]};}
@@ -67,6 +69,7 @@ test('messagerie : accès, envoi atomique aux actifs, boîte personnelle, cases 
   assert.deepEqual(await (await request('/api/publications')).json(),[{universe:'Actualités',unread:1}]);
   assert.equal((await request('/api/news/1','PATCH',{seen:true})).status,200);
   assert.deepEqual(await (await request('/api/publications')).json(),[{universe:'Actualités',unread:0}]);
+  actor.id=1;const outbox=await (await request('/api/news/sent')).json();assert.equal(outbox.length,1);assert.equal(outbox[0].recipients.find(p=>p.id===2).seen,true);assert.ok(outbox[0].recipients.find(p=>p.id===2).seenAt);actor.id=2;assert.deepEqual(await (await request('/api/news/sent')).json(),[]);
   actor.id=3;received=await (await request('/api/news')).json();assert.equal(received[0].seen,false);assert.equal(received[0].archived,false);
   assert.equal((await request('/api/publications/Actualit%C3%A9s/read','POST',{id:'1'})).status,403);
 });

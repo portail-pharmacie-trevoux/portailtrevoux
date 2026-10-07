@@ -8,10 +8,10 @@ const normalize=value=>String(value).normalize('NFD').replace(/[\u0300-\u036f]/g
 export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent=()=>true}){
  let [documents,requests]=await Promise.all([api('/api/hr/documents'),api('/api/hr/signatures')]);if(!isCurrent())return;
  let connection=null,saving=false,listRequest=0,refreshProvider=()=>{};
- const note=el('p','Les documents de cet espace sont consultables par l’ensemble de l’équipe. L’import, la suppression et l’envoi pour signature sont réservés aux administrateurs.','field-note');
+ const note=el('p','Les documents communs sont consultables par l’équipe. Les documents personnels sont réservés au salarié concerné et aux administrateurs. L’import, la suppression et l’envoi pour signature sont réservés aux administrateurs.','field-note');
  const editor=el('div'),feedback=el('p','','status-line');feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
  const list=el('div','','hr-document-list'),history=el('section','','hr-signature-history');
- container.replaceChildren(note,editor,feedback,list,history);
+ const category=el('select');category.setAttribute('aria-label','Type de documents RH');[['common','Documents communs'],['personal',isAdmin?'Documents personnels':'Mes documents personnels']].forEach(([value,text])=>{const option=el('option',text);option.value=value;category.append(option);});category.onchange=()=>display();container.replaceChildren(note,category,editor,feedback,list,history);
  if(isAdmin){const drop=el('div','Glissez-déposez un PDF ici, ou cliquez pour choisir un document.','hr-dropzone');drop.tabIndex=0;drop.setAttribute('role','button');drop.onclick=()=>importDocument();drop.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();importDocument();}};drop.ondragover=e=>{e.preventDefault();drop.classList.add('dragging');};drop.ondragleave=()=>drop.classList.remove('dragging');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('dragging');const files=[...e.dataTransfer.files];if(files.length!==1){feedback.textContent='Déposez un seul document à la fois.';return;}importDocument(files[0]);};container.insertBefore(drop,editor);const add=button('Importer un document',()=>importDocument(),'btn primary');add.id='hr-import-action';heading.append(add);}
  const settings=isAdmin?el('details','','hr-settings'):null;
  if(settings){settings.append(el('summary','Connexion Youtrust'),el('p','Youtrust envoie les invitations de signature par e-mail. Connectez le compte de la pharmacie pour utiliser « Envoyer pour signature ».','field-note'));container.append(settings);void loadConnection();}
@@ -20,9 +20,9 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
   if(!isCurrent()||request!==listRequest)return;documents=freshDocuments;requests=freshRequests;display();displayHistory();if(message)feedback.textContent=message;
  }
  function display(){
-  list.replaceChildren();if(!documents.length){list.append(el('p','Aucun document importé. Les règlements, chartes et accords internes apparaîtront ici.','empty'));return;}
+  const visible=documents.filter(d=>(d.scope||'common')===category.value);list.replaceChildren();if(!visible.length){list.append(el('p','Aucun document importé. Les règlements, chartes et accords internes apparaîtront ici.','empty'));return;}
   const grid=el('div','','hr-document-grid');
-  documents.forEach(doc=>{
+  visible.forEach(doc=>{
    const card=el('article','','hr-document-card');card.dataset.documentId=doc.id;
    const preview=el('div','','hr-document-preview');
    if(doc.file_type==='application/pdf'){
@@ -35,7 +35,7 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
     if(!confirm('Supprimer « '+doc.title+' » de la liste des documents RH ? Les demandes déjà envoyées dans Youtrust seront conservées.'))return;
     try{await api('/api/hr/documents/'+doc.id,'DELETE',{});await reload('Document supprimé de la liste.');}catch(e){if(isCurrent())feedback.textContent=e.message;}
    },'btn small danger'),button('Envoyer pour signature',()=>signatureForm(doc),'btn small primary'));}
-   card.append(preview,name,el('small',doc.file_name,'field-note'),el('small','Ajouté le '+date(doc.created_at),'field-note'),actions);grid.append(card);
+   if(doc.scope==='personal')card.append(el('p','Document personnel · '+(doc.owner_name||'Salarié concerné'),'field-note'));card.append(preview,name,el('small',doc.file_name,'field-note'),el('small','Ajouté le '+date(doc.created_at),'field-note'),actions);grid.append(card);
   });list.append(grid);
  }
  function renameDocument(doc){
@@ -51,19 +51,20 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
   const fileLabel=el('label','Document PDF ou Word (.docx)');fileLabel.htmlFor='hr-file';const file=el('input');file.id='hr-file';file.type='file';file.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';file.required=!droppedFile;
   let selectedFile=droppedFile;if(selectedFile)input.value=selectedFile.name.replace(/\.(pdf|docx)$/i,'').slice(0,200);
   const chosen=el('p',selectedFile?'Fichier déposé : '+selectedFile.name:'','field-note');file.onchange=()=>{selectedFile=file.files[0];if(selectedFile){input.value=selectedFile.name.replace(/\.(pdf|docx)$/i,'').slice(0,200);chosen.textContent='Fichier choisi : '+selectedFile.name;}};
+  const scopeLabel=el('label','Accès au document'),scope=el('select'),ownerLabel=el('label','Salarié concerné'),owner=el('select');scope.setAttribute('aria-label','Accès au document RH');owner.setAttribute('aria-label','Salarié destinataire du document personnel');[['common','Document commun — toute l’équipe'],['personal','Document personnel — salarié et administrateurs']].forEach(([v,t])=>{const o=el('option',t);o.value=v;scope.append(o);});scope.value=category.value;scopeLabel.append(scope);ownerLabel.append(owner);const none=el('option','Choisir le salarié');none.value='';owner.append(none);api('/api/hr/signatories').then(people=>{if(!isCurrent())return;people.forEach(p=>{const o=el('option',p.name);o.value=p.id;owner.append(o);});}).catch(e=>{error.textContent=e.message;});const toggle=()=>{ownerLabel.hidden=scope.value!=='personal';owner.disabled=scope.value!=='personal';owner.required=scope.value==='personal';};scope.onchange=toggle;toggle();
   const error=el('p','','error');error.setAttribute('role','alert');const actions=el('div','','dialog-actions'),cancel=button('Annuler',()=>editor.replaceChildren()),submit=el('button','Importer le document','btn primary');submit.type='submit';actions.append(cancel,submit);
-  form.append(title,label,input,fileLabel,file,chosen,el('p','10 Mo maximum. Le document sera accessible à toute l’équipe.','field-note'),error,actions);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});
+  form.append(title,label,input,scopeLabel,ownerLabel,fileLabel,file,chosen,el('p','10 Mo maximum. Vérifiez le type d’accès et le salarié destinataire avant l’import.','field-note'),error,actions);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});
   form.onsubmit=async e=>{
    e.preventDefault();if(saving||!isCurrent())return;saving=true;submit.disabled=true;cancel.disabled=true;error.textContent='';
    try{const selected=selectedFile||file.files[0];if(!selected||! /\.(pdf|docx)$/i.test(selected.name)||!selected.size||selected.size>10*1024*1024)throw Error('Choisissez un document PDF ou Word contenant des données, de 10 Mo maximum.');
     const fileData=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(Error('Le fichier n’a pas pu être lu.'));reader.readAsDataURL(selected);});
-    await api('/api/hr/documents/import','POST',{title:input.value,fileName:selected.name,fileData});if(!isCurrent())return;editor.replaceChildren();await reload('Document importé.');
+    await api('/api/hr/documents/import','POST',{title:input.value,fileName:selected.name,fileData,scope:scope.value,ownerId:scope.value==='personal'?Number(owner.value):null});if(!isCurrent())return;category.value=scope.value;editor.replaceChildren();await reload('Document importé.');
    }catch(e){if(isCurrent())error.textContent=e.message;}finally{saving=false;submit.disabled=false;cancel.disabled=false;}
   };
  }
  async function signatureForm(doc){
   editor.replaceChildren(el('p','Chargement des signataires…','field-note'));
-  let people;try{people=await api('/api/hr/signatories');}catch(e){if(isCurrent())editor.replaceChildren(el('p',e.message,'error'));return;}if(!isCurrent())return;
+  let people;try{people=await api('/api/hr/signatories');}catch(e){if(isCurrent())editor.replaceChildren(el('p',e.message,'error'));return;}if(!isCurrent())return;if(doc.scope==='personal')people=people.filter(p=>p.id===Number(doc.owner_id));
   const form=el('form','','hr-form hr-signature-form'),selected=new Map(),requestKey=crypto.randomUUID();form.append(el('h3','Envoyer pour signature : '+doc.title),el('p','Youtrust enverra un e-mail à chaque signataire sélectionné. Le document sera accompagné d’une feuille avec un emplacement de signature pour chacun.','field-note'));
   const provider=el('p','','hr-provider-status');const providerState=()=>{provider.textContent=connection?.connected?(connection.environment==='demo'?'Compte Youtrust de démonstration : les demandes sont des essais.':'Compte Youtrust connecté : '+connection.accountName):'Connectez Youtrust dans les paramètres de cette page avant l’envoi.';};refreshProvider=providerState;providerState();
   form.append(provider,button('Ouvrir les paramètres Youtrust',()=>{settings.open=true;settings.scrollIntoView?.({behavior:'smooth',block:'center'});}));

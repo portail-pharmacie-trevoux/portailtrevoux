@@ -128,14 +128,14 @@ function renderPeople(){
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
     if(!list.length){section.append(node('p',active?'Aucun collaborateur actif.':'Aucun collaborateur inactif.','empty'));content.append(section);continue;}
     const wrap=node('div','','tablewrap'),table=node('table','','people-table'),head=node('thead'),header=node('tr');
-    ['Prénom','Nom','Téléphone',...(isAdmin?['Gestion']:[])].forEach(text=>{const th=node('th',text);th.scope='col';header.append(th);});head.append(header);table.append(head);
+    ['Prénom','Nom','Téléphone',...(isAdmin?['Connexion','Gestion']:[])].forEach(text=>{const th=node('th',text);th.scope='col';header.append(th);});head.append(header);table.append(head);
     const body=node('tbody');
     for(const p of list){
       const tr=node('tr','','person-row'+(p.isSelf?' own-person':''));tr.dataset.personId=p.id;
       const first=node('td'),last=node('td',p.lastName.toLocaleUpperCase('fr-FR')),phone=node('td',p.phone||'À renseigner','person-phone');
       if(isAdmin){const open=button(p.firstName,()=>openEmployeeRecord(p),'person-open');open.setAttribute('aria-label','Ouvrir la fiche de '+personName(p));first.append(open);const surname=button(p.lastName.toLocaleUpperCase('fr-FR'),()=>openEmployeeRecord(p),'person-open');surname.setAttribute('aria-label','Consulter la fiche de '+personName(p));last.replaceChildren(surname);}
       else if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
-      tr.append(first,last,phone);
+      tr.append(first,last,phone);if(isAdmin){const state=!p.active?'Sans accès':p.passwordConfigured?'Accès activé':p.invitationSentAt?'Invitation envoyée':'Sans accès';const cell=node('td'),badge=node('span',state,'access-state '+(state==='Accès activé'?'active':state==='Invitation envoyée'?'pending':''));cell.append(badge);if(p.active&&!p.passwordConfigured&&p.invitationSentAt&&Date.now()-new Date(p.invitationSentAt).getTime()>72*3600000)cell.append(node('small','Lien expiré · renvoyer une invitation','field-note'));tr.append(cell);}
       if(isAdmin){
         const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
         if(active&&!p.passwordConfigured){

@@ -176,3 +176,9 @@ CREATE TABLE IF NOT EXISTS order_planning (
  updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE team_message_recipients ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;
+ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'common' CHECK(scope IN ('common','personal'));
+ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS hr_documents_owner_idx ON hr_documents(owner_id) WHERE scope='personal';

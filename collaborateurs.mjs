@@ -138,7 +138,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
         revision=revision+1,published_revision=CASE WHEN published_revision=revision THEN published_revision+1 ELSE published_revision END
         WHERE EXISTS(SELECT 1 FROM jsonb_each(draft) WHERE value->>'userId'=$1::text)
           OR EXISTS(SELECT 1 FROM jsonb_each(COALESCE(published,'{}'::jsonb)) WHERE value->>'userId'=$1::text)`,[id]);
-      await client.query("DELETE FROM users WHERE id=$1 AND active=FALSE AND role='employee'",[id]);
+      try{await client.query("DELETE FROM users WHERE id=$1 AND active=FALSE AND role='employee'",[id]);}catch(e){if(e.code==='23503')throw fail(409,'Des documents personnels sont encore rattachés à ce collaborateur. Conservez sa fiche inactive et vérifiez leur conservation avant toute suppression définitive.');throw e;}
     });res.json({ok:true});
   });
   app.post('/api/users/:id/restore',auth,ready,admin,csrf,async(req,res)=>{

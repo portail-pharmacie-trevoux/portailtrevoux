@@ -4,7 +4,7 @@ const date=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris
 export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=>{}}){
   const [recipients,initialMessages]=await Promise.all([api('/api/news/recipients'),api('/api/news')]);
   if(!isCurrent())return;
-  let messages=initialMessages,filter='all',request=0,sending=false;
+  let sentMessages=[],view='inbox';let messages=initialMessages,filter='all',request=0,sending=false;
   const note=node('p','Les messages non archivés disparaissent automatiquement au bout de 30 jours. Cochez « Archiver » pour conserver un message dans votre espace.','news-retention');
   const layout=node('div','','news-layout'),compose=node('section','','news-compose'),inbox=node('section','','news-inbox');
   const form=node('form');form.append(node('h3','Envoyer un message court'));
@@ -30,21 +30,22 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
   fieldset.append(searchLabel,search,selectionActions,choices,selection);
   const feedback=node('p','','field-note');feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
   const submit=node('button','Envoyer le message','btn primary');submit.type='submit';submit.disabled=!recipients.length;
-  form.append(textLabel,text,count,fieldset,submit,feedback);compose.append(form);
+  const priorityLabel=node('label','Priorité'),priority=node('select');priority.setAttribute('aria-label','Priorité du message');for(const [value,label]of [['normal','Normale'],['important','Important']]){const option=node('option',label);option.value=value;priority.append(option);}priorityLabel.append(priority);form.append(textLabel,text,count,priorityLabel,fieldset,submit,feedback);compose.append(form);
   const heading=node('div','','news-inbox-heading');heading.append(node('h3','Mes messages reçus'));
   const list=node('div','','news-message-list');list.setAttribute('aria-live','polite');
   const filterLabel=node('label','Afficher');filterLabel.htmlFor='news-filter';
   const selector=node('select');selector.id='news-filter';
-  [['all','Tous les messages'],['current','Non archivés'],['archived','Archivés']].forEach(([value,label])=>{const option=node('option',label);option.value=value;selector.append(option);});
+  [['all','Tous les messages'],['unseen','Non vus'],['current','Non archivés'],['archived','Archivés']].forEach(([value,label])=>{const option=node('option',label);option.value=value;selector.append(option);});
   const inboxError=node('p','','error');inboxError.setAttribute('role','alert');
   const redraw=()=>{
     list.replaceChildren();
-    const visible=messages.filter(m=>filter==='all'||(filter==='archived'?m.archived:!m.archived));
+    if(view==='sent'){list.append(node('p','Messages envoyés au cours des 30 derniers jours. Le suivi correspond aux cases « Vu » cochées par les destinataires.','field-note'));for(const message of sentMessages){const card=node('article','','news-message'),seen=message.recipients.filter(p=>p.seen).length;card.append(node('strong',(message.priority==='important'?'Important · ':'')+date(message.created_at)),node('p',message.text,'news-message-text'),node('p',seen+' / '+message.recipients.length+' destinataires ont coché « Vu »','field-note'));const people=node('ul');message.recipients.forEach(p=>people.append(node('li',p.name+' · '+(p.seen?'Vu'+(p.seenAt?' le '+date(p.seenAt):''):'Non vu'))));card.append(people);list.append(card);}if(!sentMessages.length)list.append(node('p','Aucun message envoyé disponible.','empty'));return;}
+    const visible=messages.filter(m=>filter==='all'||(filter==='unseen'?!m.seen:filter==='archived'?m.archived:!m.archived));
     if(!visible.length){list.append(node('p',filter==='archived'?'Aucun message archivé.':'Aucun message reçu dans cette sélection.','empty'));return;}
     for(const message of visible){
       const card=node('article','','news-message'+(message.seen?'':' unread'));
       const top=node('div','','news-message-heading'),time=node('time',date(message.created_at));time.dateTime=message.created_at;
-      top.append(node('strong',message.sender),time);card.append(top,node('p',message.text,'news-message-text'));
+      top.append(node('strong',(message.priority==='important'?'Important · ':'')+message.sender),time);card.append(top,node('p',message.text,'news-message-text'));
       const actions=node('div','','news-message-actions');
       const controls=[];
       for(const [key,labelText] of [['seen','Vu'],['archived','Archiver']]){
@@ -61,10 +62,10 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
       card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));list.append(card);
     }
   };
-  async function reload(){const current=++request;const result=await api('/api/news');if(isCurrent()&&current===request){messages=result;redraw();}}
+  async function reload(){const current=++request;const [result,sent]=await Promise.all([api('/api/news'),api('/api/news/sent')]);if(isCurrent()&&current===request){messages=result;sentMessages=sent;redraw();}}
   selector.onchange=()=>{filter=selector.value;redraw();};
   const refresh=button('Actualiser',async()=>{refresh.disabled=true;inboxError.textContent='';try{await reload();onChanged();}catch(e){if(isCurrent())inboxError.textContent=e.message;}finally{refresh.disabled=false;}});
-  heading.append(refresh);const filters=node('div','','news-filters');filters.append(filterLabel,selector);
+  const inboxTab=button('Messages reçus',()=>{view='inbox';selector.disabled=false;redraw();}),sentTab=button('Messages envoyés',async()=>{view='sent';selector.disabled=true;try{await reload();}catch(e){inboxError.textContent=e.message;}});heading.append(inboxTab,sentTab,refresh);const filters=node('div','','news-filters');filters.append(filterLabel,selector);
   inbox.append(heading,filters,node('p','Du plus récent au plus ancien. Cochez « Vu » pour confirmer votre lecture.','field-note'),inboxError,list);
   form.onsubmit=async e=>{
     e.preventDefault();if(sending)return;feedback.textContent='';updateCount();
@@ -72,7 +73,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
     if(!text.value.trim()){feedback.textContent='Rédigez votre message.';return;}
     if(!selected.size){feedback.textContent='Sélectionnez au moins un destinataire.';return;}
     sending=true;submit.disabled=true;
-    try{const result=await api('/api/news','POST',{text:text.value.trim(),recipients:[...selected]});if(!isCurrent())return;
+    try{const result=await api('/api/news','POST',{text:text.value.trim(),priority:priority.value,recipients:[...selected]});if(!isCurrent())return;
       text.value='';updateCount();feedback.textContent='Message envoyé à '+result.sent+' collaborateur'+(result.sent>1?'s':'')+'.';
       try{await reload();}catch(e){inboxError.textContent=e.message;}onChanged();
     }catch(e){if(isCurrent())feedback.textContent=e.message;}finally{sending=false;submit.disabled=!recipients.length;}
