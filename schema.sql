@@ -162,3 +162,10 @@ CREATE TABLE IF NOT EXISTS laboratory_documents(
  added_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS laboratory_documents_lab_idx ON laboratory_documents(laboratory_id);
+
+CREATE TABLE IF NOT EXISTS calendar_reminders (
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ calendar_id TEXT NOT NULL, event_id TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ PRIMARY KEY(user_id,calendar_id,event_id)
+);

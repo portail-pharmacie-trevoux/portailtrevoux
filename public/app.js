@@ -16,7 +16,17 @@ function eventCard(e){
   heading.append(node('span',e.title));card.append(heading);let when;
   if(e.start?.date){const {start,end}=eventDays(e);when=start.split('-').reverse().join('/')+(start!==end?' — '+end.split('-').reverse().join('/'):'')+' · Toute la journée';}
   else {const format=d=>new Date(d).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});when=format(e.start.dateTime)+' — '+format(e.end?.dateTime||e.start.dateTime);}
-  card.append(node('p',when,'event-time'));if(e.location)card.append(node('p',e.location));if(e.description)card.append(node('p',e.description));return card;
+  card.append(node('p',when,'event-time'));if(e.location)card.append(node('p',e.location));if(e.description)card.append(node('p',e.description));
+  const reminder=node('label','','event-reminder'),check=node('input'),bell=node('span','🔔','reminder-bell'),status=node('span','','reminder-status');
+  check.type='checkbox';check.checked=!!e.remind;check.disabled=!e.id;bell.setAttribute('aria-hidden','true');reminder.classList.toggle('enabled',check.checked);
+  reminder.append(check,bell,node('span','Me le rappeler'));status.setAttribute('role','status');
+  check.onchange=async()=>{
+    const userId=session?.user.id,enabled=check.checked;check.disabled=true;status.textContent='Enregistrement…';
+    try{await api('/api/calendar/reminders','POST',{eventId:e.id,enabled});if(session?.user.id!==userId)return;e.remind=enabled;reminder.classList.toggle('enabled',enabled);status.textContent=enabled?'Visible sur votre accueil dès 7 jours avant sa date.':'Rappel retiré.';void refreshHomeExtras();}
+    catch(error){if(session?.user.id!==userId)return;check.checked=!!e.remind;status.textContent=error.message;}
+    finally{if(session?.user.id===userId)check.disabled=false;}
+  };
+  card.append(reminder,status);return card;
 }
 function renderCalendarResults(data,container){
   const today=parisDay();if(!calendarDay)calendarDay=today;
@@ -696,24 +706,32 @@ function renderCelebrations(data){
 }
 
 
+function homeAgendaEvents(events,today){
+  const last=moveDay(today,7);
+  const order=(a,b)=>eventDays(a).start.localeCompare(eventDays(b).start)||Number(!a.start.date)-Number(!b.start.date)||new Date(a.start.dateTime||a.start.date+'T00:00:00Z')-new Date(b.start.dateTime||b.start.date+'T00:00:00Z');
+  const valid=events.filter(e=>e.start?.date||e.start?.dateTime);
+  const reminders=valid.filter(e=>e.remind&&eventDays(e).start>=today&&eventDays(e).start<=last).sort(order);
+  const seen=new Set(reminders.map(e=>e.id));
+  const todayEvents=valid.filter(e=>{
+    const title=normalizeSearch(e.title||''),days=eventDays(e);
+    return !seen.has(e.id)&&/\brdv\b|\brendez[ -]+vous\b|\bformations?\b/.test(title)&&days.start<=today&&days.end>=today;
+  }).sort(order);
+  return [...reminders,...todayEvents];
+}
 function renderHomeAgenda(data){
-  const tile=q('.grid [data-universe="Agenda"]');tile.querySelector('.tile-agenda')?.remove();
+  const tile=q('.grid [data-universe="Agenda"]');if(!tile)return;tile.querySelector('.tile-agenda')?.remove();
   if(!session||!tileAllowed('Agenda'))return;
-  const today=parisDay(),block=node('span','','tile-agenda');
-  block.setAttribute('aria-label','Rendez-vous du jour');
-  const events=(data?.events||[]).filter(e=>{
-    if(!e.start?.date&&!e.start?.dateTime)return false;
-    const title=normalizeSearch(e.title||'');if(!/\brdv\b|\brendez[ -]+vous\b|\bformations?\b/.test(title))return false;
-    const days=eventDays(e);return days.start<=today&&days.end>=today;
-  }).sort((a,b)=>Number(!a.start.date)-Number(!b.start.date)||(a.start.date||a.start.dateTime).localeCompare(b.start.date||b.start.dateTime));
-  const label=e=>(e.start.date?'Journée':parisDay(e.start.dateTime)<today?'En cours':new Date(e.start.dateTime).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · '+(e.title||'Rendez-vous');
-  if(!data||data.error)block.append(node('span','Rendez-vous momentanément indisponibles'));
+  const today=parisDay(),block=node('span','','tile-agenda'),events=homeAgendaEvents(data?.events||[],today);
+  const label=e=>{
+    const day=eventDays(e).start,when=e.start.date?'Journée':day<today?'En cours':new Date(e.start.dateTime).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'});
+    return (day>today?day.split('-').slice(1).reverse().join('/')+' · ':'')+when+' · '+(e.title||'Événement');
+  };
+  if(!data||data.error)block.append(node('span','Agenda momentanément indisponible'));
   else if(!data.connected)block.append(node('span','Agenda à connecter'));
-  else if(!events.length)block.append(node('span','Aucun rendez-vous ni formation aujourd’hui'));
+  else if(!events.length)block.append(node('span','Aucun rendez-vous ni rappel à afficher'));
   else {
-    block.title=events.map(label).join('\n');
-    events.slice(0,5).forEach((e,i)=>{const row=node('span',(normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ')+label(e)+(i===4&&events.length>5?' · +'+(events.length-5):''));row.title=label(e);block.append(row);});
-    block.setAttribute('aria-label','Rendez-vous du jour : '+events.map(label).join('; '));
+    block.title=events.map(e=>(e.remind?'🔔 ':'')+label(e)).join('\n');
+    events.slice(0,5).forEach((e,i)=>{const row=node('span',(e.remind?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ')+label(e)+(i===4&&events.length>5?' · +'+(events.length-5):''));row.title=label(e);row.classList.toggle('personal-reminder',!!e.remind);block.append(row);});
   }
-  tile.append(block);
+  block.setAttribute('aria-label','Agenda du jour et rappels personnels : '+events.map(label).join('; '));tile.append(block);
 }

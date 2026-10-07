@@ -1,3 +1,4 @@
+import {registerCalendarReminders} from './calendar-reminders.mjs';
 import {importLaboratories,importLaboratoryLogos} from './laboratory-import.mjs';
 import {registerLaboratories} from './laboratories.mjs';
 import {createYoutrust} from './youtrust.mjs';
@@ -250,12 +251,13 @@ export function createApp(db,config) {
     res.json({ok:true});
   });
   app.post('/api/google/sync',auth,ready,admin,csrf,async(req,res)=>{await sync();res.json({ok:true});});
+  const personalCalendarEvents=registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,fail,getSetting});
   app.get('/api/calendar',auth,ready,async(req,res)=>{
     if(!canAccess(req.auth,'Agenda'))throw fail(403,'Vous n’avez pas accès à l’agenda.');
     const cached=(await db.query('SELECT * FROM calendar_cache WHERE singleton=TRUE')).rows[0];
     if(!cached||Date.now()-new Date(cached.synced_at).getTime()>15*60000){try{await sync();}catch{}}
     const current=(await db.query('SELECT * FROM calendar_cache WHERE singleton=TRUE')).rows[0];
-    res.json({name:await getSetting('calendar_name')||'Agenda équipe',events:current?.events||[],syncedAt:current?.synced_at||null,error:await getSetting('sync_error')||'',connected:!!await getSetting('google_tokens')});
+    res.json({name:await getSetting('calendar_name')||'Agenda équipe',events:await personalCalendarEvents(req.auth.id,current?.events||[]),syncedAt:current?.synced_at||null,error:await getSetting('sync_error')||'',connected:!!await getSetting('google_tokens')});
   });
 
 
