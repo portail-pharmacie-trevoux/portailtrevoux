@@ -13,7 +13,8 @@
   "dependencies": {
     "express": "^5.1.0",
     "pdf-lib": "^1.17.1",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "qrcode": "^1.5.4"
   },
   "packageManager": "pnpm@11.19.0"
 }

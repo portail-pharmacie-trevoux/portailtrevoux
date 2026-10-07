@@ -1,8 +1,10 @@
+import {protectOrderSpace} from './order-mfa.js';
 import {openOrderImport} from './order-import.js';
 const columns=[['frequency','FRÉQUENCE (jours)','number'],['nextOrder','DATE PROCHAINE COMMANDE','date'],['lastName','NOM','text'],['firstName','PRÉNOM','text'],['treatment','TRAITEMENT','textarea'],['mode','MODE DE COMMANDE','select'],['comments','COMMENTAIRES','textarea']];
 const modes=['grossiste','direct labo','prep rosiers'];
 const node=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n;};
-export async function renderOrderPlanning({container,api,canEdit,isCurrent}){
+export async function renderOrderPlanning(options){return protectOrderSpace({...options,render:({api,isCurrent})=>renderOrderTable({...options,api,isCurrent})});}
+async function renderOrderTable({container,api,canEdit,isCurrent}){
  const rows=await api('/api/order-planning');if(!isCurrent())return;
  const root=node('div','','order-planning'),toolbar=node('div','','order-plan-toolbar'),wrap=node('div','','order-plan-scroll'),table=node('table','','order-plan-table'),head=node('thead'),header=node('tr'),body=node('tbody');
  wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label','Commandes programmées, tableau à défilement horizontal');
@@ -61,7 +63,7 @@ export async function renderOrderPlanning({container,api,canEdit,isCurrent}){
   trackingState();
   remove.onclick=()=>{
    if(!saved.id){row.remove();updateEmpty();return;}
-   const dialog=node('dialog'),title=node('h2','Supprimer cette ligne ?'),text=node('p',[saved.lastName,saved.firstName].filter(Boolean).join(' ')),buttons=node('div','','dialog-actions'),cancel=node('button','Annuler','btn'),confirm=node('button','Supprimer','btn danger'),error=node('p','','error');
+   const dialog=node('dialog','','order-plan-dialog'),title=node('h2','Supprimer cette ligne ?'),text=node('p',[saved.lastName,saved.firstName].filter(Boolean).join(' ')),buttons=node('div','','dialog-actions'),cancel=node('button','Annuler','btn'),confirm=node('button','Supprimer','btn danger'),error=node('p','','error');
    cancel.type=confirm.type='button';cancel.onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());
    confirm.onclick=async()=>{confirm.disabled=true;try{await api('/api/order-planning/'+saved.id,'DELETE',{revision:saved.revision});dialog.close();if(isCurrent()){row.remove();updateEmpty();}}catch(e){error.textContent=e.message;confirm.disabled=false;}};
    buttons.append(cancel,confirm);dialog.append(title,text,error,buttons);document.body.append(dialog);dialog.showModal();
@@ -73,7 +75,7 @@ export async function renderOrderPlanning({container,api,canEdit,isCurrent}){
  exportButton.onclick=async()=>{
   if(body.querySelector('.order-plan-dirty')){exportStatus.textContent='Enregistrez les lignes modifiées avant d’exporter.';return;}
   exportButton.disabled=true;exportStatus.textContent='Préparation du fichier…';
-  try{const response=await fetch('/api/order-planning/export.xlsx',{credentials:'same-origin'});if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(error.error||'Impossible d’exporter le tableau.');}const blob=await response.blob();if(!isCurrent())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=response.headers.get('content-disposition')?.match(/filename=([^;]+)/)?.[1]||'commandes-programmees.xlsx';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);exportStatus.textContent='Fichier Excel téléchargé.';}catch(error){if(isCurrent())exportStatus.textContent=error.message;}finally{exportButton.disabled=false;}
+  try{const response=await fetch('/api/order-planning/export.xlsx',{credentials:'same-origin'});if(!response.ok){const error=await response.json().catch(()=>({}));if(error.code==='MFA_REQUIRED')await api('/api/order-mfa/touch','POST',{});throw Error(error.error||'Impossible d’exporter le tableau.');}const blob=await response.blob();if(!isCurrent())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=response.headers.get('content-disposition')?.match(/filename=([^;]+)/)?.[1]||'commandes-programmees.xlsx';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);exportStatus.textContent='Fichier Excel téléchargé.';}catch(error){if(isCurrent())exportStatus.textContent=error.message;}finally{exportButton.disabled=false;}
  };toolbar.append(exportButton,exportStatus);
  rows.forEach(addRow);root.append(toolbar,searchBox,notice,empty,wrap);container.replaceChildren(root);updateEmpty();
 }

@@ -1,3 +1,4 @@
+import {registerOrderMFA} from './order-mfa.mjs';
 import {registerOrderPlanning} from './order-planning.mjs';
 import {registerCalendarReminders} from './calendar-reminders.mjs';
 import {importLaboratories,importLaboratoryLogos} from './laboratory-import.mjs';
@@ -65,6 +66,8 @@ export function createApp(db,config) {
   }
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
+  const orderMFA=registerOrderMFA({app,db,auth,ready,csrf,viewUniverse,fail,secret});
+  app.use('/api/order-planning',auth,ready,viewUniverse("Outils d'aide aux commandes"),orderMFA.guard);
   registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret});
   registerNews({app,db,auth,ready,csrf,viewUniverse,fail});
   const youtrust=config.youtrustClient||createYoutrust({getSetting,setSetting,deleteSetting:key=>db.query('DELETE FROM settings WHERE key=$1',[key]),secret,origin,fail,config,fetchImpl:config.youtrustFetch});
@@ -300,7 +303,7 @@ export function createApp(db,config) {
     const status=error.status||500;
     if(status===413)return res.status(413).json({error:'Le fichier dépasse la limite de 10 Mo.'});
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
-    res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message});
+    res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message,...(error.code==='MFA_REQUIRED'?{code:'MFA_REQUIRED'}:{})});
   });
   return {app,sync,dailyJoke};
 }

@@ -182,3 +182,18 @@ ALTER TABLE team_message_recipients ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ
 ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'common' CHECK(scope IN ('common','personal'));
 ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
 CREATE INDEX IF NOT EXISTS hr_documents_owner_idx ON hr_documents(owner_id) WHERE scope='personal';
+
+CREATE TABLE IF NOT EXISTS order_mfa (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ secret TEXT, pending_secret TEXT, pending_session TEXT, pending_expires TIMESTAMPTZ,
+ last_step BIGINT NOT NULL DEFAULT -1, recovery_hashes JSONB NOT NULL DEFAULT '[]',
+ generation INTEGER NOT NULL DEFAULT 1, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS order_mfa_at TIMESTAMPTZ;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS order_mfa_generation INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS order_mfa_audit (
+ id BIGSERIAL PRIMARY KEY,
+ user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ action TEXT NOT NULL, details TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
