@@ -710,13 +710,12 @@ function homeAgendaEvents(events,today){
   const last=moveDay(today,7);
   const order=(a,b)=>eventDays(a).start.localeCompare(eventDays(b).start)||Number(!a.start.date)-Number(!b.start.date)||new Date(a.start.dateTime||a.start.date+'T00:00:00Z')-new Date(b.start.dateTime||b.start.date+'T00:00:00Z');
   const valid=events.filter(e=>e.start?.date||e.start?.dateTime);
-  const reminders=valid.filter(e=>e.remind&&eventDays(e).start>=today&&eventDays(e).start<=last).sort(order);
-  const seen=new Set(reminders.map(e=>e.id));
+  const reminders=valid.filter(e=>e.remind&&eventDays(e).start>today&&eventDays(e).start<=last).sort(order);
   const todayEvents=valid.filter(e=>{
     const title=normalizeSearch(e.title||''),days=eventDays(e);
-    return !seen.has(e.id)&&/\brdv\b|\brendez[ -]+vous\b|\bformations?\b/.test(title)&&days.start<=today&&days.end>=today;
+    return (e.remind||/\brdv\b|\brendez[ -]+vous\b|\bformations?\b/.test(title))&&days.start<=today&&days.end>=today;
   }).sort(order);
-  return [...reminders,...todayEvents];
+  return [...todayEvents,...reminders];
 }
 function renderHomeAgenda(data){
   const tile=q('.grid [data-universe="Agenda"]');if(!tile)return;tile.querySelector('.tile-agenda')?.remove();
@@ -728,10 +727,18 @@ function renderHomeAgenda(data){
   };
   if(!data||data.error)block.append(node('span','Agenda momentanément indisponible'));
   else if(!data.connected)block.append(node('span','Agenda à connecter'));
-  else if(!events.length)block.append(node('span','Aucun rendez-vous ni rappel à afficher'));
   else {
-    block.title=events.map(e=>(e.remind?'🔔 ':'')+label(e)).join('\n');
-    events.slice(0,5).forEach((e,i)=>{const row=node('span',(e.remind?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ')+label(e)+(i===4&&events.length>5?' · +'+(events.length-5):''));row.title=label(e);row.classList.toggle('personal-reminder',!!e.remind);block.append(row);});
+    const daily=events.filter(e=>eventDays(e).start<=today),reminders=events.filter(e=>eventDays(e).start>today);
+    const daySection=node('span','','agenda-today'),reminderSection=node('span','','agenda-reminders');
+    daySection.append(node('span','Aujourd’hui','agenda-group-title'));
+    reminderSection.append(node('span',reminders.length?'🔔 Rappels · 7 prochains jours':'🔔 Aucun rappel à venir','agenda-group-title'));
+    const addRows=(section,list,limit,isReminder)=>{
+      list.slice(0,limit).forEach((e,i)=>{const icon=isReminder?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ';const text=icon+label(e)+(i===limit-1&&list.length>limit?' · +'+(list.length-limit):'');const row=node('span',text,'agenda-event-line'+(isReminder?' personal-reminder':''));row.title=label(e);section.append(row);});
+    };
+    if(!daily.length)daySection.append(node('span','Aucun rendez-vous ni formation','agenda-event-line'));
+    addRows(daySection,daily,reminders.length?3:5,false);addRows(reminderSection,reminders,2,true);
+    daySection.title=daily.map(label).join('\n');reminderSection.title=reminders.map(label).join('\n');
+    block.append(daySection,reminderSection);
   }
   block.setAttribute('aria-label','Agenda du jour et rappels personnels : '+events.map(label).join('; '));tile.append(block);
 }
