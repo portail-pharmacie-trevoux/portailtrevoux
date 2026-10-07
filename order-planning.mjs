@@ -13,23 +13,26 @@ export function validateOrderPlan(body,fail,delivery=null){
  data.frequency=body.frequency==null?null:body.frequency;
  if(data.frequency!==null&&(!Number.isSafeInteger(data.frequency)||data.frequency<1||data.frequency>3650))throw fail(400,'La fréquence doit être un nombre de jours entre 1 et 3650.');
  if(delivery?.date)validDate(delivery.date);
- data.nextOrder=delivery?.date&&data.frequency?shiftDate(delivery.date,data.frequency):'';
+ data.initialNextOrder=body.nextOrder??'';if(typeof data.initialNextOrder!=='string')throw fail(400,'Date invalide.');if(data.initialNextOrder)validDate(data.initialNextOrder);
+ data.nextOrder=delivery?.date&&data.frequency?shiftDate(delivery.date,data.frequency):data.initialNextOrder;
  return data;
 }
 export function orderInitials(user){
  const parts=[user.first_name,user.last_name].filter(Boolean);const names=parts.length?parts:(user.name||'').trim().split(/\s+/);return names.map(n=>Array.from(n.trim())[0]||'').join('').toLocaleUpperCase('fr').slice(0,8)||'?';
 }
+export const orderNextDate=data=>data.delivery?.date&&data.frequency?shiftDate(data.delivery.date,data.frequency):(data.initialNextOrder||'');
+export const compareOrders=(a,b)=>Number(!!a.suspended)-Number(!!b.suspended)||(a.nextOrder||'9999').localeCompare(b.nextOrder||'9999')||a.lastName.localeCompare(b.lastName,'fr')||a.firstName.localeCompare(b.firstName,'fr');
 function orderDay(now){const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value]));return p.year+'-'+p.month+'-'+p.day;}
 export function registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret,now=()=>new Date()}){
  const universe="Outils d'aide aux commandes",access=viewUniverse(universe),guard=[auth,ready,editUniverse(universe),csrf];
- const clean=row=>{const data=decrypt(row.content,secret);return {id:row.id,revision:row.revision,...data,nextOrder:data.delivery?.date&&data.frequency?shiftDate(data.delivery.date,data.frequency):''};};
+ const clean=row=>{const data=decrypt(row.content,secret);return {id:row.id,revision:row.revision,...data,nextOrder:orderNextDate(data)};};
  app.get('/api/order-planning',auth,ready,access,async(req,res)=>{
   const rows=(await db.query('SELECT id,revision,content FROM order_planning')).rows.map(clean);
-  rows.sort((a,b)=>(a.nextOrder||'9999').localeCompare(b.nextOrder||'9999')||a.lastName.localeCompare(b.lastName,'fr')||a.firstName.localeCompare(b.firstName,'fr'));res.json(rows);
+  rows.sort(compareOrders);res.json(rows);
  });
  app.get('/api/order-planning/export.xlsx',auth,ready,access,async(req,res)=>{
   const rows=(await db.query('SELECT id,revision,content FROM order_planning')).rows.map(clean);
-  rows.sort((a,b)=>(a.nextOrder||'9999').localeCompare(b.nextOrder||'9999')||a.lastName.localeCompare(b.lastName,'fr')||a.firstName.localeCompare(b.firstName,'fr'));
+  rows.sort(compareOrders);
   const day=orderDay(now());res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename=commandes-programmees-'+day+'.xlsx','Cache-Control':'no-store'}).send(exportOrderWorkbook(rows,day));
  });
  app.post('/api/order-planning',...guard,async(req,res)=>{
@@ -40,7 +43,7 @@ export function registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editU
   const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(req.body?.revision))throw fail(400,'Actualisez la ligne avant de la modifier.');
   const current=(await db.query('SELECT id,revision,content FROM order_planning WHERE id=$1',[id])).rows[0];
   if(!current||current.revision!==req.body.revision)throw fail(409,'Cette ligne a changé. Rechargez le tableau.');
-  const previous=decrypt(current.content,secret),data={...previous,...validateOrderPlan(req.body,fail,previous.delivery)};
+  const previous=decrypt(current.content,secret),data={...previous,...validateOrderPlan({...req.body,nextOrder:previous.delivery?(previous.initialNextOrder||''):(req.body.nextOrder??previous.initialNextOrder??'')},fail,previous.delivery)};
   const row=(await db.query('UPDATE order_planning SET content=$2,updated_by=$3,updated_at=now(),revision=revision+1 WHERE id=$1 AND revision=$4 RETURNING id,revision,content',[id,encrypt(data,secret),req.auth.id,req.body.revision])).rows[0];
   if(!row)throw fail(409,'Cette ligne a changé. Rechargez le tableau avant de continuer.');res.json(clean(row));
  });
@@ -60,9 +63,15 @@ export function registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editU
   if(!current||current.revision!==req.body.revision)throw fail(409,'Cette ligne a changé. Rechargez le tableau.');
   const data=decrypt(current.content,secret);
   if(req.body.enabled){const timestamp=now();data.delivery={date:orderDay(timestamp),at:timestamp.toISOString(),initials:orderInitials(req.auth),userId:req.auth.id};}else delete data.delivery;
-  data.nextOrder=data.delivery?.date&&data.frequency?shiftDate(data.delivery.date,data.frequency):'';
+  data.nextOrder=orderNextDate(data);
   const row=(await db.query('UPDATE order_planning SET content=$2,updated_by=$3,updated_at=now(),revision=revision+1 WHERE id=$1 AND revision=$4 RETURNING id,revision,content',[id,encrypt(data,secret),req.auth.id,req.body.revision])).rows[0];
   if(!row)throw fail(409,'Cette ligne a changé. Rechargez le tableau.');res.json(clean(row));
+ });
+ app.post('/api/order-planning/:id/suspension',...guard,async(req,res)=>{
+  const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(req.body?.revision)||typeof req.body.enabled!=='boolean')throw fail(400,'Suspension invalide.');
+  const current=(await db.query('SELECT id,revision,content FROM order_planning WHERE id=$1',[id])).rows[0];if(!current||current.revision!==req.body.revision)throw fail(409,'Cette ligne a changé. Rechargez le tableau.');
+  const data=decrypt(current.content,secret);data.suspended=req.body.enabled;
+  const row=(await db.query('UPDATE order_planning SET content=$2,updated_by=$3,updated_at=now(),revision=revision+1 WHERE id=$1 AND revision=$4 RETURNING id,revision,content',[id,encrypt(data,secret),req.auth.id,req.body.revision])).rows[0];if(!row)throw fail(409,'Cette ligne a changé. Rechargez le tableau.');res.json(clean(row));
  });
  app.delete('/api/order-planning/:id',...guard,async(req,res)=>{
   const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(req.body?.revision))throw fail(400,'Ligne invalide.');
