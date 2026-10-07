@@ -35,7 +35,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&['/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();

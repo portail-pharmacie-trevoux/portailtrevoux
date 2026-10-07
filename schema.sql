@@ -151,3 +151,14 @@ DO $$ BEGIN
   INSERT INTO settings(key,value) VALUES('laboratories_team_access_v1','enabled');
  END IF;
 END $$;
+
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS logo_content BYTEA;
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS logo_type TEXT;
+ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS logo_version INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS laboratory_documents(
+ id SERIAL PRIMARY KEY,laboratory_id INTEGER NOT NULL REFERENCES laboratories(id) ON DELETE CASCADE,
+ title TEXT NOT NULL,file_name TEXT NOT NULL,file_type TEXT NOT NULL,file_content BYTEA NOT NULL,
+ added_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS laboratory_documents_lab_idx ON laboratory_documents(laboratory_id);
