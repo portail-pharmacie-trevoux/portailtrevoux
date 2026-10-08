@@ -608,7 +608,7 @@ async function renderSchedule(){
   if(!session)return;const userId=session.user.id,request=++scheduleRequest;
   if(!scheduleWeek)scheduleWeek=mondayOf(parisDay());
   if(!scheduleScope)scheduleScope=schedulePreference()||(session.user.role==='admin'?'team':'mine');
-  const data=await api('/api/schedule?week='+scheduleWeek+'&scope='+scheduleScope);
+  const [data,posts,tools]=await Promise.all([api('/api/schedule?week='+scheduleWeek+'&scope='+scheduleScope),api('/api/schedule-posts'),import('/schedule-tools.js')]);data.posts=posts;
   if(currentUniverse!=='Emplois du temps'||session?.user.id!==userId||request!==scheduleRequest)return;
   scheduleData=data;const isAdmin=data.canEdit??(session.user.role==='admin'),content=q('#content');
   const root=node('div','','schedule'),toolbar=node('div','','schedule-toolbar');
@@ -621,7 +621,7 @@ async function renderSchedule(){
     const b=button(label,async()=>{scheduleScope=value;try{localStorage.setItem('portail-plus:schedule-scope:'+session.user.id,value);}catch{}try{await renderSchedule();}catch(e){error(e);}},'btn small'+(scheduleScope===value?' primary':''));
     b.setAttribute('aria-pressed',String(scheduleScope===value));scope.append(b);
   });
-  toolbar.append(scope,button('Imprimer',()=>window.print()));root.append(toolbar);
+  toolbar.append(scope,button('Demander des congés',()=>void tools.openLeaveRequests({api,user:session.user,dialogFactory:scheduleDialog}),'btn primary'));if(session.user.role==='admin')toolbar.append(button('Demandes de congés de l’équipe',()=>void tools.openLeaveRequests({api,user:session.user,team:true,dialogFactory:scheduleDialog})),button('Paramétrer les postes',()=>void tools.openSchedulePosts({api,dialogFactory:scheduleDialog,onChanged:renderSchedule})));toolbar.append(button('Imprimer',()=>window.print()));root.append(toolbar);
   const title=node('h3','Semaine du '+scheduleDate(scheduleWeek)+' au '+scheduleDate(moveDay(scheduleWeek,6),{day:'numeric',month:'long',year:'numeric'}),'schedule-week-title');
   const status=node('p',data.publishedAt?(isAdmin&&data.unpublishedChanges?'Brouillon modifié · la dernière version publiée reste visible pour l’équipe.':'Publié le '+new Date(data.publishedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'})):(isAdmin?'Brouillon · cette semaine n’est pas encore publiée.':'Cette semaine n’a pas encore été publiée.'),'schedule-status');
   root.append(title,status);
@@ -636,9 +636,9 @@ async function renderSchedule(){
     const publish=button(data.publishedAt?'Republier le planning de l’équipe':'Publier le planning de l’équipe',async()=>{
       publish.disabled=true;try{await api('/api/schedule/'+data.week+'/publish','POST',{revision:data.revision});await renderSchedule();q('#feedback').textContent='Planning publié : l’équipe peut le consulter.';void renderPublications('Emplois du temps');}catch(e){error(e);publish.disabled=false;}
     },'btn primary');publish.disabled=!!data.publishedAt&&!data.unpublishedChanges;
-    actions.append(sourceLabel,source,copy,publish,button('Recharger la semaine',async()=>{try{await renderSchedule();}catch(e){error(e);}}));root.append(actions,node('p','Cliquez sur une journée pour saisir les horaires. La copie et la publication portent sur toute l’équipe. Les congés, absences et repos s’appliquent à toute la journée.','field-note'));
+    actions.append(sourceLabel,source,copy,publish,button('Recharger la semaine',async()=>{try{await renderSchedule();}catch(e){error(e);}}));root.append(actions,node('p','Cliquez sur une journée pour saisir jusqu’à 10 créneaux. Le clic droit sur un créneau permet d’en ajouter un ou de changer son poste. La copie et la publication portent sur toute l’équipe. Les congés, absences et repos s’appliquent à toute la journée.','field-note'));
   }
-  const legend=node('div','','schedule-legend');Object.entries(scheduleLabels).forEach(([kind,label])=>legend.append(node('span',label,'schedule-kind '+kind)));root.append(legend);
+  const legend=node('div','','schedule-legend');Object.entries(scheduleLabels).forEach(([kind,label])=>legend.append(node('span',label,'schedule-kind '+kind)));posts.filter(p=>p.active).forEach(p=>{const item=node('span',p.name,'schedule-post-badge');paintSchedulePost(item,p.color);legend.append(item);});root.append(legend);
   const wrap=node('div','','schedule-scroll');wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label','Planning hebdomadaire, défilement horizontal');
   const table=node('table','','schedule-table'),head=node('thead'),headRow=node('tr');headRow.append(node('th','Collaborateur'));
   const days=Array.from({length:7},(_,i)=>moveDay(scheduleWeek,i));days.forEach(day=>headRow.append(node('th',scheduleDate(day,{weekday:'short',day:'2-digit',month:'2-digit'}))));headRow.append(node('th','Total prévu'));headRow.querySelectorAll('th').forEach(th=>th.scope='col');head.append(headRow);table.append(head);
@@ -648,9 +648,9 @@ async function renderSchedule(){
     days.forEach(day=>{
       const entry=entries.get(person.id+':'+day),td=node('td'),cell=node(isAdmin?'button':'div','','schedule-day '+(entry?.kind||'empty-day'));
       if(isAdmin){cell.type='button';cell.setAttribute('aria-label','Modifier '+person.name+', '+scheduleDate(day,{weekday:'long',day:'numeric',month:'long'}));cell.onclick=()=>editScheduleDay(person,day,entry,data);}
-      if(entry){cell.append(node('span',scheduleLabels[entry.kind],'schedule-day-kind'));entry.slots.forEach(([start,end])=>cell.append(node('span',start+' – '+end,'schedule-slot')));total+=scheduleMinutes(entry);}
+      if(entry){cell.append(node('span',scheduleLabels[entry.kind],'schedule-day-kind'));entry.slots.forEach(([start,end],i)=>{const post=posts.find(p=>p.id===entry.postIds?.[i]),slot=node('span',start+' – '+end+(post?' · '+post.name:''),'schedule-slot');slot.dataset.slot=String(i);if(post)paintSchedulePost(slot,post.color);cell.append(slot);});total+=scheduleMinutes(entry);}
       else cell.append(node('span',isAdmin?'+':'—'));
-      td.append(cell);tr.append(td);
+      if(isAdmin)cell.oncontextmenu=e=>{const slot=e.target.closest('.schedule-slot'),index=slot?Number(slot.dataset.slot):Math.max(0,(entry?.slots?.length||1)-1);tools.showScheduleMenu({event:e,canAdd:(entry?.slots?.length||0)<10,onAdd:()=>editScheduleDay(person,day,entry,data,{addAfter:index}),onPost:()=>editScheduleDay(person,day,entry,data,{focusPost:index})});};td.append(cell);tr.append(td);
     });tr.append(node('td',formatHours(total),'schedule-total'));body.append(tr);
   });table.append(body);wrap.append(table);root.append(wrap);
   if(!data.people.length)root.append(node('p','Aucun collaborateur dans cette vue.','empty'));
@@ -668,29 +668,24 @@ function openScheduleCopy(from,data){
   const dialog=scheduleDialog('Remplacer le brouillon de cette semaine ?');dialog.append(node('p','La copie remplacera les journées préparées. La version publiée restera visible jusqu’à votre prochaine publication.'));
   const status=node('p','','error'),actions=node('div','','dialog-actions');const confirm=button('Remplacer le brouillon',async()=>{confirm.disabled=true;try{await copyScheduleWeek(from,data);dialog.close();}catch(e){status.textContent=e.message;confirm.disabled=false;}},'btn primary');actions.append(button('Annuler',()=>dialog.close()),confirm);dialog.append(status,actions);dialog.showModal();
 }
-function editScheduleDay(person,day,entry,data){
+function paintSchedulePost(element,color){if(!/^#[0-9a-f]{6}$/i.test(color))return;element.style.backgroundColor=color;const n=parseInt(color.slice(1),16),channels=[n>>16,(n>>8)&255,n&255].map(v=>{const c=v/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;}),light=channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;element.style.color=light>.179?'#000000':'#ffffff';}
+function editScheduleDay(person,day,entry,data,options={}){
   const dialog=scheduleDialog(person.name+' · '+scheduleDate(day,{weekday:'long',day:'numeric',month:'long'})),form=node('form'),typeLabel=node('label','Type de journée','field');typeLabel.htmlFor='schedule-kind';
-  const kind=node('select');kind.id='schedule-kind';Object.entries(scheduleLabels).forEach(([value,label])=>{const option=node('option',label);option.value=value;kind.append(option);});kind.value=entry?.kind||'travail';
-  const slots=node('div','','schedule-slot-editor'),inputs=[];
-  for(let i=0;i<2;i++){
-    const row=node('div'),label=node('p',i===0?'Créneau 1':'Créneau 2 (facultatif)'),pair=[];row.append(label);
-    for(const [j,text] of [[0,'Début'],[1,'Fin']]){const l=node('label',text),input=node('input');input.type='time';input.id='schedule-slot-'+i+'-'+j;l.htmlFor=input.id;input.value=entry?.slots?.[i]?.[j]||'';row.append(l,input);pair.push(input);}inputs.push(pair);slots.append(row);
-  }
-  const total=node('p','','field-note'),update=()=>{
-    const timed=['travail','formation'].includes(kind.value);slots.classList.toggle('hidden',!timed);inputs.flat().forEach(input=>{input.disabled=!timed;input.required=timed&&inputs[0].includes(input);});
-    const valid=inputs.filter(pair=>pair.every(input=>input.value)).map(pair=>pair.map(input=>input.value));total.textContent=timed?'Durée saisie : '+formatHours(Math.max(0,scheduleMinutes({slots:valid}))):'Journée entière · hors total des heures.';
-  };kind.onchange=update;inputs.flat().forEach(input=>input.oninput=update);update();
-  const status=node('p','','error');status.setAttribute('role','alert');const actions=node('div','','dialog-actions');
-  const save=node('button','Enregistrer le brouillon','btn primary');save.type='submit';
-  const clear=button('Vider cette journée',async()=>{
-    clear.disabled=true;try{await api('/api/schedule/'+data.week+'/clear-day','POST',{userId:person.id,day,revision:data.revision});dialog.close();await renderSchedule();q('#feedback').textContent='Journée retirée du brouillon.';}catch(e){status.textContent=e.message;clear.disabled=false;}
-  });clear.disabled=!entry;
-  actions.append(clear,button('Annuler',()=>dialog.close()),save);form.append(typeLabel,kind,slots,total,status,actions);dialog.append(form);
-  form.onsubmit=async e=>{
-    e.preventDefault();status.textContent='';const pairs=['travail','formation'].includes(kind.value)?inputs.map(pair=>pair.map(input=>input.value)).filter(pair=>pair.some(Boolean)):[];
+  const kind=node('select');kind.id='schedule-kind';Object.entries(scheduleLabels).forEach(([value,label])=>{const option=node('option',label);option.value=value;kind.append(option);});kind.value=options.addAfter!==undefined?(['travail','formation'].includes(entry?.kind)?entry.kind:'travail'):entry?.kind||'travail';
+  const slots=node('div','','schedule-slot-editor'),items=[];let seed=(entry?.slots||[]).map((times,i)=>({times,postId:entry.postIds?.[i]??null}));if(options.addAfter!==undefined&&seed.length<10)seed.splice(options.addAfter+1,0,{times:['',''],postId:null});if(!seed.length)seed=[{times:['',''],postId:null}];
+  const add=button('Ajouter un créneau (maximum 10)',()=>{if(items.length<10)addSlot();update();}),total=node('p','','field-note');
+  function addSlot(times=['',''],postId=null){const row=node('div','','schedule-slot-form-row'),title=node('p'),pair=[],post=node('select');row.append(title);
+    for(const [j,text]of [[0,'Début'],[1,'Fin']]){const label=node('label',text),input=node('input');input.type='time';input.value=times[j]||'';label.append(input);row.append(label);pair.push(input);input.oninput=update;}
+    const label=node('label','Poste'),empty=node('option','Sans poste');empty.value='';post.append(empty);(data.posts||[]).filter(p=>p.active||p.id===postId).forEach(p=>{const o=node('option',p.name+(p.active?'':' (archivé)'));o.value=p.id;post.append(o);});post.value=postId??'';label.append(post);row.append(label);
+    const item={row,pair,post,title};row.append(button('Retirer ce créneau',()=>{items.splice(items.indexOf(item),1);row.remove();if(!items.length)addSlot();update();},'btn small'));items.push(item);slots.append(row);}
+  function update(){const timed=['travail','formation'].includes(kind.value);slots.classList.toggle('hidden',!timed);add.classList.toggle('hidden',!timed);add.disabled=items.length>=10;items.forEach((item,i)=>{item.title.textContent='Créneau '+(i+1);item.pair.forEach((input,j)=>{input.disabled=!timed;input.required=timed;input.setAttribute('aria-label',(j?'Fin':'Début')+' du créneau '+(i+1));});item.post.disabled=!timed;item.post.setAttribute('aria-label','Poste du créneau '+(i+1));});const valid=items.filter(item=>item.pair.every(i=>i.value)).map(item=>item.pair.map(i=>i.value));total.textContent=timed?'Durée saisie : '+formatHours(Math.max(0,scheduleMinutes({slots:valid}))):'Journée entière · hors total des heures.';}
+  seed.forEach(item=>addSlot(item.times,item.postId));kind.onchange=update;update();const status=node('p','','error');status.setAttribute('role','alert');const actions=node('div','','dialog-actions'),save=node('button','Enregistrer le brouillon','btn primary');save.type='submit';
+  const clear=button('Vider cette journée',async()=>{clear.disabled=true;try{await api('/api/schedule/'+data.week+'/clear-day','POST',{userId:person.id,day,revision:data.revision});dialog.close();await renderSchedule();q('#feedback').textContent='Journée retirée du brouillon.';}catch(e){status.textContent=e.message;clear.disabled=false;}});clear.disabled=!entry;
+  actions.append(clear,button('Annuler',()=>dialog.close()),save);form.append(typeLabel,kind,slots,add,total,status,actions);dialog.append(form);form.onsubmit=async e=>{
+    e.preventDefault();status.textContent='';const timed=['travail','formation'].includes(kind.value),pairs=timed?items.map(item=>item.pair.map(i=>i.value)):[],postIds=timed?items.map(item=>item.post.value?Number(item.post.value):null):[];
     if(pairs.some(pair=>pair.some(value=>!value))){status.textContent='Renseignez le début et la fin de chaque créneau.';return;}
-    save.disabled=true;clear.disabled=true;try{await api('/api/schedule/'+data.week+'/day','PUT',{userId:person.id,day,kind:kind.value,slots:pairs,revision:data.revision});dialog.close();await renderSchedule();q('#feedback').textContent='Journée enregistrée dans le brouillon.';}catch(e){status.textContent=e.message;save.disabled=false;clear.disabled=!entry;}
-  };dialog.showModal();kind.focus();
+    const ordered=pairs.map((times,i)=>({times,postId:postIds[i]})).sort((a,b)=>a.times[0].localeCompare(b.times[0]));save.disabled=true;clear.disabled=true;try{await api('/api/schedule/'+data.week+'/day','PUT',{userId:person.id,day,kind:kind.value,slots:ordered.map(i=>i.times),postIds:ordered.map(i=>i.postId),revision:data.revision});dialog.close();await renderSchedule();q('#feedback').textContent='Journée enregistrée dans le brouillon.';}catch(e){status.textContent=e.message;save.disabled=false;clear.disabled=!entry;}
+  };dialog.showModal();if(options.focusPost!==undefined)items[options.focusPost]?.post.focus();else if(options.addAfter!==undefined)items[Math.min(options.addAfter+1,items.length-1)]?.pair[0].focus();else kind.focus();
 }
 
 function renderCelebrations(data){

@@ -1,3 +1,4 @@
+import {registerScheduleTools} from './schedule-tools.mjs';
 export const scheduleKinds=['travail','formation','conge','absence','repos'];
 const invalid=message=>Object.assign(new Error(message),{status:400});
 export function validDate(value){
@@ -13,7 +14,7 @@ export function validateDay(body,week){
   validWeek(week);const {userId,day,kind,slots}=body||{};
   if(!Number.isSafeInteger(userId)||userId<1)throw invalid('Collaborateur invalide.');
   validDate(day);if(day<week||day>shiftDate(week,6))throw invalid('Ce jour ne fait pas partie de la semaine.');
-  if(!scheduleKinds.includes(kind)||!Array.isArray(slots)||slots.length>2)throw invalid('Journée invalide.');
+  if(!scheduleKinds.includes(kind)||!Array.isArray(slots)||slots.length>10)throw invalid('Journée invalide.');
   const timed=kind==='travail'||kind==='formation';
   if(timed&&!slots.length)throw invalid('Renseignez au moins un créneau horaire.');
   if(!timed&&slots.length)throw invalid('Un congé, une absence ou un repos ne comporte pas de créneau.');
@@ -25,7 +26,8 @@ export function validateDay(body,week){
     if(start<lastEnd)throw invalid('Les créneaux doivent être dans l’ordre et ne pas se chevaucher.');
     lastEnd=end;
   }
-  return {userId,day,kind,slots};
+  const postIds=body.postIds;if(postIds!==undefined&&(!Array.isArray(postIds)||postIds.length!==slots.length||postIds.some(id=>id!==null&&(!Number.isSafeInteger(id)||id<1))))throw invalid('Choisissez un poste valide pour chaque créneau.');
+  return {userId,day,kind,slots,...(postIds!==undefined?{postIds}: {})};
 }
 function minutes(t){const [h,m]=t.split(':').map(Number);return h*60+m;}
 export function plannedMinutes(entry){return (entry?.slots||[]).reduce((sum,[start,end])=>sum+minutes(end)-minutes(start),0);}
@@ -40,6 +42,7 @@ export function copySchedule(source,sourceWeek,targetWeek,allowedIds){
   return result;
 }
 export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModify,fail}){
+  const tools=registerScheduleTools({app,db,auth,ready,admin,csrf,canAccess,fail});
   const access=(req,res,next)=>canAccess(req.auth,'Emplois du temps')?next():next(fail(403,'Accès refusé.'));
   const editor=(req,res,next)=>canModify(req.auth,'Emplois du temps')?next():next(fail(403,'Vous pouvez uniquement consulter le planning.'));
   const conflict=()=>fail(409,'Le planning a été modifié entre-temps. Rechargez la semaine avant de continuer.');
@@ -57,7 +60,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   app.put('/api/schedule/:week/day',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision),entry=validateDay(req.body,week);
     if(!(await roster()).some(p=>p.id===entry.userId))throw fail(404,'Collaborateur introuvable.');
-    await ensureWeek(week);
+    if(entry.postIds?.some(id=>id!==null)){const previous=(await weekRow(week))?.draft?.[entry.userId+':'+entry.day]||{};await tools.validatePostIds(entry,previous);}await ensureWeek(week);
     const {rows}=await db.query(`UPDATE schedule_weeks SET draft=jsonb_set(draft,ARRAY[$1::text],$2::jsonb),revision=revision+1
       WHERE week=$3::date AND revision=$4 RETURNING revision`,[entry.userId+':'+entry.day,JSON.stringify(entry),week,revision]);
     if(!rows.length)throw conflict();res.json(rows[0]);
@@ -89,3 +92,4 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     res.json({ok:true});
   });
 }
+

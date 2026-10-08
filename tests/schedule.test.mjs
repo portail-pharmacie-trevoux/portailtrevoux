@@ -24,3 +24,6 @@ test('copie conserve le jour de semaine, passe les changements d’heure et excl
   assert.deepEqual(Object.keys(copied),['1:2026-10-26']);assert.equal(copied['1:2026-10-26'].day,'2026-10-26');assert.deepEqual(copied['1:2026-10-26'].slots,entry.slots);
   assert.equal(entry.day,'2026-10-05');
 });
+
+
+test('Dix créneaux avec postes distincts, copie préservée et onzième refusé',()=>{const slots=Array.from({length:10},(_,i)=>[String(8+i).padStart(2,'0')+':00',String(8+i).padStart(2,'0')+':30']);const posts=slots.map((_,i)=>i+1),day={...entry,slots,postIds:posts};assert.equal(plannedMinutes(validateDay(day,'2026-10-05')),300);assert.deepEqual(copySchedule({a:day},'2026-10-05','2026-10-12',[1])['1:2026-10-12'].postIds,posts);assert.throws(()=>validateDay({...day,slots:[...slots,['19:00','19:30']],postIds:[...posts,11]},'2026-10-05'));assert.throws(()=>validateDay({...day,postIds:[1]},'2026-10-05'));assert.throws(()=>validateDay({...day,postIds:posts.map(()=>-1)},'2026-10-05'));});

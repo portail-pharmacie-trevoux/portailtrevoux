@@ -201,3 +201,19 @@ CREATE TABLE IF NOT EXISTS order_mfa_audit (
 ALTER TABLE order_mfa ADD COLUMN IF NOT EXISTS paper_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE order_mfa ADD COLUMN IF NOT EXISTS paper_hashes JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE order_mfa ADD COLUMN IF NOT EXISTS paper_reference TEXT;
+
+CREATE TABLE IF NOT EXISTS schedule_posts (
+ id SERIAL PRIMARY KEY,name TEXT NOT NULL,color TEXT NOT NULL,
+ active BOOLEAN NOT NULL DEFAULT TRUE,revision INTEGER NOT NULL DEFAULT 1,
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS leave_requests (
+ id SERIAL PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ leave_type TEXT NOT NULL,start_date DATE NOT NULL,end_date DATE NOT NULL,
+ start_part TEXT NOT NULL,end_part TEXT NOT NULL,comment TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','refused','cancelled')),
+ revision INTEGER NOT NULL DEFAULT 1,review_note TEXT NOT NULL DEFAULT '',
+ reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),reviewed_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS leave_requests_pending_unique ON leave_requests(user_id,leave_type,start_date,end_date,start_part,end_part) WHERE status='pending';
