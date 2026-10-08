@@ -21,7 +21,8 @@ export function orderInitials(user){
  const parts=[user.first_name,user.last_name].filter(Boolean);const names=parts.length?parts:(user.name||'').trim().split(/\s+/);return names.map(n=>Array.from(n.trim())[0]||'').join('').toLocaleUpperCase('fr').slice(0,8)||'?';
 }
 export const orderNextDate=data=>data.delivery?.date&&data.frequency?shiftDate(data.delivery.date,data.frequency):(data.initialNextOrder||'');
-export const compareOrders=(a,b)=>Number(!!a.suspended)-Number(!!b.suspended)||(a.nextOrder||'9999').localeCompare(b.nextOrder||'9999')||a.lastName.localeCompare(b.lastName,'fr')||a.firstName.localeCompare(b.firstName,'fr');
+const orderNames=new Intl.Collator('fr',{sensitivity:'base'});
+export const compareOrders=(a,b)=>orderNames.compare(a.lastName.trim(),b.lastName.trim());
 function orderDay(now){const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value]));return p.year+'-'+p.month+'-'+p.day;}
 export function registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret,now=()=>new Date()}){
  const universe="Outils d'aide aux commandes",access=viewUniverse(universe),guard=[auth,ready,editUniverse(universe),csrf];
