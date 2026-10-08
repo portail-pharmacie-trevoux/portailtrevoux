@@ -217,3 +217,8 @@ CREATE TABLE IF NOT EXISTS leave_requests (
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),reviewed_at TIMESTAMPTZ
 );
 CREATE UNIQUE INDEX IF NOT EXISTS leave_requests_pending_unique ON leave_requests(user_id,leave_type,start_date,end_date,start_part,end_part) WHERE status='pending';
+
+CREATE TABLE IF NOT EXISTS schedule_templates (
+ id SERIAL PRIMARY KEY,name TEXT NOT NULL,content JSONB NOT NULL DEFAULT '{}',
+ revision INTEGER NOT NULL DEFAULT 1,updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

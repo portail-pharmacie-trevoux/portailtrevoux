@@ -1,5 +1,7 @@
+import {registerScheduleMonth} from './schedule-month.mjs';
+import {registerScheduleTemplates} from './schedule-templates.mjs';
 import {registerScheduleTools} from './schedule-tools.mjs';
-export const scheduleKinds=['travail','formation','conge','absence','repos'];
+export const scheduleKinds=['travail','formation','conge','maladie','recuperation','absence_injustifiee','absence','repos'];
 const invalid=message=>Object.assign(new Error(message),{status:400});
 export function validDate(value){
   if(typeof value!=='string'||!/^20\d{2}-\d{2}-\d{2}$/.test(value))throw invalid('Date invalide.');
@@ -22,12 +24,15 @@ export function validateDay(body,week){
   for(const slot of slots){
     if(!Array.isArray(slot)||slot.length!==2||slot.some(t=>typeof t!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)))throw invalid('Horaires invalides.');
     const start=minutes(slot[0]),end=minutes(slot[1]);
+    if(start<450||end>1290)throw invalid('Les créneaux doivent être compris entre 7 h 30 et 21 h 30.');
     if(end<=start)throw invalid('L’heure de fin doit être après l’heure de début.');
     if(start<lastEnd)throw invalid('Les créneaux doivent être dans l’ordre et ne pas se chevaucher.');
     lastEnd=end;
   }
   const postIds=body.postIds;if(postIds!==undefined&&(!Array.isArray(postIds)||postIds.length!==slots.length||postIds.some(id=>id!==null&&(!Number.isSafeInteger(id)||id<1))))throw invalid('Choisissez un poste valide pour chaque créneau.');
-  return {userId,day,kind,slots,...(postIds!==undefined?{postIds}: {})};
+  if(body.mealTicket!==undefined&&typeof body.mealTicket!=='boolean')throw invalid('Attribution de ticket restaurant invalide.');
+  if(body.actualMinutes!==undefined&&body.actualMinutes!==null&&(!Number.isInteger(body.actualMinutes)||body.actualMinutes<0||body.actualMinutes>840||(!timed&&body.actualMinutes>0)))throw invalid('Renseignez une durée réalisée entre 0 et 14 heures, uniquement pour le travail ou la formation.');
+  return {userId,day,kind,slots,...(body.actualMinutes!==undefined?{actualMinutes:body.actualMinutes}:{}),...(postIds!==undefined?{postIds}: {}),...(body.mealTicket!==undefined?{mealTicket:body.mealTicket}: {})};
 }
 function minutes(t){const [h,m]=t.split(':').map(Number);return h*60+m;}
 export function plannedMinutes(entry){return (entry?.slots||[]).reduce((sum,[start,end])=>sum+minutes(end)-minutes(start),0);}
@@ -37,7 +42,7 @@ export function copySchedule(source,sourceWeek,targetWeek,allowedIds){
     if(!allowedIds.includes(entry.userId))continue;
     const offset=Math.round((new Date(entry.day+'T12:00:00Z')-new Date(sourceWeek+'T12:00:00Z'))/86400000);
     if(offset<0||offset>6)continue;
-    const copied=validateDay({...entry,day:shiftDate(targetWeek,offset)},targetWeek);result[copied.userId+':'+copied.day]=copied;
+    const copied=validateDay({...entry,day:shiftDate(targetWeek,offset)},targetWeek);delete copied.mealTicket;delete copied.actualMinutes;result[copied.userId+':'+copied.day]=copied;
   }
   return result;
 }
@@ -49,25 +54,31 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   const roster=async()=>(await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY name')).rows;
   async function weekRow(week){return (await db.query('SELECT * FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];}
   async function ensureWeek(week){await db.query('INSERT INTO schedule_weeks(week) VALUES($1::date) ON CONFLICT(week) DO NOTHING',[week]);}
+  registerScheduleTemplates({app,db,auth,ready,admin,csrf,access,roster,ensureWeek,tools,fail});
+  registerScheduleMonth({app,db,auth,ready,admin,csrf,access,roster,fail});
+  const sensitive=entry=>['maladie','absence_injustifiee'].includes(entry?.kind);
   app.get('/api/schedule',auth,ready,access,async(req,res)=>{
     const week=validWeek(req.query.week),scope=req.query.scope||'team';if(!['mine','team'].includes(scope))throw fail(400,'Vue invalide.');
     const [row,all]=await Promise.all([weekRow(week),roster()]);const isAdmin=canModify(req.auth,'Emplois du temps');
     const people=scope==='mine'?all.filter(p=>p.id===req.auth.id):all,ids=new Set(people.map(p=>p.id));
-    const entries=Object.values(isAdmin?row?.draft||{}:row?.published||{}).filter(e=>ids.has(e.userId));
+    const entries=Object.values(isAdmin?row?.draft||{}:row?.published||{}).filter(e=>ids.has(e.userId)).map(entry=>{if(req.auth.role==='admin')return entry;const {mealTicket,actualMinutes,...e}=entry;return {...e,...(entry.userId===req.auth.id&&mealTicket!==undefined?{mealTicket}:{}),...(entry.userId===req.auth.id&&actualMinutes!==undefined?{actualMinutes}:{}),...(sensitive(entry)?{kind:entry.userId===req.auth.id?entry.kind:'absence',readOnly:true}: {})};});
     res.json({week,people,entries,canEdit:isAdmin,draftEntryCount:isAdmin?Object.keys(row?.draft||{}).length:undefined,revision:isAdmin?row?.revision||0:undefined,publishedAt:row?.published_at||null,
       unpublishedChanges:isAdmin?!!row&&row.revision!==row.published_revision:undefined});
   });
   app.put('/api/schedule/:week/day',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision),entry=validateDay(req.body,week);
     if(!(await roster()).some(p=>p.id===entry.userId))throw fail(404,'Collaborateur introuvable.');
-    if(entry.postIds?.some(id=>id!==null)){const previous=(await weekRow(week))?.draft?.[entry.userId+':'+entry.day]||{};await tools.validatePostIds(entry,previous);}await ensureWeek(week);
+    const previous=(await weekRow(week))?.draft?.[entry.userId+':'+entry.day]||{};if(req.auth.role!=='admin'&&(sensitive(entry)||sensitive(previous)||(entry.mealTicket!==undefined&&entry.mealTicket!==!!previous.mealTicket)||(entry.actualMinutes!==undefined&&entry.actualMinutes!==(previous.actualMinutes??null))))throw fail(403,'Ces absences, les heures réalisées et les tickets restaurant sont réservés à l’administrateur.');if(entry.mealTicket===undefined&&previous.mealTicket!==undefined)entry.mealTicket=previous.mealTicket;if(entry.actualMinutes===undefined&&previous.actualMinutes!==undefined)entry.actualMinutes=previous.actualMinutes;if(entry.postIds?.some(id=>id!==null))await tools.validatePostIds(entry,previous);await ensureWeek(week);
     const {rows}=await db.query(`UPDATE schedule_weeks SET draft=jsonb_set(draft,ARRAY[$1::text],$2::jsonb),revision=revision+1
       WHERE week=$3::date AND revision=$4 RETURNING revision`,[entry.userId+':'+entry.day,JSON.stringify(entry),week,revision]);
     if(!rows.length)throw conflict();res.json(rows[0]);
   });
+  app.post('/api/schedule/:week/meal-ticket',auth,ready,access,admin,csrf,async(req,res)=>{
+    const week=validWeek(req.params.week),revision=validRevision(req.body.revision),{userId,day,enabled}=req.body;if(typeof enabled!=='boolean')throw fail(400,'Attribution invalide.');validateDay({userId,day,kind:'repos',slots:[]},week);if(!(await roster()).some(p=>p.id===userId))throw fail(404,'Collaborateur introuvable.');const previous=(await weekRow(week))?.draft?.[userId+':'+day]||{userId,day,kind:'repos',slots:[]};const entry={...previous,mealTicket:enabled};await ensureWeek(week);const result=(await db.query('UPDATE schedule_weeks SET draft=jsonb_set(draft,ARRAY[$1::text],$2::jsonb),revision=revision+1 WHERE week=$3::date AND revision=$4 RETURNING revision',[userId+':'+day,JSON.stringify(entry),week,revision])).rows[0];if(!result)throw conflict();res.json(result);
+  });
   app.post('/api/schedule/:week/clear-day',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision),{userId,day}=req.body;
-    validateDay({userId,day,kind:'repos',slots:[]},week);await ensureWeek(week);
+    validateDay({userId,day,kind:'repos',slots:[]},week);const previous=(await weekRow(week))?.draft?.[userId+':'+day];if(req.auth.role!=='admin'&&(sensitive(previous)||previous?.mealTicket||previous?.actualMinutes!==undefined&&previous?.actualMinutes!==null))throw fail(403,'Cette journée doit être modifiée par un administrateur.');await ensureWeek(week);
     const {rows}=await db.query(`UPDATE schedule_weeks SET draft=draft-$1::text,revision=revision+1
       WHERE week=$2::date AND revision=$3 RETURNING revision`,[userId+':'+day,week,revision]);
     if(!rows.length)throw conflict();res.json(rows[0]);
@@ -76,7 +87,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const week=validWeek(req.params.week),from=validWeek(req.body.from),revision=validRevision(req.body.revision);
     if(from===week)throw fail(400,'Choisissez une autre semaine à copier.');
     const source=await weekRow(from);if(!source||!Object.keys(source.draft).length)throw fail(400,'La semaine à copier est vide.');
-    const copied=copySchedule(source.draft,from,week,(await roster()).map(p=>p.id));await ensureWeek(week);
+    if(req.auth.role!=='admin'){const target=await weekRow(week);if(Object.values(source.draft).some(sensitive)||Object.values(target?.draft||{}).some(e=>sensitive(e)||e.mealTicket||e.actualMinutes!==undefined&&e.actualMinutes!==null))throw fail(403,'Un administrateur doit copier cette semaine.');}const copied=copySchedule(source.draft,from,week,(await roster()).map(p=>p.id));await ensureWeek(week);
     const {rows}=await db.query(`UPDATE schedule_weeks SET draft=$1::jsonb,revision=revision+1
       WHERE week=$2::date AND revision=$3 RETURNING revision`,[JSON.stringify(copied),week,revision]);
     if(!rows.length)throw conflict();res.json(rows[0]);
