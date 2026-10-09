@@ -16,9 +16,15 @@ function meetingIcon(title){
   icon.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18v5H3zM5 13v7M19 13v7M8 3h3v3H8zM14 3h3v3h-3zM1 16h2M21 16h2"/></svg>';
   return icon;
 }
+function loungeIcon(title){
+  if(!/\bl['’\s]+etage\b/.test(normalizeSearch(title||'')))return null;
+  const icon=node('span','','agenda-meeting-icon');icon.setAttribute('role','img');icon.setAttribute('aria-label','Salon de l’étage');icon.title='Salon de l’étage';
+  icon.innerHTML='<svg viewBox="0 0 32 24" width="26" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12V8a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v4M4 11h2v4h13v-4h2v8H4zM6 19v2M19 19v2M12 7v7M24 8h6l-2-5h-2zM27 8v12M24 21h6M23 15h7M24 15v3M29 15v3"/><path d="M2 22h29"/></svg>';
+  return icon;
+}
 function eventCard(e){
   const card=node('article','','event'),heading=node('h3'),icons=eventIcons(e.title);
-  const meeting=meetingIcon(e.title);if(meeting)heading.append(meeting);
+  const meeting=meetingIcon(e.title);if(meeting)heading.append(meeting);const lounge=loungeIcon(e.title);if(lounge)heading.append(lounge);
   if(icons){const icon=node('span',icons+' ');icon.setAttribute('aria-hidden','true');heading.append(icon);}
   heading.append(node('span',e.title));card.append(heading);let when;
   if(e.start?.date){const {start,end}=eventDays(e);when=start.split('-').reverse().join('/')+(start!==end?' — '+end.split('-').reverse().join('/'):'')+' · Toute la journée';}
@@ -739,7 +745,7 @@ function renderHomeAgenda(data){
     daySection.append(node('span','Aujourd’hui','agenda-group-title'));
     reminderSection.append(node('span',reminders.length?'🔔 Rappels · 7 prochains jours':'🔔 Aucun rappel à venir','agenda-group-title'));
     const addRows=(section,list,limit,isReminder)=>{
-      list.slice(0,limit).forEach((e,i)=>{const icon=isReminder?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ';const text=icon+label(e)+(i===limit-1&&list.length>limit?' · +'+(list.length-limit):'');const row=node('span',text,'agenda-event-line'+(isReminder?' personal-reminder':''));const meeting=meetingIcon(e.title);if(meeting)row.prepend(meeting);row.title=label(e);section.append(row);});
+      list.slice(0,limit).forEach((e,i)=>{const icon=isReminder?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ';const text=icon+label(e)+(i===limit-1&&list.length>limit?' · +'+(list.length-limit):'');const row=node('span',text,'agenda-event-line'+(isReminder?' personal-reminder':''));const meeting=meetingIcon(e.title);if(meeting)row.prepend(meeting);const lounge=loungeIcon(e.title);if(lounge)row.prepend(lounge);row.title=label(e);section.append(row);});
     };
     if(!daily.length)daySection.append(node('span','Aucun rendez-vous ni formation','agenda-event-line'));
     addRows(daySection,daily,reminders.length?3:5,false);addRows(reminderSection,reminders,2,true);
