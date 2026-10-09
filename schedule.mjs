@@ -1,7 +1,7 @@
 import {registerScheduleMonth} from './schedule-month.mjs';
 import {registerScheduleTemplates} from './schedule-templates.mjs';
 import {registerScheduleTools} from './schedule-tools.mjs';
-export const scheduleKinds=['travail','formation','conge','maladie','recuperation','absence_injustifiee','absence','repos'];
+export const scheduleKinds=['travail','formation','ecole_cfa','conge','maladie','recuperation','absence_injustifiee','absence','repos'];
 const invalid=message=>Object.assign(new Error(message),{status:400});
 export function validDate(value){
   if(typeof value!=='string'||!/^20\d{2}-\d{2}-\d{2}$/.test(value))throw invalid('Date invalide.');
@@ -17,7 +17,7 @@ export function validateDay(body,week){
   if(!Number.isSafeInteger(userId)||userId<1)throw invalid('Collaborateur invalide.');
   validDate(day);if(day<week||day>shiftDate(week,6))throw invalid('Ce jour ne fait pas partie de la semaine.');
   if(!scheduleKinds.includes(kind)||!Array.isArray(slots)||slots.length>10)throw invalid('Journée invalide.');
-  const timed=kind==='travail'||kind==='formation';
+  const timed=['travail','formation','ecole_cfa'].includes(kind);
   if(timed&&!slots.length)throw invalid('Renseignez au moins un créneau horaire.');
   if(!timed&&slots.length)throw invalid('Un congé, une absence ou un repos ne comporte pas de créneau.');
   let lastEnd=-1;
@@ -31,7 +31,7 @@ export function validateDay(body,week){
   }
   const postIds=body.postIds;if(postIds!==undefined&&(!Array.isArray(postIds)||postIds.length!==slots.length||postIds.some(id=>id!==null&&(!Number.isSafeInteger(id)||id<1))))throw invalid('Choisissez un poste valide pour chaque créneau.');
   if(body.mealTicket!==undefined&&typeof body.mealTicket!=='boolean')throw invalid('Attribution de ticket restaurant invalide.');
-  if(body.actualMinutes!==undefined&&body.actualMinutes!==null&&(!Number.isInteger(body.actualMinutes)||body.actualMinutes<0||body.actualMinutes>840||(!timed&&body.actualMinutes>0)))throw invalid('Renseignez une durée réalisée entre 0 et 14 heures, uniquement pour le travail ou la formation.');
+  if(body.actualMinutes!==undefined&&body.actualMinutes!==null&&(!Number.isInteger(body.actualMinutes)||body.actualMinutes<0||body.actualMinutes>840||(!timed&&body.actualMinutes>0)))throw invalid('Renseignez une durée réalisée entre 0 et 14 heures, uniquement pour le travail, la formation ou l’école CFA.');
   return {userId,day,kind,slots,...(body.actualMinutes!==undefined?{actualMinutes:body.actualMinutes}:{}),...(postIds!==undefined?{postIds}: {}),...(body.mealTicket!==undefined?{mealTicket:body.mealTicket}: {})};
 }
 function minutes(t){const [h,m]=t.split(':').map(Number);return h*60+m;}

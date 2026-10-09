@@ -275,3 +275,5 @@ body:has(#login:not(.hidden)) .login-card{margin:0;width:min(460px,100%);box-siz
 
 /* Agenda preview: let both sections grow, keep icons aligned with one-line labels. */
 .tile .tile-agenda{height:auto;min-height:94px;overflow:visible;gap:6px}.tile .tile-agenda>.agenda-today,.tile .tile-agenda>.agenda-reminders{overflow:visible;min-width:0;gap:3px;line-height:18px}.tile .tile-agenda>.agenda-reminders{margin-top:0;padding-top:6px}.tile .tile-agenda .agenda-group-title{margin:0;line-height:16px}.tile .tile-agenda .agenda-event-line{display:flex;align-items:center;gap:4px;min-height:18px;line-height:18px;margin:0;min-width:0;overflow:hidden}.tile .tile-agenda .agenda-event-text{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;font-size:11px;line-height:18px}.tile .tile-agenda .agenda-meeting-icon{display:inline-flex;flex:0 0 14px;width:14px;height:14px;margin:0;font-size:11px;line-height:14px}.tile .tile-agenda .agenda-meeting-icon svg{width:14px;height:14px}
+
+.schedule-kind.ecole_cfa,.schedule-day.ecole_cfa,.timeline-slot.ecole_cfa{background:#eae5fa;color:#51417b}
