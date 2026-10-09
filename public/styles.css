@@ -293,3 +293,5 @@ body:has(#login:not(.hidden)) .login-card{margin:0;width:min(460px,100%);box-siz
 .merch-bs-connector{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}.merch-bs-connector line{stroke:#a12587;stroke-width:1.5;vector-effect:non-scaling-stroke}.merch-marker{z-index:2}.merch-marker-bs{background:#a12587;font-size:11px;padding:4px 7px;white-space:nowrap}.merch-marker-bs:hover{background:#781a62}.merch-marker-bs.bs-1,.merch-marker-bs.bs-2,.merch-marker-bs.bs-3,.merch-marker-bs.bs-4{transform:translate(-50%,-50%)}
 
 .merch-marker-ev{background:#7548b5}.merch-marker-ev:hover{background:#57318b}
+
+.merch-zone-item{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}.merch-zone-status{font-size:12px;font-weight:700;white-space:nowrap}.merch-zone-item.merch-zone-free{background:#e8f6ed;border-color:#6ba882;color:#205f38}.merch-zone-item.merch-zone-occupied{background:#fdecec;border-color:#d98787;color:#962c2c}.merch-zone-item:hover{filter:brightness(.96)}.merch-status-legend{font-size:13px;color:#54616b}
