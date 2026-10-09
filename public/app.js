@@ -99,9 +99,9 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-function displayUniverse(name){return name==='Actualités'?'Communication':name;}
+function displayUniverse(name){return name==='Actualités'?'Communication':name==='Outils de calculs rapides'?"Outils d’aide au calcul":name;}
 const descriptions={'Outils de calculs rapides':'Trousse de secours en cas de panique.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'L’annuaire de l’équipe et votre accès personnel aux bulletins de paie.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'échanges internes & informations','Formations':'Les ressources pour apprendre et se former.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les documents internes de la pharmacie et leur signature en ligne.'};
-descriptions["Outils d'aide aux commandes"]='commandes programmées';
+descriptions["Outils d'aide aux commandes"]='commandes programmées';descriptions["Outils d’aide au merchandising"]='';descriptions["Outils d'aide au merchandising"]='Organisation de l’espace de vente.';
 document.querySelectorAll('[data-universe]').forEach(b=>b.onclick=()=>openUniverse(b.dataset.universe));
 q('#back').onclick=()=>showHome();
 q('#portal-home').onclick=e=>{if(session&&!session.user.mustChange){e.preventDefault();showHome();}};
@@ -300,15 +300,15 @@ setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
 let draftTileOrder=[],draftHiddenTiles=new Set();
 function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
-function tileAllowed(name){return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires'].includes(name)||session.user.rights.includes(name)));}
+function tileAllowed(name){return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires',"Outils d'aide au merchandising"].includes(name)||session.user.rights.includes(name)));}
 function canEditUniverse(name){if(['Laboratoires',"Outils d'aide aux commandes"].includes(name))return tileAllowed(name);if(name==='Ressources humaines')return session.user.role==='admin';return session.user.role==='admin'||(tileAllowed(name)&&(session.user.permissionsConfigured?session.user.editRights?.includes(name):name==='Fun'));}
 function tilePreferences(){
   let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}
   let order=Array.isArray(saved)?saved:Array.isArray(saved?.order)?saved.order:[];
   // Migrate the former first row once, while preserving custom orders and hidden tiles.
   if((saved?.version||0)<2&&order.indexOf('Procédures')===3&&order.indexOf('Actualités')>3){const index=order.indexOf('Actualités');[order[3],order[index]]=[order[index],order[3]];}
-  if((saved?.version||0)<3){
-    const bottom=['Fun','Passerelle groupement','Outils de calculs rapides',"Outils d'aide aux commandes"];
+  if((saved?.version||0)<4){
+    const bottom=['Fun','Passerelle groupement','Outils de calculs rapides',"Outils d'aide au merchandising","Outils d'aide aux commandes"];
     order=[...order.filter(name=>!bottom.includes(name)),...initialTileOrder.filter(name=>!order.includes(name)&&!bottom.includes(name)),...bottom];
   }
   return {order,hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
@@ -349,7 +349,7 @@ q('#organize-tiles').onclick=()=>{
 q('#tile-order-cancel').onclick=()=>q('#tile-order-dialog').close();
 q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(tileAllowed);draftHiddenTiles.clear();renderTileOrder();q('#tile-order-status').textContent='Ordre initial et toutes vos tuiles affichées.';};
 q('#tile-order-save').onclick=()=>{
-  try{localStorage.setItem(tileOrderKey(),JSON.stringify({version:3,order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
+  try{localStorage.setItem(tileOrderKey(),JSON.stringify({version:4,order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
   catch{q('#tile-order-status').textContent='Ce navigateur ne permet pas de mémoriser votre ordre.';}
 };
 

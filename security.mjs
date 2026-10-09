@@ -1,7 +1,7 @@
 import { randomBytes, scrypt as rawScrypt, timingSafeEqual, createHash, createCipheriv, createDecipheriv } from 'node:crypto';
 import { promisify } from 'node:util';
 const scrypt = promisify(rawScrypt);
-export const universes = ['Collaborateurs','Emplois du temps','Agenda','Procédures','Laboratoires','Challenges','Actualités','Formations','Contacts utiles','Ressources humaines','Fun','Passerelle groupement','Outils de calculs rapides',"Outils d'aide aux commandes"];
+export const universes = ['Collaborateurs','Emplois du temps','Agenda','Procédures','Laboratoires','Challenges','Actualités','Formations','Contacts utiles','Ressources humaines','Fun','Passerelle groupement','Outils de calculs rapides',"Outils d'aide aux commandes","Outils d'aide au merchandising"];
 export function passwordValid(p) { return typeof p === 'string' && p.length >= 12 && Buffer.byteLength(p) <= 256; }
 export async function hashPassword(password) {
   const salt=randomBytes(16).toString('hex');
@@ -31,11 +31,11 @@ export function decrypt(value,secret) {
 export function canAccess(user,universe) {
  if(!user)return false;if(user.role==='admin')return true;
  if(user.permissions_configured)return !!user.rights?.includes(universe);
- return ['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires',"Outils d'aide aux commandes"].includes(universe)||!!user.rights?.includes(universe);
+ return ['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires',"Outils d'aide aux commandes","Outils d'aide au merchandising"].includes(universe)||!!user.rights?.includes(universe);
 }
 export function canModify(user,universe) {
  if(!user||!canAccess(user,universe))return false;if(user.role==='admin')return true;
- if(['Laboratoires',"Outils d'aide aux commandes"].includes(universe))return true;
+ if(['Laboratoires',"Outils d'aide aux commandes","Outils d'aide au merchandising"].includes(universe))return true;
  if(['Collaborateurs','Ressources humaines'].includes(universe))return false;
  return user.permissions_configured?!!user.edit_rights?.includes(universe):universe==='Fun';
 }
