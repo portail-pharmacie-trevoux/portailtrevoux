@@ -287,3 +287,5 @@ body:has(#login:not(.hidden)) .login-card{margin:0;width:min(460px,100%);box-siz
 .merch-plan-scroll{max-height:none;overflow:visible;background:#f5f8f8;padding:8px}.merch-plan{min-width:0;width:min(100%,calc(min(58vh,560px) * 1.062449));max-width:none}.merch-marker{font-size:10px;padding:3px 5px;border-width:1px}@media(max-width:560px){.merch-plan{width:100%}}
 
 .merch-marker-ic{background:#315bb6}.merch-marker-ic:hover{background:#234184}
+
+.merch-marker-bs{background:#a75f12;font-size:9px;padding:3px 4px}.merch-marker-bs:hover{background:#78420a}.merch-marker-bs.bs-1{transform:translate(-100%,-100%)}.merch-marker-bs.bs-2{transform:translate(0,-100%)}.merch-marker-bs.bs-3{transform:translate(-100%,0)}.merch-marker-bs.bs-4{transform:translate(0,0)}

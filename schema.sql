@@ -228,4 +228,7 @@ CREATE TABLE IF NOT EXISTS merchandising_zones(id INTEGER PRIMARY KEY CHECK(id B
 ALTER TABLE merchandising_zones ADD COLUMN IF NOT EXISTS months JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 ALTER TABLE merchandising_zones DROP CONSTRAINT IF EXISTS merchandising_zones_id_check;
-ALTER TABLE merchandising_zones ADD CONSTRAINT merchandising_zones_id_check CHECK(id BETWEEN 1 AND 18);
+ALTER TABLE merchandising_zones ADD CONSTRAINT merchandising_zones_id_check CHECK(id BETWEEN 1 AND 22);
+
+ALTER TABLE merchandising_zones DROP CONSTRAINT IF EXISTS merchandising_zones_id_check;
+ALTER TABLE merchandising_zones ADD CONSTRAINT merchandising_zones_id_check CHECK(id BETWEEN 1 AND 22);
