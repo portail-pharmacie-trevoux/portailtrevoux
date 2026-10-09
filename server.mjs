@@ -1,3 +1,4 @@
+import {registerMerchandising} from './merchandising.mjs';
 import {registerOrderMFA} from './order-mfa.mjs';
 import {registerOrderPlanning} from './order-planning.mjs';
 import {registerCalendarReminders} from './calendar-reminders.mjs';
@@ -65,6 +66,7 @@ export function createApp(db,config) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
+  registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   const orderMFA=registerOrderMFA({app,db,auth,ready,csrf,viewUniverse,fail,secret});
   app.use('/api/order-planning',auth,ready,viewUniverse("Outils d'aide aux commandes"),orderMFA.guard);
