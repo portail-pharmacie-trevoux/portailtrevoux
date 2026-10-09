@@ -232,3 +232,5 @@ ALTER TABLE merchandising_zones ADD CONSTRAINT merchandising_zones_id_check CHEC
 
 ALTER TABLE merchandising_zones DROP CONSTRAINT IF EXISTS merchandising_zones_id_check;
 ALTER TABLE merchandising_zones ADD CONSTRAINT merchandising_zones_id_check CHECK(id BETWEEN 1 AND 28);
+
+ALTER TABLE merchandising_zones ADD COLUMN IF NOT EXISTS number INTEGER CHECK(number BETWEEN 1 AND 999);
