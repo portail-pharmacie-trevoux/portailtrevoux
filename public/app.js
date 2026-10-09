@@ -10,8 +10,15 @@ function eventIcons(title){
   const text=normalizeSearch(title||'');
   return [text.includes('conge')?'🏝️':'',text.includes('formation')?'🎓':'',text.includes('rdv')?'📝':'',text.includes('livraison')?'📦':''].filter(Boolean).join(' ');
 }
+function meetingIcon(title){
+  if(!normalizeSearch(title||'').includes('reunion'))return null;
+  const icon=node('span','','agenda-meeting-icon');icon.setAttribute('role','img');icon.setAttribute('aria-label','Réunion');icon.title='Réunion';
+  icon.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18v5H3zM5 13v7M19 13v7M8 3h3v3H8zM14 3h3v3h-3zM1 16h2M21 16h2"/></svg>';
+  return icon;
+}
 function eventCard(e){
   const card=node('article','','event'),heading=node('h3'),icons=eventIcons(e.title);
+  const meeting=meetingIcon(e.title);if(meeting)heading.append(meeting);
   if(icons){const icon=node('span',icons+' ');icon.setAttribute('aria-hidden','true');heading.append(icon);}
   heading.append(node('span',e.title));card.append(heading);let when;
   if(e.start?.date){const {start,end}=eventDays(e);when=start.split('-').reverse().join('/')+(start!==end?' — '+end.split('-').reverse().join('/'):'')+' · Toute la journée';}
@@ -732,7 +739,7 @@ function renderHomeAgenda(data){
     daySection.append(node('span','Aujourd’hui','agenda-group-title'));
     reminderSection.append(node('span',reminders.length?'🔔 Rappels · 7 prochains jours':'🔔 Aucun rappel à venir','agenda-group-title'));
     const addRows=(section,list,limit,isReminder)=>{
-      list.slice(0,limit).forEach((e,i)=>{const icon=isReminder?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ';const text=icon+label(e)+(i===limit-1&&list.length>limit?' · +'+(list.length-limit):'');const row=node('span',text,'agenda-event-line'+(isReminder?' personal-reminder':''));row.title=label(e);section.append(row);});
+      list.slice(0,limit).forEach((e,i)=>{const icon=isReminder?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ';const text=icon+label(e)+(i===limit-1&&list.length>limit?' · +'+(list.length-limit):'');const row=node('span',text,'agenda-event-line'+(isReminder?' personal-reminder':''));const meeting=meetingIcon(e.title);if(meeting)row.prepend(meeting);row.title=label(e);section.append(row);});
     };
     if(!daily.length)daySection.append(node('span','Aucun rendez-vous ni formation','agenda-event-line'));
     addRows(daySection,daily,reminders.length?3:5,false);addRows(reminderSection,reminders,2,true);
