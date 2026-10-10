@@ -83,7 +83,7 @@ async function api(path,method='GET',data){
   if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Object.assign(Error(body.error||'Demande impossible.'),{code:body.code,status:response.status});}return body;
 }
 function error(e){q('#global-message').textContent=e.message;}
-function showLogin(){q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showLogin(){q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
   const whatsappUserId=session.user.id;void import('/whatsapp.js').then(module=>{if(session?.user.id===whatsappUserId)module.setupWhatsApp({button:q('#whatsapp-button'),status:q('#whatsapp-status'),api,getUser:()=>session?.user});}).catch(error);
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
@@ -556,12 +556,12 @@ async function refreshHomeExtras(){
   if(!session||session.user.mustChange||homeExtrasPending)return;
   const userId=session.user.id;homeExtrasPending=true;
   try{
-    const results=await Promise.allSettled([api('/api/fun/joke'),api('/api/publications'),api('/api/collaborateurs/celebrations'),tileAllowed('Agenda')?api('/api/calendar'):Promise.resolve(null)]);
+    const results=await Promise.allSettled([api('/api/fun/joke'),api('/api/publications'),api('/api/collaborateurs/celebrations'),tileAllowed('Agenda')?api('/api/calendar'):Promise.resolve(null),tileAllowed('Emplois du temps')?api('/api/schedule/today'):Promise.resolve(null)]);
     const joke=results[0].status==='fulfilled'?results[0].value:null,news=results[1].status==='fulfilled'?results[1].value:[],celebrations=results[2].status==='fulfilled'?results[2].value:null;
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
-      if(['Collaborateurs','Contacts utiles','Agenda'].includes(tile.dataset.universe))return;
+      if(['Collaborateurs','Contacts utiles','Agenda','Emplois du temps'].includes(tile.dataset.universe))return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
       const label=tile.dataset.universe==='Actualités'?(count?count+' message'+(count>1?'s':'')+' non vu'+(count>1?'s':''):'Aucun message non vu'):(count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue');
@@ -569,6 +569,16 @@ async function refreshHomeExtras(){
       tile.append(badge);
     });
     renderHomeAgenda(results[3].status==='fulfilled'?results[3].value:null);
+    const planning=q('.grid [data-universe="Emplois du temps"]');
+    if(planning){
+      planning.querySelector('.tile-schedule')?.remove();
+      const data=results[4].status==='fulfilled'?results[4].value:null,block=node('span','','tile-schedule');
+      block.append(node('span','Mes horaires aujourd’hui','tile-schedule-title'));
+      const list=node('span','','tile-schedule-list');
+      if(data?.slots?.length)data.slots.forEach(slot=>{const line=node('span','','tile-schedule-line');line.append(node('b',slot.start+'–'+slot.end),node('span',slot.post||({formation:'Formation',ecole_cfa:'École CFA'}[data.kind]||'Poste non renseigné')));list.append(line);});
+      else list.append(node('span',data?({conge:'Congés',maladie:'Arrêt maladie',recuperation:'Récupération',absence_injustifiee:'Absence',absence:'Absence',repos:'Repos'}[data.kind]||'Aucun créneau publié aujourd’hui'):'Horaires indisponibles'));
+      list.addEventListener('click',e=>e.stopPropagation());block.append(list);planning.append(block);
+    }
     renderCelebrations(celebrations);
     const fun=q('.grid [data-universe="Fun"]');fun.querySelector('.daily-joke')?.remove();
     const block=node('span','','daily-joke');block.append(node('strong','😄 La blague du jour'));

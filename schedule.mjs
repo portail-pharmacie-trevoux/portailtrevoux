@@ -64,6 +64,13 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const {userId,neighborId,direction}=req.body||{};if(!Number.isSafeInteger(userId)||!Number.isSafeInteger(neighborId)||!['up','down'].includes(direction))throw fail(400,'Déplacement invalide.');
     const client=await db.connect();try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(78451023)');const rows=(await client.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id FOR UPDATE')).rows,ids=rows.map(p=>p.id),index=ids.indexOf(userId),next=index+(direction==='up'?-1:1);if(index<0||next<0||next>=ids.length||ids[next]!==neighborId)throw fail(409,'L’ordre des collaborateurs a changé. Rechargez le planning.');[ids[index],ids[next]]=[ids[next],ids[index]];await client.query('UPDATE users u SET schedule_position=o.position FROM unnest($1::int[]) WITH ORDINALITY AS o(id,position) WHERE u.id=o.id',[ids]);await client.query('COMMIT');res.json({ok:true});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   });
+  app.get('/api/schedule/today',auth,ready,access,async(req,res)=>{
+    const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),offset=(new Date(day+'T12:00:00Z').getUTCDay()+6)%7;
+    const row=await weekRow(shiftDate(day,-offset)),entry=row?.published?.[req.auth.id+':'+day];
+    const ids=[...new Set((entry?.postIds||[]).filter(Number.isSafeInteger))];
+    const posts=ids.length?(await db.query('SELECT id,name FROM schedule_posts WHERE id=ANY($1::int[])',[ids])).rows:[];
+    res.json({day,kind:entry?.kind||null,slots:(entry?.slots||[]).map(([start,end],i)=>({start,end,post:posts.find(p=>p.id===entry.postIds?.[i])?.name||null}))});
+  });
   app.get('/api/schedule',auth,ready,access,async(req,res)=>{
     const week=validWeek(req.query.week),scope=req.query.scope||'team';if(!['mine','team'].includes(scope))throw fail(400,'Vue invalide.');
     const [row,all]=await Promise.all([weekRow(week),roster()]);const isAdmin=canModify(req.auth,'Emplois du temps');
