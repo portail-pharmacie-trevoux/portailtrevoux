@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS team_challenges(
  target NUMERIC NOT NULL CHECK(target>0),participants JSONB NOT NULL,results JSONB,report_id INTEGER,revision INTEGER NOT NULL DEFAULT 1,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
+ALTER TABLE team_challenges ADD COLUMN IF NOT EXISTS gain_per_collaborator NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK(gain_per_collaborator>=0 AND gain_per_collaborator<=1000000);
 CREATE INDEX IF NOT EXISTS team_challenges_month_idx ON team_challenges(month);
 CREATE TABLE IF NOT EXISTS challenge_reports(
  id SERIAL PRIMARY KEY,challenge_id INTEGER NOT NULL REFERENCES team_challenges(id) ON DELETE CASCADE,file_name TEXT NOT NULL,file_content BYTEA NOT NULL,
