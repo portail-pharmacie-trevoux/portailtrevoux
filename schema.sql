@@ -255,3 +255,9 @@ CREATE INDEX IF NOT EXISTS challenge_reports_challenge_idx ON challenge_reports(
 ALTER TABLE users ADD COLUMN IF NOT EXISTS schedule_position INTEGER;
 
 ALTER TABLE schedule_weeks ADD COLUMN IF NOT EXISTS locked_days JSONB NOT NULL DEFAULT '{}';
+
+CREATE TABLE IF NOT EXISTS training_documents(
+ id SERIAL PRIMARY KEY,category TEXT NOT NULL CHECK(category IN ('reference','training')),title TEXT NOT NULL,
+ file_name TEXT NOT NULL,file_type TEXT NOT NULL,file_content BYTEA NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+);

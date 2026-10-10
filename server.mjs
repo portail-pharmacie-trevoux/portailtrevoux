@@ -12,6 +12,7 @@ import {createInvitationMailer,registerInvitations,gmailSendScope,sameMailAccoun
 import {registerEmployeeImport} from './employee-import.mjs';
 import express from 'express';
 import { importProcedureDocuments } from './procedure-import.mjs';
+import {registerTrainingDocuments} from './training-documents.mjs';
 import { registerProcedures } from './procedures.mjs';
 import { registerContacts } from './contacts.mjs';
 import { registerCollaborateurs } from './collaborateurs.mjs';
@@ -41,7 +42,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -66,6 +67,7 @@ export function createApp(db,config) {
   async function publish(universe,title,key=null) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
+  registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
