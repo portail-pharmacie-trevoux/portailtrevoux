@@ -4,7 +4,7 @@ test('Semaine type sans dates, affectations préservées, utilisateurs actifs et
 test('Modèles et tickets administrateur, application au brouillon, révisions et confidentialité des absences',async t=>{
  let actor={id:1,role:'admin'},models=new Map(),weeks=new Map(),next=0;const people=[{id:1,name:'Admin'},{id:2,name:'Salarié'}];
  const db={query:async(sql,a=[])=>{
-  if(sql.startsWith('SELECT id,name FROM users'))return {rows:people};
+  if(sql.startsWith('SELECT id,name,job FROM users'))return {rows:people};
   if(sql.startsWith('SELECT id,active FROM schedule_posts'))return {rows:a[0].filter(id=>id===7).map(id=>({id,active:true}))};
   if(sql.startsWith('SELECT id,name,revision FROM schedule_templates'))return {rows:[...models.values()]};
   if(sql.startsWith('SELECT id,name,content,revision FROM schedule_templates'))return {rows:models.has(a[0])?[models.get(a[0])]:[]};

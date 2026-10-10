@@ -51,7 +51,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   const access=(req,res,next)=>canAccess(req.auth,'Emplois du temps')?next():next(fail(403,'Accès refusé.'));
   const editor=(req,res,next)=>canModify(req.auth,'Emplois du temps')?next():next(fail(403,'Vous pouvez uniquement consulter le planning.'));
   const conflict=()=>fail(409,'Le planning a été modifié entre-temps. Rechargez la semaine avant de continuer.');
-  const roster=async()=>(await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id')).rows;
+  const roster=async()=>(await db.query('SELECT id,name,job FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id')).rows;
   async function weekRow(week){return (await db.query('SELECT * FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];}
   async function ensureWeek(week){await db.query('INSERT INTO schedule_weeks(week) VALUES($1::date) ON CONFLICT(week) DO NOTHING',[week]);}
   async function unlocked(req,res,next){try{const week=validWeek(req.params.week),row=await weekRow(week),locks=row?.locked_days||{};if(req.body?.day?locks[req.body.day]:Object.keys(locks).length)throw fail(409,'Journée validée : dévalidez-la avec le cadenas avant de modifier le planning.');next();}catch(e){next(e);}}

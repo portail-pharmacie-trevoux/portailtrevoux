@@ -4,12 +4,21 @@ const minutes=s=>{const [h,m]=s.split(':').map(Number);return h*60+m;};
 const clock=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 export function presentAt(entries,day,time,postIds=null){const ids=new Set();for(const entry of entries)if(entry.day===day&&['travail','formation','ecole_cfa'].includes(entry.kind)&&(entry.slots||[]).some(([a,b],i)=>(postIds===null||postIds.has(entry.postIds?.[i]))&&minutes(a)<=time&&minutes(b)>time))ids.add(entry.userId);return ids.size;}
 export function quarterCounts(entries,day,postIds=null){return Array.from({length:daySteps},(_,i)=>presentAt(entries,day,dayStart+i*15,postIds));}
+export function pharmacistQuarterCounts(entries,people,day){
+ const pharmacists=new Set(people.filter(p=>/^pharmacien(?:ne|\s*\(\s*cienne\s*\)|\s*\(\s*ne\s*\))?(?:\b|$)/i.test((p.job||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim())).map(p=>p.id));
+ return quarterCounts(entries.filter(e=>pharmacists.has(e.userId)&&e.kind==='travail'),day);
+}
 export function renderScheduleDay({container,data,day,canEdit,isAdmin,userId,labels,paintPost,editDay,showMenu,onMeal,onError,isCurrent,orderControls}){
  const counterPosts=new Set((data.posts||[]).filter(p=>p.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr')==='comptoir').map(p=>p.id));
  const counts=quarterCounts(data.presenceEntries||data.entries,day,counterPosts),entries=new Map(data.entries.filter(e=>e.day===day).map(e=>[e.userId,e])),wrap=el('div','','schedule-timeline-scroll'),timeline=el('div','','schedule-timeline');
  const timeHeader=el('div','','timeline-row timeline-hours'),nameHeader=el('div','Collaborateurs','timeline-name'),axis=el('div','','timeline-axis'),totalHeader=el('div','Total prévu','timeline-total');timeHeader.append(nameHeader,axis,totalHeader);
  for(let minute=dayStart;minute<=dayEnd;minute+=15){const label=el('span',minute===dayStart||minute===dayEnd||minute%60===0?clock(minute):'','timeline-hour');label.style.left=(minute-dayStart)/(dayEnd-dayStart)*100+'%';axis.append(label);}
  const presenceRow=el('div','','timeline-row timeline-presence'),presenceLabel=el('div','Présences planifiées','timeline-name'),chart=el('div','','timeline-chart'),max=Math.max(1,...counts),nowLabel=el('div','','timeline-total');presenceLabel.append(el('small','Poste Comptoir uniquement'));counts.forEach((n,i)=>{const col=el('div','','timeline-quarter');col.title=clock(dayStart+i*15)+' : '+n+' collaborateur'+(n>1?'s':'')+' au comptoir';col.setAttribute('aria-label',col.title);const bar=el('span','','timeline-count-bar'),number=el('span',String(n),'timeline-count');bar.style.height=n?Math.max(5,n/max*66)+'px':'0px';col.append(bar,number);chart.append(col);});presenceRow.append(presenceLabel,chart,nowLabel);timeline.append(timeHeader,presenceRow);
+ const pharmacistCounts=pharmacistQuarterCounts(data.presenceEntries||data.entries,data.presencePeople||data.people,day),pharmacistRow=el('div','','timeline-row timeline-pharmacists'),pharmacistLabel=el('div','Pharmaciens présents','timeline-name'),pharmacistChart=el('div','','timeline-pharmacist-chart');
+ pharmacistLabel.append(el('small','En travail · tous postes'));
+ pharmacistCounts.forEach((n,i)=>{const square=el('span','','timeline-pharmacist-square '+(n===0?'none':n===1?'one':'several'));square.title=clock(dayStart+i*15)+'–'+clock(dayStart+(i+1)*15)+' : '+n+' pharmacien'+(n>1?'s':'')+' présent'+(n>1?'s':'');square.setAttribute('aria-label',square.title);pharmacistChart.append(square);});
+ pharmacistRow.append(pharmacistLabel,pharmacistChart,el('div','','timeline-total'));timeline.append(pharmacistRow);
+ const legend=el('div','','timeline-pharmacist-legend');[['none','0 pharmacien'],['one','1 pharmacien'],['several','2 pharmaciens ou plus']].forEach(([cls,text])=>{const item=el('span',text);item.prepend(el('i','','timeline-pharmacist-square '+cls));legend.append(item);});container.append(legend);
  const tracks=[];
  data.people.forEach(person=>{const entry=entries.get(person.id),row=el('div','','timeline-row timeline-person'),label=el('div',person.name,'timeline-name'),track=el('div','','timeline-track'),total=el('div',formatTotal(entry),'timeline-total'),editable=canEdit&&!entry?.readOnly&&!data.lockedDays?.[day];
   if(orderControls)label.append(orderControls(person));
