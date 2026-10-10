@@ -242,6 +242,7 @@ CREATE TABLE IF NOT EXISTS team_challenges(
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 ALTER TABLE team_challenges ADD COLUMN IF NOT EXISTS gain_per_collaborator NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK(gain_per_collaborator>=0 AND gain_per_collaborator<=1000000);
+ALTER TABLE team_challenges ADD COLUMN IF NOT EXISTS gain_per_unit NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK(gain_per_unit>=0 AND gain_per_unit<=1000000);
 CREATE INDEX IF NOT EXISTS team_challenges_month_idx ON team_challenges(month);
 CREATE TABLE IF NOT EXISTS challenge_reports(
  id SERIAL PRIMARY KEY,challenge_id INTEGER NOT NULL REFERENCES team_challenges(id) ON DELETE CASCADE,file_name TEXT NOT NULL,file_content BYTEA NOT NULL,
