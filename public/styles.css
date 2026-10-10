@@ -315,3 +315,5 @@ body:has(#login:not(.hidden)) .login-card{margin:0;width:min(460px,100%);box-siz
 .schedule-day-lock{margin-left:5px;padding:3px 5px!important;font-size:.9rem}@media print{.schedule-day-lock{display:none}}
 
 .challenge-expand-toggle{display:flex;align-items:center;justify-content:center;width:42px;height:42px;margin-left:auto;border:0;border-radius:50%;background:#087b65;color:#fff;font-size:28px;font-weight:700;line-height:1;box-shadow:0 3px 8px #087b6533}.challenge-expand-toggle:hover{background:#05634f}.challenge-expand-toggle:focus-visible{outline:3px solid #61cbb2;outline-offset:3px}
+
+.merch-month-navigation{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:20px}.merch-month-navigation input{padding:9px;border:1px solid #bcced4;border-radius:8px;font:inherit;background:white}
