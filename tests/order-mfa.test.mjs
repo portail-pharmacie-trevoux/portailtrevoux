@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';import {registerOrderMFA,base32,totp,matchTotp,orderIdleMs} from '../order-mfa.mjs';import {hashPassword,decrypt,digest} from '../security.mjs';
 const fail=(status,message)=>Object.assign(Error(message),{status});
 test('TOTP conforme RFC 6238, dérive horaire limitée et protection contre la réutilisation',()=>{const secret=base32(Buffer.from('12345678901234567890'));for(const [time,code]of [[59,'94287082'],[1111111109,'07081804'],[1111111111,'14050471'],[1234567890,'89005924'],[2000000000,'69279037'],[20000000000,'65353130']])assert.equal(totp(secret,Math.floor(time/30),8),code);const time=1234567890000,step=Math.floor(time/30000),code=totp(secret,step);assert.equal(matchTotp(secret,code,time),step);assert.equal(matchTotp(secret,code,time,step),null);assert.equal(matchTotp(secret,'12345',time),null);assert.equal(matchTotp(secret,totp(secret,step-2),time),null);});
-test('2FAS : activation personnelle, QR local, verrouillage API, secours uniques, expiration, droits et réinitialisation',async t=>{
+test('Ente Auth : activation personnelle, QR local, verrouillage API, secours uniques, expiration, droits et réinitialisation',async t=>{
  const password='A long test password 123!',hash=await hashPassword(password),secret='mfa-test-secret-not-production-32';let timestamp=Date.parse('2026-10-07T15:00:00Z'),actor={id:1,role:'admin',email:'admin@example.org',session_id:'session1',password_hash:hash},authorized=true;let rows=new Map(),sessions=new Map([['session1',{user_id:1,order_mfa_at:null,order_mfa_generation:0}],['session2',{user_id:2,order_mfa_at:null,order_mfa_generation:0}]]),snapshot=null;const attempts=new Map(),audit=[];
  const db={query:async(sql,args=[])=>{
   if(sql==='BEGIN'){snapshot=structuredClone({rows,sessions});return {rows:[]};}if(sql==='COMMIT'){snapshot=null;return {rows:[]};}if(sql==='ROLLBACK'){if(snapshot){rows=snapshot.rows;sessions=snapshot.sessions;snapshot=null;}return {rows:[]};}
@@ -11,13 +11,13 @@ test('2FAS : activation personnelle, QR local, verrouillage API, secours uniques
   if(sql.startsWith('INSERT INTO order_mfa(user_id)')){if(!rows.has(args[0]))rows.set(args[0],{user_id:args[0],secret:null,generation:1,paper_enabled:false,paper_hashes:[],recovery_hashes:[]});return {rows:[]};}
   if(sql.startsWith('UPDATE order_mfa SET paper_enabled=TRUE')){const r=rows.get(args[0]);Object.assign(r,{paper_enabled:true,paper_hashes:JSON.parse(args[1]),paper_reference:args[2],generation:r.generation+1});return {rows:[]};}
   if(sql.startsWith('UPDATE order_mfa SET paper_hashes')){rows.get(args[0]).paper_hashes=JSON.parse(args[1]);return {rows:[]};}
-  if(sql.startsWith('INSERT INTO order_mfa(')){let row=rows.get(args[0]);if(row?.secret)return {rows:[]};row={user_id:args[0],generation:row?.generation||1,last_step:-1,recovery_hashes:[],...row,pending_secret:args[1],pending_session:args[2],pending_expires:args[3]};rows.set(args[0],row);return {rows:[{user_id:args[0]}]};}
+  if(sql.startsWith('INSERT INTO order_mfa(')){let row=rows.get(args[0]);if(row?.secret&&!args[4])return {rows:[]};row={user_id:args[0],generation:row?.generation||1,last_step:-1,recovery_hashes:[],...row,pending_secret:args[1],pending_session:args[2],pending_expires:args[3]};rows.set(args[0],row);return {rows:[{user_id:args[0]}]};}
   if(sql.startsWith('SELECT secret')||sql.startsWith('SELECT * FROM order_mfa'))return {rows:rows.has(args[0])?[rows.get(args[0])]:[]};
   if(sql.startsWith('SELECT order_mfa_at'))return {rows:sessions.get(args[0])?.user_id===args[1]?[sessions.get(args[0])]:[]};
   if(sql.startsWith('UPDATE sessions s SET')){const s=sessions.get(args[0]),r=rows.get(args[1]);if(!s||s.user_id!==args[1]||(!r?.secret&&!r?.paper_enabled)||s.order_mfa_generation!==r.generation||!s.order_mfa_at||new Date(s.order_mfa_at).getTime()<=new Date(args[2]).getTime()-orderIdleMs)return {rows:[]};s.order_mfa_at=args[2];return {rows:[{id:args[0]}]};}
   if(sql.startsWith('UPDATE sessions SET order_mfa_at=$2')){const s=sessions.get(args[0]);if(!s||s.user_id!==args[3])return {rows:[]};s.order_mfa_at=args[1];s.order_mfa_generation=args[2];return {rows:[{id:args[0]}]};}
   if(sql.startsWith('UPDATE sessions SET order_mfa_at=NULL')){for(const [id,s]of sessions)if(sql.includes('WHERE user_id')?s.user_id===args[0]:id===args[0]&&s.user_id===args[1]){s.order_mfa_at=null;s.order_mfa_generation=0;}return {rows:[]};}
-  if(sql.startsWith('UPDATE order_mfa SET secret=$2')){const r=rows.get(args[0]);Object.assign(r,{secret:args[1],pending_secret:null,pending_session:null,pending_expires:null,last_step:args[2],recovery_hashes:JSON.parse(args[3])});return {rows:[]};}
+  if(sql.startsWith('UPDATE order_mfa SET secret=$2')){const r=rows.get(args[0]);Object.assign(r,{secret:args[1],pending_secret:null,pending_session:null,pending_expires:null,last_step:args[2],recovery_hashes:JSON.parse(args[3]),generation:args[4]});return {rows:[]};}
   if(sql.startsWith('UPDATE order_mfa SET last_step')){rows.get(args[0]).last_step=args[1];return {rows:[]};}
   if(sql.startsWith('UPDATE order_mfa SET recovery_hashes')){rows.get(args[0]).recovery_hashes=JSON.parse(args[1]);return {rows:[]};}
   if(sql.startsWith('UPDATE order_mfa SET secret=NULL')){const r=rows.get(args[0]);if(!r)return {rows:[]};Object.assign(r,{secret:null,generation:r.generation+1,recovery_hashes:[],last_step:-1,...(sql.includes('paper_enabled=FALSE')?{paper_enabled:false,paper_hashes:[]}:{} )});return {rows:[{user_id:args[0]}]};}
@@ -35,7 +35,16 @@ test('2FAS : activation personnelle, QR local, verrouillage API, secours uniques
  actor=firstActor;assert.equal((await request('/api/order-mfa/reset',{userId:1,reason:'Identity verified',password})).status,400);assert.equal((await request('/api/order-mfa/reset',{userId:2,reason:'Phone lost and identity verified',password})).status,200);actor={...actor,id:2,role:'employee',session_id:'session2'};assert.equal((await request('/api/order-planning')).status,403);assert.equal((await (await request('/api/order-mfa/status')).json()).configured,false);
 
  // Existing 2FAS accounts cannot create a weaker factor with only their password.
- actor=firstActor;assert.equal((await request('/api/order-mfa/paper',{password})).status,400);timestamp+=30000;
+ actor=firstActor;
+ await request('/api/order-mfa/lock',{});
+ assert.equal((await request('/api/order-mfa/setup',{password,replace:true})).status,403);
+ timestamp+=30000;assert.equal((await request('/api/order-mfa/unlock',{code:totp(setup.secret,Math.floor(timestamp/30000))})).status,200);
+ const replacement=await (await request('/api/order-mfa/setup',{password,replace:true})).json();assert.notEqual(replacement.secret,setup.secret);
+ assert.equal((await request('/api/order-mfa/confirm',{code:totp(replacement.secret,Math.floor(timestamp/30000))})).status,200);
+ await request('/api/order-mfa/lock',{});timestamp+=30000;
+ assert.equal((await request('/api/order-mfa/unlock',{code:totp(setup.secret,Math.floor(timestamp/30000))})).status,400);
+ assert.equal((await request('/api/order-mfa/unlock',{code:totp(replacement.secret,Math.floor(timestamp/30000))})).status,200);setup.secret=replacement.secret;
+ assert.equal((await request('/api/order-mfa/paper',{password})).status,400);timestamp+=30000;
  response=await request('/api/order-mfa/paper',{password,code:totp(setup.secret,Math.floor(timestamp/30000))});assert.equal(response.status,200);const adminSheet=await response.json();assert.equal(adminSheet.codes.length,50);assert.match(Buffer.from(adminSheet.pdf,'base64').toString('ascii',0,8),/^%PDF/);assert.equal(rows.get(1).paper_hashes.includes(adminSheet.codes[0]),false);
  // 2FAS can be removed only when a paper fallback exists; sessions are renewed.
  assert.equal((await request('/api/order-mfa/totp-disable',{password,paperCode:adminSheet.codes[0]})).status,200);assert.equal(rows.get(1).secret,null);assert.equal(rows.get(1).paper_hashes.length,49);assert.equal((await request('/api/order-planning')).status,200);
