@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, passwordValid, token, digest, encrypt, decrypt, universes, canAccess, canModify } from './security.mjs';
 
 const root=fileURLToPath(new URL('.',import.meta.url));
-const cleanUser=u=>({id:u.id,name:u.name,job:u.job,email:u.email,role:u.role,rights:u.rights,editRights:u.edit_rights||[],permissionsConfigured:!!u.permissions_configured,mustChange:u.must_change});
+const cleanUser=u=>({id:u.id,name:u.name,job:u.job,phone:u.phone||'',email:u.email,role:u.role,rights:u.rights,editRights:u.edit_rights||[],permissionsConfigured:!!u.permissions_configured,mustChange:u.must_change});
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function createApp(db,config) {
   const app=express(), secret=config.secret, origin=new URL(config.origin).origin;
