@@ -251,3 +251,5 @@ CREATE TABLE IF NOT EXISTS challenge_reports(
  send_status TEXT NOT NULL DEFAULT 'none' CHECK(send_status IN ('none','sending','sent','uncertain'))
 );
 CREATE INDEX IF NOT EXISTS challenge_reports_challenge_idx ON challenge_reports(challenge_id,id);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS schedule_position INTEGER;

@@ -51,12 +51,16 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   const access=(req,res,next)=>canAccess(req.auth,'Emplois du temps')?next():next(fail(403,'Accès refusé.'));
   const editor=(req,res,next)=>canModify(req.auth,'Emplois du temps')?next():next(fail(403,'Vous pouvez uniquement consulter le planning.'));
   const conflict=()=>fail(409,'Le planning a été modifié entre-temps. Rechargez la semaine avant de continuer.');
-  const roster=async()=>(await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY name')).rows;
+  const roster=async()=>(await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id')).rows;
   async function weekRow(week){return (await db.query('SELECT * FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];}
   async function ensureWeek(week){await db.query('INSERT INTO schedule_weeks(week) VALUES($1::date) ON CONFLICT(week) DO NOTHING',[week]);}
   registerScheduleTemplates({app,db,auth,ready,admin,csrf,access,roster,ensureWeek,tools,fail});
   registerScheduleMonth({app,db,auth,ready,admin,csrf,access,roster,fail});
   const sensitive=entry=>['maladie','absence_injustifiee'].includes(entry?.kind);
+  app.post('/api/schedule/people-order',auth,ready,access,admin,csrf,async(req,res)=>{
+    const {userId,neighborId,direction}=req.body||{};if(!Number.isSafeInteger(userId)||!Number.isSafeInteger(neighborId)||!['up','down'].includes(direction))throw fail(400,'Déplacement invalide.');
+    const client=await db.connect();try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(78451023)');const rows=(await client.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id FOR UPDATE')).rows,ids=rows.map(p=>p.id),index=ids.indexOf(userId),next=index+(direction==='up'?-1:1);if(index<0||next<0||next>=ids.length||ids[next]!==neighborId)throw fail(409,'L’ordre des collaborateurs a changé. Rechargez le planning.');[ids[index],ids[next]]=[ids[next],ids[index]];await client.query('UPDATE users u SET schedule_position=o.position FROM unnest($1::int[]) WITH ORDINALITY AS o(id,position) WHERE u.id=o.id',[ids]);await client.query('COMMIT');res.json({ok:true});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  });
   app.get('/api/schedule',auth,ready,access,async(req,res)=>{
     const week=validWeek(req.query.week),scope=req.query.scope||'team';if(!['mine','team'].includes(scope))throw fail(400,'Vue invalide.');
     const [row,all]=await Promise.all([weekRow(week),roster()]);const isAdmin=canModify(req.auth,'Emplois du temps');
