@@ -234,3 +234,18 @@ ALTER TABLE merchandising_zones DROP CONSTRAINT IF EXISTS merchandising_zones_id
 ALTER TABLE merchandising_zones ADD CONSTRAINT merchandising_zones_id_check CHECK(id BETWEEN 1 AND 28);
 
 ALTER TABLE merchandising_zones ADD COLUMN IF NOT EXISTS number INTEGER CHECK(number BETWEEN 1 AND 999);
+
+CREATE TABLE IF NOT EXISTS team_challenges(
+ id SERIAL PRIMARY KEY,month TEXT NOT NULL CHECK(month ~ '^20[0-9]{2}-(0[1-9]|1[0-2])$'),title TEXT NOT NULL,
+ laboratory_id INTEGER NOT NULL REFERENCES laboratories(id),modalities TEXT NOT NULL DEFAULT '',metric TEXT NOT NULL CHECK(metric IN ('units','revenue')),
+ target NUMERIC NOT NULL CHECK(target>0),participants JSONB NOT NULL,results JSONB,report_id INTEGER,revision INTEGER NOT NULL DEFAULT 1,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS team_challenges_month_idx ON team_challenges(month);
+CREATE TABLE IF NOT EXISTS challenge_reports(
+ id SERIAL PRIMARY KEY,challenge_id INTEGER NOT NULL REFERENCES team_challenges(id) ON DELETE CASCADE,file_name TEXT NOT NULL,file_content BYTEA NOT NULL,
+ analysis JSONB NOT NULL,challenge_revision INTEGER NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),added_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ confirmed_at TIMESTAMPTZ,confirmed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,sent_at TIMESTAMPTZ,sent_to TEXT,message_id TEXT,
+ send_status TEXT NOT NULL DEFAULT 'none' CHECK(send_status IN ('none','sending','sent','uncertain'))
+);
+CREATE INDEX IF NOT EXISTS challenge_reports_challenge_idx ON challenge_reports(challenge_id,id);

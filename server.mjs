@@ -3,6 +3,7 @@ import {registerOrderMFA} from './order-mfa.mjs';
 import {registerOrderPlanning} from './order-planning.mjs';
 import {registerCalendarReminders} from './calendar-reminders.mjs';
 import {importLaboratories,importLaboratoryLogos} from './laboratory-import.mjs';
+import {registerChallenges} from './challenges.mjs';
 import {registerLaboratories} from './laboratories.mjs';
 import {createYoutrust} from './youtrust.mjs';
 import {registerHRDocuments} from './hr-documents.mjs';
@@ -40,7 +41,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -105,6 +106,7 @@ export function createApp(db,config) {
   const callback=origin+'/auth/google/callback';
   const mailSender=config.mailEmail||'pharmacie.trevoux@gmail.com';
   const mailer=config.invitationMailer||createInvitationMailer({getSetting,setSetting,secret,clientId:config.googleId,clientSecret:config.googleSecret,sender:mailSender,fail,fetchImpl:config.mailFetch});
+  registerChallenges({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,mailer,fetchImpl:config.employeeScanFetch});
   const cookieOptions={httpOnly:true,secure,sameSite:'lax',path:'/',maxAge:8*60*60*1000};
   async function newSession(user,res){
     const raw=token(),session=digest(raw),csrfToken=token();

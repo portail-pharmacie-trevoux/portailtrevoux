@@ -21,6 +21,12 @@ export function welcomeMessage({sender,email,firstName,url}){
  const mime=[`From: Pharmacie de Trevoux <${sender}>`,`To: ${email}`,`Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/alternative; boundary="${boundary}"`,'',`--${boundary}`,'Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64','',encode(text),`--${boundary}`,'Content-Type: text/html; charset=UTF-8','Content-Transfer-Encoding: base64','',encode(html),`--${boundary}--`,''].join('\r\n');
  return {raw:Buffer.from(mime).toString('base64url')};
 }
+export function documentMessage({sender,email,subject,text,fileName,bytes}){
+ if(!emailValid(sender)||!emailValid(email)||typeof subject!=='string'||/[\r\n]/.test(subject)||typeof fileName!=='string'||/[\r\n\x00]/.test(fileName)||!Buffer.isBuffer(bytes))throw Error('Invalid mail attachment');
+ const boundary='portal_'+token(),encode=value=>Buffer.from(value).toString('base64').match(/.{1,76}/g)?.join('\r\n')||'';
+ const mime=[`From: Pharmacie de Trevoux <${sender}>`,`To: ${email}`,`Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,'',`--${boundary}`,'Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64','',encode(text),`--${boundary}`,'Content-Type: application/pdf',`Content-Disposition: attachment; filename="bilan-challenge.pdf"; filename*=UTF-8''${encodeURIComponent(fileName)}`,'Content-Transfer-Encoding: base64','',encode(bytes),`--${boundary}--`,''].join('\r\n');
+ return {raw:Buffer.from(mime).toString('base64url')};
+}
 export function createInvitationMailer({getSetting,setSetting,secret,clientId,clientSecret,sender='pharmacie.trevoux@gmail.com',fail,fetchImpl=fetch}){
  let refreshing=null;
  async function authorization(){
@@ -37,6 +43,12 @@ export function createInvitationMailer({getSetting,setSetting,secret,clientId,cl
   return refreshing;
  }
  return {
+  sendDocument:async(payload)=>{
+   const tokens=await authorization();let response;
+   try{response=await fetchImpl('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',redirect:'error',headers:{Authorization:'Bearer '+tokens.access_token,'Content-Type':'application/json'},body:JSON.stringify(documentMessage({sender,...payload})),signal:AbortSignal.timeout(20000)});}catch{throw fail(502,'Gmail n’a pas confirmé l’envoi. Vérifiez les messages envoyés avant de réessayer.');}
+   if(!response.ok){if([401,403].includes(response.status))throw fail(409,'Reconnectez Gmail et autorisez l’envoi depuis la pharmacie.');throw fail(502,'Gmail n’a pas confirmé l’envoi du PDF. Vérifiez les messages envoyés.');}
+   const sent=await response.json();if(!sent.id)throw fail(502,'Gmail n’a pas confirmé l’envoi.');return sent.id;
+  },
   status:async()=>({configured:!!(clientId&&clientSecret),connected:!!await getSetting('mail_tokens'),sender}),
   send:async({email,firstName,url})=>{
    const tokens=await authorization();let response;
