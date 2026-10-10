@@ -253,3 +253,5 @@ CREATE TABLE IF NOT EXISTS challenge_reports(
 CREATE INDEX IF NOT EXISTS challenge_reports_challenge_idx ON challenge_reports(challenge_id,id);
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS schedule_position INTEGER;
+
+ALTER TABLE schedule_weeks ADD COLUMN IF NOT EXISTS locked_days JSONB NOT NULL DEFAULT '{}';

@@ -54,6 +54,9 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   const roster=async()=>(await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id')).rows;
   async function weekRow(week){return (await db.query('SELECT * FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];}
   async function ensureWeek(week){await db.query('INSERT INTO schedule_weeks(week) VALUES($1::date) ON CONFLICT(week) DO NOTHING',[week]);}
+  async function unlocked(req,res,next){try{const week=validWeek(req.params.week),row=await weekRow(week),locks=row?.locked_days||{};if(req.body?.day?locks[req.body.day]:Object.keys(locks).length)throw fail(409,'Journée validée : dévalidez-la avec le cadenas avant de modifier le planning.');next();}catch(e){next(e);}}
+  app.post('/api/schedule/:week/day-lock',auth,ready,access,admin,csrf,async(req,res)=>{const week=validWeek(req.params.week),revision=validRevision(req.body.revision),{day,locked}=req.body;validateDay({userId:req.auth.id,day,kind:'repos',slots:[]},week);if(typeof locked!=='boolean')throw fail(400,'Validation invalide.');await ensureWeek(week);const value={by:req.auth.id,at:new Date().toISOString()};const row=(await db.query(locked?'UPDATE schedule_weeks SET locked_days=jsonb_set(locked_days,ARRAY[$1::text],$2::jsonb),revision=revision+1 WHERE week=$3::date AND revision=$4 RETURNING revision':'UPDATE schedule_weeks SET locked_days=locked_days-$1::text,revision=revision+1 WHERE week=$3::date AND revision=$4 AND $2::jsonb IS NOT NULL RETURNING revision',[day,JSON.stringify(value),week,revision])).rows[0];if(!row)throw conflict();res.json(row);});
+  app.use(['/api/schedule/:week/day','/api/schedule/:week/clear-day','/api/schedule/:week/meal-ticket','/api/schedule/:week/copy','/api/schedule/:week/apply-template'],auth,ready,access,unlocked);
   registerScheduleTemplates({app,db,auth,ready,admin,csrf,access,roster,ensureWeek,tools,fail});
   registerScheduleMonth({app,db,auth,ready,admin,csrf,access,roster,fail});
   const sensitive=entry=>['maladie','absence_injustifiee'].includes(entry?.kind);
@@ -66,7 +69,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const [row,all]=await Promise.all([weekRow(week),roster()]);const isAdmin=canModify(req.auth,'Emplois du temps');
     const people=scope==='mine'?all.filter(p=>p.id===req.auth.id):all,ids=new Set(people.map(p=>p.id));
     const entries=Object.values(isAdmin?row?.draft||{}:row?.published||{}).filter(e=>ids.has(e.userId)).map(entry=>{if(req.auth.role==='admin')return entry;const {mealTicket,actualMinutes,...e}=entry;return {...e,...(entry.userId===req.auth.id&&mealTicket!==undefined?{mealTicket}:{}),...(entry.userId===req.auth.id&&actualMinutes!==undefined?{actualMinutes}:{}),...(sensitive(entry)?{kind:entry.userId===req.auth.id?entry.kind:'absence',readOnly:true}: {})};});
-    res.json({week,people,entries,canEdit:isAdmin,draftEntryCount:isAdmin?Object.keys(row?.draft||{}).length:undefined,revision:isAdmin?row?.revision||0:undefined,publishedAt:row?.published_at||null,
+    res.json({week,people,entries,lockedDays:row?.locked_days||{},canEdit:isAdmin,draftEntryCount:isAdmin?Object.keys(row?.draft||{}).length:undefined,revision:isAdmin?row?.revision||0:undefined,publishedAt:row?.published_at||null,
       unpublishedChanges:isAdmin?!!row&&row.revision!==row.published_revision:undefined});
   });
   app.put('/api/schedule/:week/day',auth,ready,editor,csrf,async(req,res)=>{
