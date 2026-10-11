@@ -32,7 +32,8 @@ export function validateDay(body,week){
   const postIds=body.postIds;if(postIds!==undefined&&(!Array.isArray(postIds)||postIds.length!==slots.length||postIds.some(id=>id!==null&&(!Number.isSafeInteger(id)||id<1))))throw invalid('Choisissez un poste valide pour chaque créneau.');
   if(body.mealTicket!==undefined&&typeof body.mealTicket!=='boolean')throw invalid('Attribution de ticket restaurant invalide.');
   if(body.actualMinutes!==undefined&&body.actualMinutes!==null&&(!Number.isInteger(body.actualMinutes)||body.actualMinutes<0||body.actualMinutes>840||(!timed&&body.actualMinutes>0)))throw invalid('Renseignez une durée réalisée entre 0 et 14 heures, uniquement pour le travail, la formation ou l’école CFA.');
-  return {userId,day,kind,slots,...(body.actualMinutes!==undefined?{actualMinutes:body.actualMinutes}:{}),...(postIds!==undefined?{postIds}: {}),...(body.mealTicket!==undefined?{mealTicket:body.mealTicket}: {})};
+  const comments=body.comments;if(comments!==undefined&&(!Array.isArray(comments)||comments.length!==slots.length||comments.some(v=>typeof v!=='string'||v.length>500)))throw invalid('Renseignez un commentaire de 500 caractères maximum par créneau.');
+  return {userId,day,kind,slots,...(comments!==undefined?{comments:comments.map(v=>v.trim())}:{}),...(body.actualMinutes!==undefined?{actualMinutes:body.actualMinutes}:{}),...(postIds!==undefined?{postIds}: {}),...(body.mealTicket!==undefined?{mealTicket:body.mealTicket}: {})};
 }
 function minutes(t){const [h,m]=t.split(':').map(Number);return h*60+m;}
 export function plannedMinutes(entry){return (entry?.slots||[]).reduce((sum,[start,end])=>sum+minutes(end)-minutes(start),0);}
