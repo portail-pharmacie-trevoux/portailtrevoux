@@ -261,3 +261,7 @@ CREATE TABLE IF NOT EXISTS training_documents(
  file_name TEXT NOT NULL,file_type TEXT NOT NULL,file_content BYTEA NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
+
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT;
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_type TEXT;
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_content BYTEA;
