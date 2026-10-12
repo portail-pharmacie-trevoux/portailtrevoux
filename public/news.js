@@ -51,7 +51,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
       const actions=node('div','','news-message-actions');
       const reply=button('Répondre',()=>{selected.clear();boxes.forEach(({person,input})=>{input.checked=person.id===message.sender_id;if(input.checked)selected.add(person.id);});search.value='';boxes.forEach(({label})=>label.hidden=false);updateSelection();composeTitle.textContent='Répondre à '+message.sender;replyContext.hidden=false;replyContext.textContent='En réponse au message du '+date(message.created_at)+' : '+message.text;feedback.textContent='Le destinataire de votre réponse est '+message.sender+'.';form.scrollIntoView?.({behavior:'smooth',block:'start'});text.focus();});reply.disabled=!recipients.some(p=>p.id===message.sender_id);if(reply.disabled)reply.title='Cet expéditeur ne fait plus partie des collaborateurs actifs.';actions.append(reply);
       const controls=[];
-      for(const [key,labelText] of [['seen','Vu'],['archived','Archiver']]){
+      for(const [key,labelText] of (message.can_archive===false?[['seen','Vu']]:[['seen','Vu'],['archived','Archiver']])){
         const label=node('label'),input=node('input');input.type='checkbox';input.checked=message[key];input.setAttribute('aria-label',labelText+' : message de '+message.sender+' du '+date(message.created_at));controls.push(input);
         input.onchange=async()=>{
           const desired=input.checked;
@@ -62,7 +62,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
           finally{controls.forEach(c=>c.disabled=false);}
         };label.append(input,node('span',labelText));actions.append(label);
       }
-      card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));list.append(card);
+      if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));list.append(card);
     }
   };
   async function reload(){const current=++request;const [result,sent]=await Promise.all([api('/api/news'),api('/api/news/sent')]);if(isCurrent()&&current===request){messages=result;sentMessages=sent;redraw();}}

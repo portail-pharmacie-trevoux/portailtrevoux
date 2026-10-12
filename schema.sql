@@ -265,3 +265,5 @@ CREATE TABLE IF NOT EXISTS training_documents(
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT;
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_type TEXT;
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_content BYTEA;
+
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS can_archive BOOLEAN NOT NULL DEFAULT TRUE;

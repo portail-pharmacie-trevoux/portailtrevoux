@@ -28,7 +28,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,
+    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,
       m.created_at+interval '30 days' AS expires_at,r.seen,r.archived
       FROM team_message_recipients r JOIN team_messages m ON m.id=r.message_id
       WHERE r.user_id=$1 AND (r.archived OR m.created_at>now()-interval '30 days')
@@ -36,7 +36,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news/sent',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    const {rows}=await db.query(`SELECT m.id,m.text,m.priority,m.created_at,m.attachment_name,
+    const {rows}=await db.query(`SELECT m.id,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,
       COALESCE(jsonb_agg(jsonb_build_object('id',r.user_id,'name',COALESCE(u.name,'Ancien collaborateur'),'seen',r.seen,'seenAt',r.seen_at,'archived',r.archived) ORDER BY u.name) FILTER(WHERE r.user_id IS NOT NULL),'[]'::jsonb) AS recipients
       FROM team_messages m LEFT JOIN team_message_recipients r ON r.message_id=m.id LEFT JOIN users u ON u.id=r.user_id
       WHERE m.sender_id=$1 AND m.created_at>now()-interval '30 days' GROUP BY m.id ORDER BY m.created_at DESC,m.id DESC`,[req.auth.id]);res.json(rows);
@@ -74,8 +74,9 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
       SET seen_at=CASE WHEN $3::boolean IS TRUE THEN COALESCE(r.seen_at,now()) WHEN $3::boolean IS FALSE THEN NULL ELSE r.seen_at END,seen=COALESCE($3::boolean,r.seen),archived=COALESCE($4::boolean,r.archived)
       FROM team_messages m WHERE r.message_id=m.id AND r.message_id=$1 AND r.user_id=$2
       AND (r.archived OR m.created_at>now()-interval '30 days')
+      AND (m.can_archive OR $4::boolean IS NOT TRUE)
       RETURNING r.seen,r.archived,m.created_at`,[id,req.auth.id,body.seen??null,body.archived??null]);
-    if(!rows[0])throw fail(404,'Ce message est indisponible ou a expiré.');
+    if(!rows[0])throw fail(404,body.archived===true?'Ce message ne peut pas être archivé ou n’est plus disponible.':'Ce message est indisponible ou a expiré.');
     await purgeNews(db);
     res.json({ok:true});
   });
