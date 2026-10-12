@@ -272,3 +272,10 @@ ALTER TABLE merchandising_zones ADD COLUMN IF NOT EXISTS month_labs JSONB NOT NU
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS planning_week DATE;
 
 ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS builtin_key TEXT UNIQUE;
+
+CREATE TABLE IF NOT EXISTS merchandising_impact(
+ id SERIAL PRIMARY KEY,zone_id INTEGER NOT NULL REFERENCES merchandising_zones(id),month TEXT NOT NULL,
+ zone_name TEXT NOT NULL,offer TEXT NOT NULL,laboratory TEXT NOT NULL DEFAULT '',data JSONB NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1,updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ UNIQUE(zone_id,month)
+);
