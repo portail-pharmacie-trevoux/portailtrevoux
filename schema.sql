@@ -279,3 +279,13 @@ CREATE TABLE IF NOT EXISTS merchandising_impact(
  revision INTEGER NOT NULL DEFAULT 1,updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
  UNIQUE(zone_id,month)
 );
+
+CREATE TABLE IF NOT EXISTS quality_services(
+ id SERIAL PRIMARY KEY,collaborator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ collaborator_name TEXT NOT NULL,service TEXT NOT NULL,missions TEXT NOT NULL DEFAULT '',revision INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS quality_service_evaluations(
+ service_id INTEGER NOT NULL REFERENCES quality_services(id) ON DELETE CASCADE,year INTEGER NOT NULL,
+ evaluated_at TIMESTAMPTZ NOT NULL DEFAULT now(),evaluated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ PRIMARY KEY(service_id,year)
+);
