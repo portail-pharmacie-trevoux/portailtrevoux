@@ -303,3 +303,11 @@ CREATE TABLE IF NOT EXISTS quality_errors(
  doctor_notified_at TIMESTAMPTZ,doctor_notified_by INTEGER REFERENCES users(id) ON DELETE SET NULL,doctor_notified_name TEXT
 );
 CREATE INDEX IF NOT EXISTS quality_errors_date_idx ON quality_errors(identified_date DESC,created_at DESC,id DESC);
+
+CREATE TABLE IF NOT EXISTS temperature_sensors(id TEXT PRIMARY KEY,name TEXT NOT NULL,low_threshold DOUBLE PRECISION NOT NULL DEFAULT 2,high_threshold DOUBLE PRECISION NOT NULL DEFAULT 8,revision INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS temperature_readings(sensor_id TEXT NOT NULL REFERENCES temperature_sensors(id),recorded_at TIMESTAMPTZ NOT NULL,value DOUBLE PRECISION NOT NULL,PRIMARY KEY(sensor_id,recorded_at));
+CREATE TABLE IF NOT EXISTS temperature_comments(id BIGSERIAL PRIMARY KEY,sensor_id TEXT NOT NULL REFERENCES temperature_sensors(id),happened_at TIMESTAMPTZ NOT NULL,text TEXT NOT NULL,operator_name TEXT NOT NULL,created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS temperature_comments_sensor_idx ON temperature_comments(sensor_id,happened_at);
+CREATE TABLE IF NOT EXISTS temperature_imports(id BIGSERIAL PRIMARY KEY,file_name TEXT NOT NULL,operator_name TEXT NOT NULL,imported_by INTEGER REFERENCES users(id) ON DELETE SET NULL,added INTEGER NOT NULL,ignored INTEGER NOT NULL,first_reading TIMESTAMPTZ NOT NULL,last_reading TIMESTAMPTZ NOT NULL,imported_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS temperature_reminders(month TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(month,user_id));
+INSERT INTO settings(key,value) VALUES('temperature_reminder_start',to_char((now() AT TIME ZONE 'Europe/Paris')+interval '1 month','YYYY-MM')) ON CONFLICT DO NOTHING;
