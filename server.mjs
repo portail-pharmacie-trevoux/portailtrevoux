@@ -1,3 +1,4 @@
+import {importPortalManuals} from './portal-manuals.mjs';
 import {registerMerchandising} from './merchandising.mjs';
 import {registerOrderMFA} from './order-mfa.mjs';
 import {registerOrderPlanning} from './order-planning.mjs';
@@ -318,6 +319,7 @@ export async function initialize(db,config){
   await db.query(await readFile(new URL('./schema.sql',import.meta.url),'utf8'));
   await purgeNews(db);
   await importProcedureDocuments(db,config.procedureImport);
+  await importPortalManuals(db);
   await importLaboratories(db,config.laboratoryImport);
   await importLaboratoryLogos(db,config.laboratoryLogosImport);
   const initialMusic=JSON.parse(await readFile(new URL('./music-seed.json',import.meta.url),'utf8'));

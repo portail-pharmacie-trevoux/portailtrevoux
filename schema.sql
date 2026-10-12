@@ -270,3 +270,5 @@ ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS can_archive BOOLEAN NOT NULL 
 
 ALTER TABLE merchandising_zones ADD COLUMN IF NOT EXISTS month_labs JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS planning_week DATE;
+
+ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS builtin_key TEXT UNIQUE;
