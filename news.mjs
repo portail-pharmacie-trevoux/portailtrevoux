@@ -28,7 +28,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,
+    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,
       m.created_at+interval '30 days' AS expires_at,r.seen,r.archived
       FROM team_message_recipients r JOIN team_messages m ON m.id=r.message_id
       WHERE r.user_id=$1 AND (r.archived OR m.created_at>now()-interval '30 days')
@@ -36,7 +36,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news/sent',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    const {rows}=await db.query(`SELECT m.id,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,
+    const {rows}=await db.query(`SELECT m.id,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,
       COALESCE(jsonb_agg(jsonb_build_object('id',r.user_id,'name',COALESCE(u.name,'Ancien collaborateur'),'seen',r.seen,'seenAt',r.seen_at,'archived',r.archived) ORDER BY u.name) FILTER(WHERE r.user_id IS NOT NULL),'[]'::jsonb) AS recipients
       FROM team_messages m LEFT JOIN team_message_recipients r ON r.message_id=m.id LEFT JOIN users u ON u.id=r.user_id
       WHERE m.sender_id=$1 AND m.created_at>now()-interval '30 days' GROUP BY m.id ORDER BY m.created_at DESC,m.id DESC`,[req.auth.id]);res.json(rows);

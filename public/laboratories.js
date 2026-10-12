@@ -8,11 +8,11 @@ export async function renderLaboratories({container,api,isCurrent=()=>true}){
  const logo=l=>{const image=node('img','','lab-logo');image.src='/api/laboratories/'+l.id+'/logo?v='+l.logoVersion;image.alt='Logo '+l.name;image.loading='lazy';image.onerror=()=>image.remove();return image;};
  const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  function directory(){
-  if(!isCurrent())return;const top=node('div','','lab-toolbar'),label=node('label','Rechercher un laboratoire');label.htmlFor='lab-search';const search=node('input');search.id='lab-search';search.type='search';search.value=query;search.placeholder='Nom, commercial, responsable…';
-  top.append(button('Ajouter un laboratoire',()=>edit(),'btn primary'));const grid=node('div','','lab-grid');
+  if(!isCurrent())return;const top=node('div','','lab-toolbar universe-toolbar'),label=node('label','Rechercher un laboratoire');label.htmlFor='lab-search';const search=node('input');search.id='lab-search';search.type='search';search.value=query;search.placeholder='Nom, commercial, responsable…';
+  const searchGroup=node('div','','universe-search'),actions=node('div','','universe-actions');searchGroup.append(label,search);actions.append(button('Ajouter un laboratoire',()=>edit(),'btn primary'));top.append(searchGroup,actions);const grid=node('div','','lab-grid');
   const draw=()=>{grid.replaceChildren();const matches=sorted().filter(l=>normalize([l.name,l.commercialName,l.responsibleName].join(' ')).includes(normalize(query)));if(!matches.length)grid.append(node('p',labs.length?'Aucun laboratoire ne correspond à la recherche.':'Aucun laboratoire ajouté. Créez la première fiche fournisseur.','empty'));
    matches.forEach(l=>{const b=button('',()=>detail(l),'lab-card');if(l.logoVersion)b.append(logo(l));b.append(node('strong',l.name),node('span','Commande : '+(l.orderMode==='pharmacie'?'Pharmacie':'Groupement')),node('span',l.orderMode==='pharmacie'?'Responsable : '+(l.responsibleName||'À désigner'):'Commande via le groupement'));grid.append(b);});};
-  search.oninput=()=>{query=search.value;draw();};container.replaceChildren(top,label,search,status,grid);draw();
+  search.oninput=()=>{query=search.value;draw();};container.replaceChildren(top,status,grid);draw();
  }
  function detail(l){
   if(!isCurrent())return;const top=node('div','','lab-toolbar');top.append(button('Retour au répertoire',directory),button('Modifier la fiche',()=>edit(l),'btn primary'));

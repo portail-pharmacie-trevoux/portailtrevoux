@@ -2,7 +2,7 @@ const node=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textCont
 const button=(text,action,cls='btn small')=>{const e=node('button',text,cls);e.type='button';e.onclick=action;return e;};
 const attachmentLink=message=>{const link=node('a','📎 '+message.attachment_name,'btn small news-attachment');link.href='/api/news/'+message.id+'/attachment';link.download=message.attachment_name;return link;};
 const date=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});
-export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=>{}}){
+export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{}}){
   const [recipients,initialMessages]=await Promise.all([api('/api/news/recipients'),api('/api/news')]);
   if(!isCurrent())return;
   let sentMessages=[],view='inbox';let messages=initialMessages,filter='all',request=0,sending=false;
@@ -62,7 +62,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
           finally{controls.forEach(c=>c.disabled=false);}
         };label.append(input,node('span',labelText));actions.append(label);
       }
-      if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));list.append(card);
+      if(message.planning_week||message.can_archive===false)card.append(button('Consulter le planning',()=>onOpenPlanning(message.planning_week?String(message.planning_week).slice(0,10):null),'btn primary small'));if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));list.append(card);
     }
   };
   async function reload(){const current=++request;const [result,sent]=await Promise.all([api('/api/news'),api('/api/news/sent')]);if(isCurrent()&&current===request){messages=result;sentMessages=sent;redraw();}}

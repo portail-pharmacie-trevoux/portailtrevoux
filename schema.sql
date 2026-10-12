@@ -267,3 +267,6 @@ ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_type TEXT;
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_content BYTEA;
 
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS can_archive BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE merchandising_zones ADD COLUMN IF NOT EXISTS month_labs JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS planning_week DATE;

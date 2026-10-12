@@ -116,8 +116,8 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     ), publication AS (
       INSERT INTO publications(universe,title) SELECT 'Emplois du temps',$3 FROM changed RETURNING id
     ), notice AS (
-      INSERT INTO team_messages(sender_name,text,priority,can_archive)
-      SELECT 'Portail +',$4,'normal',FALSE FROM changed RETURNING id
+      INSERT INTO team_messages(sender_name,text,priority,can_archive,planning_week)
+      SELECT 'Portail +',$4,'normal',FALSE,$1::date FROM changed RETURNING id
     ), deliveries AS (
       INSERT INTO team_message_recipients(message_id,user_id)
       SELECT notice.id,u.id FROM notice CROSS JOIN users u WHERE u.active=TRUE RETURNING message_id

@@ -19,3 +19,5 @@ test('BS : consignes fixes sur les quatre bacs',()=>{for(const id of [19,20,21,2
 test('SA : consignes fixes sur les quatre zones saisonnières',()=>{for(const id of [25,26,27,28])assert.equal(validateTG({id,revision:0,name:'Zone saison',comment:'Ancien texte'}).comment,saGuidelines);});
 
 test('EV : consignes fixes de la zone événementielle',()=>{assert.equal(validateTG({id:23,revision:0,name:'Événement',comment:'Ancien texte'}).comment,evGuidelines);});
+
+test('Laboratoires mensuels : mois indépendants, noms et choix Autres validés',()=>{const value={id:1,revision:0,name:'TG1',comment:'',months:{'2026-10':'Promo'},monthLabs:{'2026-10':'Aragan','2026-11':'Autres'}};assert.deepEqual(validateTG(value).monthLabs,value.monthLabs);for(const monthLabs of [[],{'2026-13':'Labo'},{'2026-10':7},{'2026-10':'x'.repeat(161)}])assert.throws(()=>validateTG({...value,monthLabs}));assert.deepEqual(validateTG({...value,monthLabs:undefined}).months,value.months);});
