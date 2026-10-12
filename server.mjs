@@ -44,7 +44,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -72,7 +72,7 @@ export function createApp(db,config) {
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify});
-  registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail});
+  registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'3mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   const orderMFA=registerOrderMFA({app,db,auth,ready,csrf,viewUniverse,fail,secret});
   app.use('/api/order-planning',auth,ready,viewUniverse("Outils d'aide aux commandes"),orderMFA.guard);

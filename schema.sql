@@ -289,3 +289,7 @@ CREATE TABLE IF NOT EXISTS quality_service_evaluations(
  evaluated_at TIMESTAMPTZ NOT NULL DEFAULT now(),evaluated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
  PRIMARY KEY(service_id,year)
 );
+
+ALTER TABLE quality_services ADD COLUMN IF NOT EXISTS icon_content BYTEA;
+ALTER TABLE quality_services ADD COLUMN IF NOT EXISTS icon_type TEXT;
+ALTER TABLE quality_services ADD COLUMN IF NOT EXISTS icon_version INTEGER NOT NULL DEFAULT 0;
