@@ -1,3 +1,4 @@
+import {registerQualityErrors} from './quality-errors.mjs';
 import {registerQualityServices} from './quality-services.mjs';
 import {importPortalManuals} from './portal-manuals.mjs';
 import {registerMerchandising} from './merchandising.mjs';
@@ -72,6 +73,7 @@ export function createApp(db,config) {
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify});
+  registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
   registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'3mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   const orderMFA=registerOrderMFA({app,db,auth,ready,csrf,viewUniverse,fail,secret});

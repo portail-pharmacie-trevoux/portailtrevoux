@@ -3,7 +3,7 @@ export function renderQuality({container,api,isCurrent=()=>true}) {
  const grid=el('div','','quality-hub'),status=el('p','','field-note');status.setAttribute('role','status');
  for(const title of ['Recueil des erreurs de délivrance','Appels aux prescripteurs','Suivi des relevés de température','Référents services']) {
   const button=el('button',title,'btn primary quality-action');button.type='button';
-  button.onclick=()=>{if(title==='Référents services')void renderServices();else status.textContent=title+' : contenu à venir.';};grid.append(button);
+  button.onclick=()=>{if(title==='Recueil des erreurs de délivrance'){void import('./quality-errors.js').then(m=>{if(isCurrent()&&container.contains(grid))m.renderQualityErrors({container,api,isCurrent,onBack:()=>renderQuality({container,api,isCurrent})});}).catch(e=>status.textContent=e.message);}else if(title==='Référents services')void renderServices();else status.textContent=title+' : contenu à venir.';};grid.append(button);
  }
  container.replaceChildren(grid,status);
  async function renderServices(){

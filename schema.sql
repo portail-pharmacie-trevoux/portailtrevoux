@@ -293,3 +293,13 @@ CREATE TABLE IF NOT EXISTS quality_service_evaluations(
 ALTER TABLE quality_services ADD COLUMN IF NOT EXISTS icon_content BYTEA;
 ALTER TABLE quality_services ADD COLUMN IF NOT EXISTS icon_type TEXT;
 ALTER TABLE quality_services ADD COLUMN IF NOT EXISTS icon_version INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS quality_errors(
+ id SERIAL PRIMARY KEY,identified_date DATE NOT NULL,error_type TEXT NOT NULL,details TEXT NOT NULL,
+ responsible_id INTEGER REFERENCES users(id) ON DELETE SET NULL,responsible_name TEXT NOT NULL,error_date DATE NOT NULL,
+ actions TEXT NOT NULL DEFAULT '',severity INTEGER NOT NULL CHECK(severity BETWEEN 1 AND 4),
+ created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,operator_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),revision INTEGER NOT NULL DEFAULT 1,
+ patient_notified_at TIMESTAMPTZ,patient_notified_by INTEGER REFERENCES users(id) ON DELETE SET NULL,patient_notified_name TEXT,
+ doctor_notified_at TIMESTAMPTZ,doctor_notified_by INTEGER REFERENCES users(id) ON DELETE SET NULL,doctor_notified_name TEXT
+);
+CREATE INDEX IF NOT EXISTS quality_errors_date_idx ON quality_errors(identified_date DESC,created_at DESC,id DESC);

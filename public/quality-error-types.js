@@ -1,0 +1,1 @@
+export const errorTypes=['Erreur de produit','Erreur de dosage','Erreur de posologie ou de quantité','Erreur de forme galénique','Erreur de destinataire','Défaut de vérification d’interaction','Défaut d’information et de conseil'];
