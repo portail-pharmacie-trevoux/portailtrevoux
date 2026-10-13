@@ -6,6 +6,7 @@ export function appendMonthValidation({label,key,z,data,months,input,lab,other,p
  label.classList.toggle('merch-month-validated',validated);
  const status=el('span','','merch-validation-status '+(validated?'approved':'pending'));
  const update=()=>status.textContent=validated?'✓ Disposition validée':(months[key]||'').trim()?'À valider':'Non renseignée';update();input.addEventListener('input',update);label.append(status);
+ if(approval.modifiedAt)label.append(el('small','Dernière modification : '+approval.modifiedBy+' — '+date(approval.modifiedAt),'merch-validation-date'));
  if(approval.validatedAt)label.append(el('small','Validation : '+date(approval.validatedAt)+' — '+approval.validatedBy,'merch-validation-date'));
  if(approval.invalidatedAt)label.append(el('small','Invalidation : '+date(approval.invalidatedAt)+' — '+approval.invalidatedBy,'merch-validation-date'));
  const history=(z.monthValidationHistory||[]).filter(e=>e.month===key);

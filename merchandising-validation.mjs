@@ -19,3 +19,6 @@ export function registerMerchandisingValidation({app,db,auth,ready,csrf,view,fai
   if(!row)throw fail(409,'Case vide, état déjà modifié ou nouvelle version. Rechargez la fiche avant de valider ou d’invalider.');res.json(row);
  });
 }
+
+// Stamp only monthly offer/laboratory changes, using the authenticated operator.
+export const modifiedMonthsSQL=`month_approvals || COALESCE((SELECT jsonb_object_agg(k,COALESCE(month_approvals->k,'{}'::jsonb)||jsonb_build_object('modifiedAt',now(),'modifiedBy',$8::text)) FROM (SELECT jsonb_object_keys(months || month_labs || COALESCE($5::jsonb,months) || COALESCE($7::jsonb,month_labs)) AS k) keys WHERE COALESCE(months->>k,'') IS DISTINCT FROM COALESCE(COALESCE($5::jsonb,months)->>k,'') OR COALESCE(month_labs->>k,'') IS DISTINCT FROM COALESCE(COALESCE($7::jsonb,month_labs)->>k,'')),'{}'::jsonb)`;
