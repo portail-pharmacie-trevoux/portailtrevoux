@@ -52,10 +52,11 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   const modifiable=p.permissionsConfigured?p.editRights||[]:['Fun'];
   for(const universe of universes){
     const tr=el('tr'),name=el('th',universe);name.scope='row';tr.append(name);
-    const read=el('input');read.type='checkbox';read.checked=isAdministrator||allowed.includes(universe);read.disabled=isAdministrator;read.setAttribute('aria-label','Consulter '+universe);
+    const read=el('input');read.type='checkbox';read.checked=isAdministrator||universe==="Outils d'aide à la démarche qualité"||allowed.includes(universe);read.disabled=isAdministrator||universe==="Outils d'aide à la démarche qualité";read.setAttribute('aria-label','Consulter '+universe);
     const readCell=el('td');readCell.append(read);tr.append(readCell);rights.set(universe,read);
     const editCell=el('td');
-    if(['Collaborateurs','Ressources humaines'].includes(universe)){editCell.append(el('span','Administrateur uniquement','permission-admin-only'));}
+    if(universe==="Outils d'aide à la démarche qualité"){readCell.append(el('small',' Toute l’équipe'));editCell.append(el('span','Selon la fonction et le service référent','permission-admin-only'));}
+    else if(['Collaborateurs','Ressources humaines'].includes(universe)){editCell.append(el('span','Administrateur uniquement','permission-admin-only'));}
     else{const edit=el('input');edit.type='checkbox';edit.checked=isAdministrator||modifiable.includes(universe);edit.disabled=isAdministrator;edit.setAttribute('aria-label','Modifier '+universe);edit.onchange=()=>{if(edit.checked)read.checked=true;};read.onchange=()=>{if(!read.checked)edit.checked=false;};editCell.append(edit);editRights.set(universe,edit);}
     tr.append(editCell);body.append(tr);
   }
@@ -63,7 +64,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   const adminLabel=el('label'),adminRights=el('input');adminRights.type='checkbox';adminRights.checked=isAdministrator;adminRights.disabled=isAdministrator;adminRights.id='employee-administrator-rights';adminLabel.htmlFor=adminRights.id;adminLabel.append(adminRights,' Donner des droits administrateur');
   permissions.append(adminLabel,el('p','Donne les mêmes droits que l’administrateur : accès et modification de tous les univers, gestion des collaborateurs et consultation des fiches confidentielles. Un compte de connexion actif est nécessaire.','field-note'));
   const initialReads=new Map([...rights].map(([key,input])=>[key,input.checked])),initialEdits=new Map([...editRights].map(([key,input])=>[key,input.checked]));
-  adminRights.onchange=()=>{for(const [key,input] of rights){input.checked=adminRights.checked||initialReads.get(key);input.disabled=adminRights.checked;}for(const [key,input] of editRights){input.checked=adminRights.checked||initialEdits.get(key);input.disabled=adminRights.checked;}};
+  adminRights.onchange=()=>{for(const [key,input] of rights){input.checked=adminRights.checked||initialReads.get(key);input.disabled=adminRights.checked||key==="Outils d'aide à la démarche qualité";}for(const [key,input] of editRights){input.checked=adminRights.checked||initialEdits.get(key);input.disabled=adminRights.checked;}};
 
   permissions.append(el('p',isAdministrator?'Ce compte administrateur conserve l’accès et la gestion de tous les univers.':'Les données des collaborateurs et les connexions Google restent gérées par l’administrateur. Les droits de modification s’appliquent aux outils de contenu disponibles ; les autres univers sont prêts à recevoir leurs futurs éditeurs.','field-note'));form.append(permissions);
   const status=el('p','','error');status.id='employee-record-status';status.setAttribute('role','alert');

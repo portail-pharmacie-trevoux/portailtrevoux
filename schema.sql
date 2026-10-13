@@ -319,3 +319,7 @@ CREATE TABLE IF NOT EXISTS merchandising_validation_events(
  operator_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),offer TEXT NOT NULL,laboratory TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS merchandising_validation_events_zone_month ON merchandising_validation_events(zone_id,month,id DESC);
+
+CREATE TABLE IF NOT EXISTS quality_tp_months(month TEXT PRIMARY KEY,invoices INTEGER NOT NULL CHECK(invoices>=0),rejections INTEGER NOT NULL CHECK(rejections>=0 AND rejections<=invoices),amount_cents BIGINT NOT NULL CHECK(amount_cents>=0),revision INTEGER NOT NULL DEFAULT 1,operator_name TEXT NOT NULL,updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS quality_monthly_reminders(service TEXT NOT NULL,month TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(service,month,user_id));
+INSERT INTO settings(key,value) VALUES('tierspayant_reminder_start',to_char((now() AT TIME ZONE 'Europe/Paris')+interval '1 month','YYYY-MM')),('merchandising_reminder_start',to_char(now() AT TIME ZONE 'Europe/Paris','YYYY-MM')) ON CONFLICT DO NOTHING;

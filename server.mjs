@@ -1,3 +1,5 @@
+import {qualityMonthlyReminders} from './quality-reminders.mjs';
+import {registerTiersPayant} from './quality-tiers-payant.mjs';
 import {announceVersion11} from './version-announcement.mjs';
 import {registerTemperatures} from './temperatures.mjs';
 import {temperatureMaintenance} from './temperature-maintenance.mjs';
@@ -47,7 +49,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -76,6 +78,7 @@ export function createApp(db,config) {
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify});
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
+  registerTiersPayant({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'200kb'})});
   registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
   registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'3mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
@@ -322,6 +325,7 @@ export function createApp(db,config) {
 
 export async function initialize(db,config){
   await db.query(await readFile(new URL('./schema.sql',import.meta.url),'utf8'));
+  await qualityMonthlyReminders(db);
   await temperatureMaintenance(db);
   await purgeNews(db);
   await importProcedureDocuments(db,config.procedureImport);
@@ -349,7 +353,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }
