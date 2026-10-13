@@ -1,3 +1,4 @@
+import {announceVersion11} from './version-announcement.mjs';
 import {registerTemperatures} from './temperatures.mjs';
 import {temperatureMaintenance} from './temperature-maintenance.mjs';
 import {registerQualityErrors} from './quality-errors.mjs';
@@ -338,6 +339,7 @@ export async function initialize(db,config){
     if(!passwordValid(config.adminPassword))throw new Error('ADMIN_PASSWORD doit contenir au moins 12 caractères.');
     await db.query("INSERT INTO users(name,first_name,last_name,job,email,password_hash,role,rights,must_change) VALUES($1,'Nicolas','Marchand',$2,$3,$4,'admin',$5::jsonb,TRUE)",['Nicolas Marchand','Titulaire',config.adminEmail.toLowerCase(),await hashPassword(config.adminPassword),JSON.stringify(universes)]);
   }
+  await announceVersion11(db);
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
   const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,laboratoryImport:env.LABORATORIES_IMPORT_JSON,laboratoryLogosImport:env.LABORATORY_LOGOS_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
