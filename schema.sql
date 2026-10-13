@@ -311,3 +311,11 @@ CREATE INDEX IF NOT EXISTS temperature_comments_sensor_idx ON temperature_commen
 CREATE TABLE IF NOT EXISTS temperature_imports(id BIGSERIAL PRIMARY KEY,file_name TEXT NOT NULL,operator_name TEXT NOT NULL,imported_by INTEGER REFERENCES users(id) ON DELETE SET NULL,added INTEGER NOT NULL,ignored INTEGER NOT NULL,first_reading TIMESTAMPTZ NOT NULL,last_reading TIMESTAMPTZ NOT NULL,imported_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS temperature_reminders(month TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(month,user_id));
 INSERT INTO settings(key,value) VALUES('temperature_reminder_start',to_char((now() AT TIME ZONE 'Europe/Paris')+interval '1 month','YYYY-MM')) ON CONFLICT DO NOTHING;
+
+ALTER TABLE merchandising_zones ADD COLUMN IF NOT EXISTS month_approvals JSONB NOT NULL DEFAULT '{}';
+CREATE TABLE IF NOT EXISTS merchandising_validation_events(
+ id BIGSERIAL PRIMARY KEY,zone_id INTEGER NOT NULL REFERENCES merchandising_zones(id),month TEXT NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('validated','invalidated')),operator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ operator_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),offer TEXT NOT NULL,laboratory TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS merchandising_validation_events_zone_month ON merchandising_validation_events(zone_id,month,id DESC);
