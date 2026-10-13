@@ -23,7 +23,6 @@ import { registerContacts } from './contacts.mjs';
 import { registerCollaborateurs } from './collaborateurs.mjs';
 import { createProductSources } from './product-sources.mjs';
 import { registerSchedule } from './schedule.mjs';
-import { createDailyJoke } from './updates.mjs';
 import { createYouTube } from './youtube.mjs';
 import { validateMusic, musicKey } from './music.mjs';
 import pg from 'pg';
@@ -85,13 +84,12 @@ export function createApp(db,config) {
   registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'15mb'})});
   const youtrust=config.youtrustClient||createYoutrust({getSetting,setSetting,deleteSetting:key=>db.query('DELETE FROM settings WHERE key=$1',[key]),secret,origin,fail,config,fetchImpl:config.youtrustFetch});
   registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,secret,publish,uploadParser:express.json({limit:'15mb'}),youtrust});
-  const dailyJoke=createDailyJoke({getSetting,setSetting,publish});
   const allowedPublications=user=>universes.filter(name=>!['Collaborateurs','Actualités'].includes(name)&&canAccess(user,name));
   app.get('/api/publications',auth,ready,async(req,res)=>{
     const allowed=allowedPublications(req.auth);
     const {rows}=await db.query(`SELECT p.universe,COUNT(*) FILTER(WHERE p.id>COALESCE(r.last_id,0))::int AS unread,
       MAX(p.id)::text AS latest FROM publications p LEFT JOIN publication_reads r ON r.user_id=$1 AND r.universe=p.universe
-      WHERE p.universe=ANY($2::text[]) GROUP BY p.universe`,[req.auth.id,allowed]);
+      WHERE p.universe=ANY($2::text[]) AND COALESCE(p.source_key,'') NOT LIKE 'joke:%' GROUP BY p.universe`,[req.auth.id,allowed]);
     if(canAccess(req.auth,'Actualités'))rows.push({universe:'Actualités',unread:await unreadNews(db,req.auth.id)});
     res.json(rows);
   });
@@ -99,7 +97,7 @@ export function createApp(db,config) {
     if(!allowedPublications(req.auth).includes(req.params.name))throw fail(403,'Accès refusé.');
     const {rows}=await db.query(`SELECT p.id::text,p.title,p.created_at,p.id>COALESCE(r.last_id,0) AS unread
       FROM publications p LEFT JOIN publication_reads r ON r.user_id=$1 AND r.universe=p.universe
-      WHERE p.universe=$2 ORDER BY p.id DESC LIMIT 20`,[req.auth.id,req.params.name]);
+      WHERE p.universe=$2 AND COALESCE(p.source_key,'') NOT LIKE 'joke:%' ORDER BY p.id DESC LIMIT 20`,[req.auth.id,req.params.name]);
     res.json(rows);
   });
   app.post('/api/publications/:name/read',auth,ready,csrf,async(req,res)=>{
@@ -111,7 +109,6 @@ export function createApp(db,config) {
       ON CONFLICT(user_id,universe) DO UPDATE SET last_id=GREATEST(publication_reads.last_id,EXCLUDED.last_id)`,[req.auth.id,name,id]);
     res.json({ok:true});
   });
-  app.get('/api/fun/joke',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await dailyJoke()));
   registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModify,fail});
   const callback=origin+'/auth/google/callback';
   const mailSender=config.mailEmail||'pharmacie.trevoux@gmail.com';
@@ -319,7 +316,7 @@ export function createApp(db,config) {
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message,...(error.code==='MFA_REQUIRED'?{code:'MFA_REQUIRED'}:{})});
   });
-  return {app,sync,dailyJoke};
+  return {app,sync};
 }
 
 export async function initialize(db,config){
@@ -348,9 +345,9 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
   await initialize(db,config);config.dummyHash=await hashPassword(token());
-  const {app,sync,dailyJoke}=createApp(db,config);
+  const {app,sync}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await dailyJoke();}catch{console.error('Blague du jour à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }

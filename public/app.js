@@ -558,8 +558,8 @@ async function refreshHomeExtras(){
   if(!session||session.user.mustChange||homeExtrasPending)return;
   const userId=session.user.id;homeExtrasPending=true;
   try{
-    const results=await Promise.allSettled([api('/api/fun/joke'),api('/api/publications'),api('/api/collaborateurs/celebrations'),tileAllowed('Agenda')?api('/api/calendar'):Promise.resolve(null),tileAllowed('Emplois du temps')?api('/api/schedule/today'):Promise.resolve(null)]);
-    const joke=results[0].status==='fulfilled'?results[0].value:null,news=results[1].status==='fulfilled'?results[1].value:[],celebrations=results[2].status==='fulfilled'?results[2].value:null;
+    const results=await Promise.allSettled([Promise.resolve(null),api('/api/publications'),api('/api/collaborateurs/celebrations'),tileAllowed('Agenda')?api('/api/calendar'):Promise.resolve(null),tileAllowed('Emplois du temps')?api('/api/schedule/today'):Promise.resolve(null)]);
+    const news=results[1].status==='fulfilled'?results[1].value:[],celebrations=results[2].status==='fulfilled'?results[2].value:null;
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
@@ -582,11 +582,7 @@ async function refreshHomeExtras(){
       list.addEventListener('click',e=>e.stopPropagation());block.append(list);planning.append(block);
     }
     renderCelebrations(celebrations);
-    const fun=q('.grid [data-universe="Fun"]');fun.querySelector('.daily-joke')?.remove();
-    const block=node('span','','daily-joke');block.append(node('strong','😄 La blague du jour'));
-    block.append(node('span',joke?.text||'La blague du jour arrive bientôt.'));
-    if(joke)block.append(node('small',(joke.stale?'Dernière blague disponible · ':'')+joke.day.split('-').reverse().join('/')+' · '+joke.source));
-    fun.insertBefore(block,fun.querySelector('.tile-news'));
+    q('.grid [data-universe="Fun"]')?.querySelector('.daily-joke')?.remove();
   }catch{}finally{homeExtrasPending=false;}
 }
 async function renderPublications(name){
