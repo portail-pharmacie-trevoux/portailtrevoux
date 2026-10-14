@@ -334,3 +334,20 @@ CREATE TABLE IF NOT EXISTS laboratory_emails (
  sent_at TIMESTAMPTZ,
  message_id TEXT
 );
+
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS operator_notified_at TIMESTAMPTZ;
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS operator_notified_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS operator_notified_name TEXT;
+
+CREATE TABLE IF NOT EXISTS quality_prescriber_calls(
+ id BIGSERIAL PRIMARY KEY,
+ request_id UUID NOT NULL UNIQUE,
+ error_id INTEGER REFERENCES quality_errors(id) ON DELETE SET NULL,
+ call_date DATE NOT NULL,
+ prescriber TEXT NOT NULL,
+ reason TEXT NOT NULL,
+ outcome TEXT NOT NULL,
+ created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ operator_name TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
