@@ -1,5 +1,6 @@
 import {validateProcedureFile} from './procedure-files.mjs';
 import express from 'express';
+import {emailValid,sameMailAccount} from './invitations.mjs';
 const limits={conditions:4000,franco:1000,commercialName:160,commercialRole:160,commercialEmail:254,commercialPhone:50,commercialMobile:50,labAddress:500,labPhone:50,labEmail:254,labWebsite:500,orderEmail:254,customerNumber:100,notes:4000};
 export function validateLaboratory(body,fail){
  if(!body||typeof body.name!=='string'||!body.name.trim()||body.name.trim().length>160)throw fail(400,'Renseignez le nom du laboratoire (160 caractères maximum).');
@@ -13,12 +14,19 @@ export function validateLaboratory(body,fail){
  return {name:body.name.trim(),orderMode:body.orderMode,responsibleId,details};
 }
 export function conditionsWithHistory(details,previous={}){const history={...(previous.conditionsHistory||{})};if(previous.conditions||previous.franco){const key=previous.conditionsYear?String(previous.conditionsYear):'non-datees';history[key]={year:previous.conditionsYear||null,conditions:previous.conditions||'',franco:previous.franco||''};}if(details.conditions||details.franco){const key=details.conditionsYear?String(details.conditionsYear):'non-datees';history[key]={year:details.conditionsYear,conditions:details.conditions,franco:details.franco};}return {...details,conditionsHistory:history};}
-export function registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,publish}){
+export function registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,publish,mailer}){
  const access=viewUniverse('Laboratoires'),guard=[auth,ready,access,csrf];
  const rowSQL='SELECT l.id,l.name,l.order_mode,l.responsible_id,l.details,l.revision,l.logo_version,u.name AS responsible_name FROM laboratories l LEFT JOIN users u ON u.id=l.responsible_id';
  const clean=r=>({id:r.id,name:r.name,orderMode:r.order_mode,responsibleId:r.responsible_id,responsibleName:r.responsible_name,revision:r.revision,logoVersion:r.logo_version||0,...r.details});
  app.get('/api/laboratories',auth,ready,access,async(req,res)=>res.json((await db.query(rowSQL+' ORDER BY lower(l.name),l.id')).rows.map(clean)));
  app.get('/api/laboratories/responsibles',auth,ready,access,async(req,res)=>res.json((await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY last_name,first_name,id')).rows));
+ app.post('/api/laboratories/:id/email',...guard,async(req,res)=>{
+  const b=req.body,id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||typeof b?.subject!=='string'||!b.subject.trim()||b.subject.length>200||/[\r\n\x00]/.test(b.subject)||typeof b.text!=='string'||!b.text.trim()||b.text.length>6000||typeof b.requestId!=='string'||!/^[a-f0-9-]{36}$/i.test(b.requestId))throw fail(400,'Renseignez un objet (200 caractères) et un message (6 000 caractères maximum).');
+  const lab=(await db.query('SELECT details FROM laboratories WHERE id=$1',[id])).rows[0];if(!lab)throw fail(404,'Laboratoire introuvable.');const email=lab.details.commercialEmail;if(!emailValid(email))throw fail(400,'Renseignez l’e-mail du commercial dans sa fiche.');if(b.email!==email)throw fail(409,'L’adresse du commercial a changé. Rechargez la fiche.');
+  const status=await mailer.status();if(!sameMailAccount(status.sender,'pharmacie.trevoux@gmail.com')||!status.connected)throw fail(409,'Connectez Gmail depuis la page Collaborateurs pour envoyer depuis pharmacie.trevoux@gmail.com.');
+  const claimed=(await db.query("INSERT INTO laboratory_emails(request_id,laboratory_id,operator_id,sent_to,status) VALUES($1,$2,$3,$4,'sending') ON CONFLICT(request_id) DO NOTHING RETURNING request_id",[b.requestId,id,req.auth.id,email])).rows[0];if(!claimed){const prior=(await db.query('SELECT status FROM laboratory_emails WHERE request_id=$1 AND operator_id=$2 AND laboratory_id=$3',[b.requestId,req.auth.id,id])).rows[0];if(prior?.status==='sent')return res.json({ok:true,email});throw fail(409,'Cet envoi est déjà en cours ou doit être vérifié dans Gmail avant toute nouvelle tentative.');}
+  try{const messageId=await mailer.sendText({email,subject:b.subject.trim(),text:b.text.trim()});await db.query("UPDATE laboratory_emails SET status='sent',sent_at=now(),message_id=$2 WHERE request_id=$1",[b.requestId,messageId]);res.json({ok:true,email});}catch(e){await db.query('UPDATE laboratory_emails SET status=$2 WHERE request_id=$1',[b.requestId,e.status===409?'failed':'uncertain']);throw e;}
+ });
  app.get('/api/laboratories/:id/logo',auth,ready,access,async(req,res)=>{
   const row=(await db.query('SELECT logo_type,logo_content FROM laboratories WHERE id=$1',[req.params.id])).rows[0];if(!row?.logo_content)throw fail(404,'Logo introuvable.');res.type(row.logo_type).send(row.logo_content);
  });

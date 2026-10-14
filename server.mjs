@@ -68,7 +68,6 @@ export function createApp(db,config) {
   const csrf=(req,res,next)=>req.get('x-csrf-token')===req.auth?.csrf?next():next(fail(403,'Session à actualiser.'));
   const viewUniverse=name=>(req,res,next)=>canAccess(req.auth,name)?next():next(fail(403,'Accès refusé.'));
   const editUniverse=name=>(req,res,next)=>canModify(req.auth,name)?next():next(fail(403,'Cet univers est en consultation seule pour votre compte.'));
-  registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,publish});
   const getSetting=async key=>(await db.query('SELECT value FROM settings WHERE key=$1',[key])).rows[0]?.value;
   const setSetting=async(key,value)=>db.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[key,value]);
   async function publish(universe,title,key=null) {
@@ -117,6 +116,7 @@ export function createApp(db,config) {
   const callback=origin+'/auth/google/callback';
   const mailSender=config.mailEmail||'pharmacie.trevoux@gmail.com';
   const mailer=config.invitationMailer||createInvitationMailer({getSetting,setSetting,secret,clientId:config.googleId,clientSecret:config.googleSecret,sender:mailSender,fail,fetchImpl:config.mailFetch});
+  registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,publish,mailer});
   registerChallenges({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,mailer,fetchImpl:config.employeeScanFetch});
   const cookieOptions={httpOnly:true,secure,sameSite:'lax',path:'/',maxAge:8*60*60*1000};
   async function newSession(user,res){
