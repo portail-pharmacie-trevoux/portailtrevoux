@@ -1,7 +1,7 @@
 import {whatsappNumber} from './whatsapp.js';
 const node=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
 const button=(text,action,cls='btn')=>{const b=node('button',text,cls);b.type='button';b.onclick=action;return b;};
-const fields=[['conditions','Conditions commerciales','textarea',4000],['franco','Franco : montant et conditions','textarea',1000],['commercialName','Nom et prénom du commercial','text',160],['commercialRole','Fonction du commercial','text',160],['commercialEmail','E-mail du commercial','email',254],['commercialPhone','Téléphone du commercial','tel',50],['commercialMobile','Mobile du commercial','tel',50],['labAddress','Adresse du laboratoire','textarea',500],['labPhone','Téléphone du laboratoire','tel',50],['labEmail','E-mail du laboratoire','email',254],['labWebsite','Site internet du laboratoire','url',500],['orderEmail','E-mail du service commandes','email',254],['customerNumber','Numéro de compte client','text',100],['notes','Informations complémentaires','textarea',4000]];
+const fields=[['conditions','Conditions commerciales','textarea',4000],['franco','Franco : montant et conditions','textarea',1000],['commercialName','Nom et prénom du commercial','text',160],['commercialEmail','E-mail du commercial','email',254],['commercialPhone','Téléphone du commercial','tel',50],['labAddress','Adresse du laboratoire','textarea',500],['labPhone','Téléphone du laboratoire','tel',50],['labEmail','E-mail du laboratoire','email',254],['labWebsite','Site internet du laboratoire','url',500],['orderEmail','E-mail du service commandes','email',254],['customerNumber','Numéro de compte client','text',100],['notes','Informations complémentaires','textarea',4000]];
 export async function renderLaboratories({container,api,isCurrent=()=>true}){
  let [labs,people]=await Promise.all([api('/api/laboratories'),api('/api/laboratories/responsibles')]);if(!isCurrent())return;
  const status=node('p','','status-line');status.setAttribute('role','status');let query='';
@@ -22,8 +22,8 @@ export async function renderLaboratories({container,api,isCurrent=()=>true}){
   fields.forEach(([key,label])=>{const block=node('div','','lab-value');block.append(node('h4',label),node('p',l[key]||'Non renseigné'));sheet.append(block);});
   const contactActions=node('div','','universe-actions');
   if(l.commercialEmail)contactActions.append(button('Envoyer un e-mail au commercial',()=>composeEmail(l),'btn primary'));else sheet.append(node('p','Renseignez l’e-mail du commercial pour lui écrire.','field-note'));
-  const phone=l.commercialMobile||l.commercialPhone,number=whatsappNumber(phone);
-  if(number){const whatsapp=node('a','WhatsApp au commercial','btn');whatsapp.href='https://wa.me/'+number;whatsapp.target='_blank';whatsapp.rel='noopener noreferrer';contactActions.append(whatsapp);whatsapp.title='Ouvrir une conversation avec '+phone;}else sheet.append(node('p',phone?'Corrigez le numéro du commercial (format français ou international) pour utiliser WhatsApp.':'Renseignez le téléphone ou le mobile du commercial pour utiliser WhatsApp.','field-note'));
+  const phone=l.commercialPhone,number=whatsappNumber(phone);
+  if(number){const whatsapp=node('a','WhatsApp au commercial','btn');whatsapp.href='https://wa.me/'+number;whatsapp.target='_blank';whatsapp.rel='noopener noreferrer';contactActions.append(whatsapp);whatsapp.title='Ouvrir une conversation avec '+phone;}else sheet.append(node('p',phone?'Corrigez le numéro du commercial (format français ou international) pour utiliser WhatsApp.':'Renseignez le téléphone du commercial pour utiliser WhatsApp.','field-note'));
   sheet.prepend(contactActions);const documents=node('section','','lab-documents');container.replaceChildren(top,sheet,documents);void documentSection(l,documents);
  }
  function composeEmail(l){
