@@ -28,9 +28,10 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,
+    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,
+      CASE WHEN parent.sender_id=$1 AND parent.created_at>now()-interval '30 days' THEN jsonb_build_object('text',parent.text,'createdAt',parent.created_at) ELSE NULL END AS reply_context,
       m.created_at+interval '30 days' AS expires_at,r.seen,r.archived
-      FROM team_message_recipients r JOIN team_messages m ON m.id=r.message_id
+      FROM team_message_recipients r JOIN team_messages m ON m.id=r.message_id LEFT JOIN team_messages parent ON parent.id=m.reply_to_id
       WHERE r.user_id=$1 AND (r.archived OR m.created_at>now()-interval '30 days')
       ORDER BY m.created_at DESC,m.id DESC`,[req.auth.id])).rows);
   });
@@ -43,18 +44,22 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.post('/api/news',auth,ready,access,csrf,uploadParser||((req,res,next)=>next()),async(req,res)=>{
     const attachment=validateNewsAttachment(req.body?.attachment,fail);
-    const {text,recipients,priority}=validateMessage(req.body,fail);
+    const {text,recipients,priority}=validateMessage(req.body,fail);const replyTo=req.body.replyTo??null;if(replyTo!==null&&(!Number.isSafeInteger(replyTo)||replyTo<1))throw fail(400,'Message d’origine invalide.');
     // One atomic statement: every selected recipient must still be active.
     const {rows}=await db.query(`WITH targets AS MATERIALIZED (
       SELECT id FROM users WHERE active=TRUE AND id=ANY($1::int[]) FOR SHARE
+    ), parent AS MATERIALIZED (
+      SELECT p.id,p.sender_id FROM team_messages p JOIN team_message_recipients pr ON pr.message_id=p.id
+      WHERE p.id=$9::int AND pr.user_id=$2 AND (pr.archived OR p.created_at>now()-interval '30 days') AND p.sender_id IS NOT NULL FOR SHARE OF p
     ), message AS (
-      INSERT INTO team_messages(sender_id,sender_name,text,priority,attachment_name,attachment_type,attachment_content)
-      SELECT $2,$3,$4,$5,$6,$7,$8 WHERE (SELECT COUNT(*) FROM targets)=cardinality($1::int[]) RETURNING id
+      INSERT INTO team_messages(sender_id,sender_name,text,priority,attachment_name,attachment_type,attachment_content,reply_to_id,is_reply)
+      SELECT $2,$3,$4,$5,$6,$7,$8,$9::int,$9::int IS NOT NULL WHERE (SELECT COUNT(*) FROM targets)=cardinality($1::int[])
+      AND ($9::int IS NULL OR EXISTS(SELECT 1 FROM parent WHERE cardinality($1::int[])=1 AND parent.sender_id=ANY($1::int[]))) RETURNING id
     ), deliveries AS (
       INSERT INTO team_message_recipients(message_id,user_id)
       SELECT message.id,targets.id FROM message CROSS JOIN targets RETURNING message_id
-    ) SELECT message.id,(SELECT COUNT(*)::int FROM deliveries) AS sent FROM message`,[recipients,req.auth.id,req.auth.name,text,priority,attachment?.fileName||null,attachment?.fileType||null,attachment?.bytes||null]);
-    if(!rows[0])throw fail(409,'Un destinataire n’est plus actif. Actualisez la liste avant de renvoyer le message.');
+    ) SELECT message.id,(SELECT COUNT(*)::int FROM deliveries) AS sent FROM message`,[recipients,req.auth.id,req.auth.name,text,priority,attachment?.fileName||null,attachment?.fileType||null,attachment?.bytes||null,replyTo]);
+    if(!rows[0])throw fail(409,replyTo?'Le message d’origine est indisponible ou son expéditeur n’est plus actif. Actualisez les messages avant de répondre.':'Un destinataire n’est plus actif. Actualisez la liste avant de renvoyer le message.');
     res.status(201).json({ok:true,sent:rows[0].sent});
   });
   app.get('/api/news/:id/attachment',auth,ready,access,async(req,res)=>{

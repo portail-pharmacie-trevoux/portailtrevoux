@@ -365,3 +365,6 @@ CREATE TABLE IF NOT EXISTS leave_schedule_changes(
  published_after JSONB NOT NULL,
  PRIMARY KEY(request_id,day)
 );
+
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER REFERENCES team_messages(id) ON DELETE SET NULL;
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS is_reply BOOLEAN NOT NULL DEFAULT FALSE;
