@@ -377,3 +377,11 @@ CREATE TABLE IF NOT EXISTS challenge_monthly_reminders(
  PRIMARY KEY(challenge_id,month,user_id)
 );
 INSERT INTO settings(key,value) VALUES('challenges_reminder_start','2026-11') ON CONFLICT(key) DO NOTHING;
+
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS challenge_digest JSONB;
+CREATE TABLE IF NOT EXISTS challenge_monthly_digests(
+ month TEXT NOT NULL,
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ PRIMARY KEY(month,user_id)
+);

@@ -28,7 +28,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,
+    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,m.challenge_digest,
       CASE WHEN parent.sender_id=$1 AND parent.created_at>now()-interval '30 days' THEN jsonb_build_object('text',parent.text,'createdAt',parent.created_at) ELSE NULL END AS reply_context,
       m.created_at+interval '30 days' AS expires_at,r.seen,r.archived
       FROM team_message_recipients r JOIN team_messages m ON m.id=r.message_id LEFT JOIN team_messages parent ON parent.id=m.reply_to_id
