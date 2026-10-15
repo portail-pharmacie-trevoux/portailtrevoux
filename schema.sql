@@ -368,3 +368,12 @@ CREATE TABLE IF NOT EXISTS leave_schedule_changes(
 
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER REFERENCES team_messages(id) ON DELETE SET NULL;
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS is_reply BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS challenge_monthly_reminders(
+ challenge_id INTEGER NOT NULL REFERENCES team_challenges(id) ON DELETE CASCADE,
+ month TEXT NOT NULL,
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ PRIMARY KEY(challenge_id,month,user_id)
+);
+INSERT INTO settings(key,value) VALUES('challenges_reminder_start','2026-11') ON CONFLICT(key) DO NOTHING;
