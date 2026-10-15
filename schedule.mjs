@@ -1,7 +1,8 @@
+import {slotKind,workMinutes,hasSensitiveKinds,redactScheduleEntry,timedWorkKinds} from './public/schedule-model.js';
 import {registerScheduleMonth} from './schedule-month.mjs';
 import {registerScheduleTemplates} from './schedule-templates.mjs';
 import {registerScheduleTools} from './schedule-tools.mjs';
-export const scheduleKinds=['travail','formation','ecole_cfa','conge','maladie','recuperation','absence_injustifiee','absence','repos'];
+export const scheduleKinds=['travail','formation','ecole_cfa','conge','maladie','recuperation','absence_injustifiee','absence','repos','mixte'];
 const invalid=message=>Object.assign(new Error(message),{status:400});
 export function validDate(value){
   if(typeof value!=='string'||!/^20\d{2}-\d{2}-\d{2}$/.test(value))throw invalid('Date invalide.');
@@ -17,9 +18,14 @@ export function validateDay(body,week){
   if(!Number.isSafeInteger(userId)||userId<1)throw invalid('Collaborateur invalide.');
   validDate(day);if(day<week||day>shiftDate(week,6))throw invalid('Ce jour ne fait pas partie de la semaine.');
   if(!scheduleKinds.includes(kind)||!Array.isArray(slots)||slots.length>10)throw invalid('Journée invalide.');
-  const timed=['travail','formation','ecole_cfa'].includes(kind);
-  if(timed&&!slots.length)throw invalid('Renseignez au moins un créneau horaire.');
-  if(!timed&&slots.length)throw invalid('Un congé, une absence ou un repos ne comporte pas de créneau.');
+  const typed=body.slotKinds!==undefined||body.durations!==undefined;
+  const kinds=body.slotKinds,durations=body.durations;
+  if(kinds!==undefined&&(!Array.isArray(kinds)||kinds.length!==slots.length||kinds.some(k=>!scheduleKinds.includes(k)||k==='mixte')))throw invalid('Type de créneau invalide.');
+  if(durations!==undefined&&(!Array.isArray(durations)||durations.length+slots.length>10||durations.some(d=>!d||!scheduleKinds.includes(d.kind)||timedWorkKinds.includes(d.kind)||d.kind==='mixte'||!Number.isInteger(d.minutes)||d.minutes<0||d.minutes===0&&d.kind!=='repos'||d.minutes>840||d.comment!==undefined&&(typeof d.comment!=='string'||d.comment.length>500))))throw invalid('Durée invalide : saisissez des heures et minutes, dans la limite de 14 heures.');
+  if(kind==='mixte'&&(!typed||slots.length&&!kinds))throw invalid('Précisez les types de créneaux.');
+  const timed=typed?slots.some((s,i)=>timedWorkKinds.includes(kinds?.[i]||kind)):timedWorkKinds.includes(kind);
+  if(!typed&&timed&&!slots.length)throw invalid('Renseignez au moins un créneau horaire.');
+  if(!typed&&!timed&&slots.length)throw invalid('Un congé, une absence ou un repos ne comporte pas de créneau.');
   let lastEnd=-1;
   for(const slot of slots){
     if(!Array.isArray(slot)||slot.length!==2||slot.some(t=>typeof t!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)))throw invalid('Horaires invalides.');
@@ -29,14 +35,16 @@ export function validateDay(body,week){
     if(start<lastEnd)throw invalid('Les créneaux doivent être dans l’ordre et ne pas se chevaucher.');
     lastEnd=end;
   }
+  if(typed&&slots.reduce((sum,[a,b])=>sum+minutes(b)-minutes(a),0)+(durations||[]).reduce((sum,d)=>sum+d.minutes,0)>840)throw invalid('Le total des durées ne doit pas dépasser 14 heures.');
   const postIds=body.postIds;if(postIds!==undefined&&(!Array.isArray(postIds)||postIds.length!==slots.length||postIds.some(id=>id!==null&&(!Number.isSafeInteger(id)||id<1))))throw invalid('Choisissez un poste valide pour chaque créneau.');
   if(body.mealTicket!==undefined&&typeof body.mealTicket!=='boolean')throw invalid('Attribution de ticket restaurant invalide.');
   if(body.actualMinutes!==undefined&&body.actualMinutes!==null&&(!Number.isInteger(body.actualMinutes)||body.actualMinutes<0||body.actualMinutes>840||(!timed&&body.actualMinutes>0)))throw invalid('Renseignez une durée réalisée entre 0 et 14 heures, uniquement pour le travail, la formation ou l’école CFA.');
   const comments=body.comments;if(comments!==undefined&&(!Array.isArray(comments)||comments.length!==slots.length||comments.some(v=>typeof v!=='string'||v.length>500)))throw invalid('Renseignez un commentaire de 500 caractères maximum par créneau.');
-  return {userId,day,kind,slots,...(comments!==undefined?{comments:comments.map(v=>v.trim())}:{}),...(body.actualMinutes!==undefined?{actualMinutes:body.actualMinutes}:{}),...(postIds!==undefined?{postIds}: {}),...(body.mealTicket!==undefined?{mealTicket:body.mealTicket}: {})};
+  const usedKinds=typed?[...new Set([...(kinds||slots.map(()=>kind)),...(durations||[]).map(d=>d.kind)])]:[kind];if(!usedKinds.length)throw invalid('Ajoutez un créneau ou videz la journée.');
+  return {userId,day,kind:typed?(usedKinds.length===1?usedKinds[0]:'mixte'):kind,slots,...(typed?{slotKinds:kinds||slots.map(()=>kind),durations:durations||[]}:{}),...(comments!==undefined?{comments:comments.map(v=>v.trim())}:{}),...(body.actualMinutes!==undefined?{actualMinutes:body.actualMinutes}:{}),...(postIds!==undefined?{postIds}: {}),...(body.mealTicket!==undefined?{mealTicket:body.mealTicket}: {})};
 }
 function minutes(t){const [h,m]=t.split(':').map(Number);return h*60+m;}
-export function plannedMinutes(entry){return (entry?.slots||[]).reduce((sum,[start,end])=>sum+minutes(end)-minutes(start),0);}
+export function plannedMinutes(entry){return workMinutes(entry);}
 export function copySchedule(source,sourceWeek,targetWeek,allowedIds){
   validWeek(sourceWeek);validWeek(targetWeek);const result={};
   for(const entry of Object.values(source||{})){
@@ -60,7 +68,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   app.use(['/api/schedule/:week/day','/api/schedule/:week/clear-day','/api/schedule/:week/meal-ticket','/api/schedule/:week/copy','/api/schedule/:week/apply-template'],auth,ready,access,unlocked);
   registerScheduleTemplates({app,db,auth,ready,admin,csrf,access,roster,ensureWeek,tools,fail});
   registerScheduleMonth({app,db,auth,ready,admin,csrf,access,roster,fail});
-  const sensitive=entry=>['maladie','absence_injustifiee'].includes(entry?.kind);
+  const sensitive=hasSensitiveKinds;
   app.post('/api/schedule/people-order',auth,ready,access,admin,csrf,async(req,res)=>{
     const {userId,neighborId,direction}=req.body||{};if(!Number.isSafeInteger(userId)||!Number.isSafeInteger(neighborId)||!['up','down'].includes(direction))throw fail(400,'Déplacement invalide.');
     const client=await db.connect();try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(78451023)');const rows=(await client.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id FOR UPDATE')).rows,ids=rows.map(p=>p.id),index=ids.indexOf(userId),next=index+(direction==='up'?-1:1);if(index<0||next<0||next>=ids.length||ids[next]!==neighborId)throw fail(409,'L’ordre des collaborateurs a changé. Rechargez le planning.');[ids[index],ids[next]]=[ids[next],ids[index]];await client.query('UPDATE users u SET schedule_position=o.position FROM unnest($1::int[]) WITH ORDINALITY AS o(id,position) WHERE u.id=o.id',[ids]);await client.query('COMMIT');res.json({ok:true});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
@@ -70,13 +78,13 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const row=await weekRow(shiftDate(day,-offset)),entry=row?.published?.[req.auth.id+':'+day];
     const ids=[...new Set((entry?.postIds||[]).filter(Number.isSafeInteger))];
     const posts=ids.length?(await db.query('SELECT id,name FROM schedule_posts WHERE id=ANY($1::int[])',[ids])).rows:[];
-    res.json({day,kind:entry?.kind||null,slots:(entry?.slots||[]).map(([start,end],i)=>({start,end,post:posts.find(p=>p.id===entry.postIds?.[i])?.name||null}))});
+    res.json({day,kind:entry?.kind||null,...(entry?.durations?{durations:entry.durations}:{}),slots:(entry?.slots||[]).map(([start,end],i)=>({start,end,post:posts.find(p=>p.id===entry.postIds?.[i])?.name||null,...(entry.slotKinds?{kind:slotKind(entry,i)}:{})}))});
   });
   app.get('/api/schedule',auth,ready,access,async(req,res)=>{
     const week=validWeek(req.query.week),scope=req.query.scope||'team';if(!['mine','team'].includes(scope))throw fail(400,'Vue invalide.');
     const [row,all]=await Promise.all([weekRow(week),roster()]);const isAdmin=canModify(req.auth,'Emplois du temps');
     const people=scope==='mine'?all.filter(p=>p.id===req.auth.id):all,ids=new Set(people.map(p=>p.id));
-    const entries=Object.values(isAdmin?row?.draft||{}:row?.published||{}).filter(e=>ids.has(e.userId)).map(entry=>{if(req.auth.role==='admin')return entry;const {mealTicket,actualMinutes,...e}=entry;return {...e,...(entry.userId===req.auth.id&&mealTicket!==undefined?{mealTicket}:{}),...(entry.userId===req.auth.id&&actualMinutes!==undefined?{actualMinutes}:{}),...(sensitive(entry)?{kind:entry.userId===req.auth.id?entry.kind:'absence',readOnly:true}: {})};});
+    const entries=Object.values(isAdmin?row?.draft||{}:row?.published||{}).filter(e=>ids.has(e.userId)).map(entry=>{if(req.auth.role==='admin')return entry;const {mealTicket,actualMinutes,...e}=entry;return {...redactScheduleEntry(e,entry.userId===req.auth.id),...(entry.userId===req.auth.id&&mealTicket!==undefined?{mealTicket}:{}),...(entry.userId===req.auth.id&&actualMinutes!==undefined?{actualMinutes}:{}),...(sensitive(entry)?{readOnly:true}: {})};});
     res.json({week,people,entries,lockedDays:row?.locked_days||{},canEdit:isAdmin,draftEntryCount:isAdmin?Object.keys(row?.draft||{}).length:undefined,revision:isAdmin?row?.revision||0:undefined,publishedAt:row?.published_at||null,
       unpublishedChanges:isAdmin?!!row&&row.revision!==row.published_revision:undefined});
   });
