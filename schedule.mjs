@@ -68,7 +68,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   app.use(['/api/schedule/:week/day','/api/schedule/:week/clear-day','/api/schedule/:week/meal-ticket','/api/schedule/:week/copy','/api/schedule/:week/apply-template'],auth,ready,access,unlocked);
   registerScheduleTemplates({app,db,auth,ready,admin,csrf,access,roster,ensureWeek,tools,fail});
   registerScheduleMonth({app,db,auth,ready,admin,csrf,access,roster,fail});
-  const sensitive=hasSensitiveKinds;
+  const sensitive=entry=>hasSensitiveKinds(entry)||Boolean(entry?.leaveRequestId);
   app.post('/api/schedule/people-order',auth,ready,access,admin,csrf,async(req,res)=>{
     const {userId,neighborId,direction}=req.body||{};if(!Number.isSafeInteger(userId)||!Number.isSafeInteger(neighborId)||!['up','down'].includes(direction))throw fail(400,'Déplacement invalide.');
     const client=await db.connect();try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(78451023)');const rows=(await client.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY schedule_position NULLS LAST,name,id FOR UPDATE')).rows,ids=rows.map(p=>p.id),index=ids.indexOf(userId),next=index+(direction==='up'?-1:1);if(index<0||next<0||next>=ids.length||ids[next]!==neighborId)throw fail(409,'L’ordre des collaborateurs a changé. Rechargez le planning.');[ids[index],ids[next]]=[ids[next],ids[index]];await client.query('UPDATE users u SET schedule_position=o.position FROM unnest($1::int[]) WITH ORDINALITY AS o(id,position) WHERE u.id=o.id',[ids]);await client.query('COMMIT');res.json({ok:true});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
@@ -78,7 +78,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const row=await weekRow(shiftDate(day,-offset)),entry=row?.published?.[req.auth.id+':'+day];
     const ids=[...new Set((entry?.postIds||[]).filter(Number.isSafeInteger))];
     const posts=ids.length?(await db.query('SELECT id,name FROM schedule_posts WHERE id=ANY($1::int[])',[ids])).rows:[];
-    res.json({day,kind:entry?.kind||null,...(entry?.durations?{durations:entry.durations}:{}),slots:(entry?.slots||[]).map(([start,end],i)=>({start,end,post:posts.find(p=>p.id===entry.postIds?.[i])?.name||null,...(entry.slotKinds?{kind:slotKind(entry,i)}:{})}))});
+    res.json({day,kind:entry?.kind||null,...(entry?.leavePart?{leavePart:entry.leavePart}:{}),...(entry?.durations?{durations:entry.durations}:{}),slots:(entry?.slots||[]).map(([start,end],i)=>({start,end,post:posts.find(p=>p.id===entry.postIds?.[i])?.name||null,...(entry.slotKinds?{kind:slotKind(entry,i)}:{})}))});
   });
   app.get('/api/schedule',auth,ready,access,async(req,res)=>{
     const week=validWeek(req.query.week),scope=req.query.scope||'team';if(!['mine','team'].includes(scope))throw fail(400,'Vue invalide.');

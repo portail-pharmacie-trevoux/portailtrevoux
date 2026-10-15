@@ -351,3 +351,17 @@ CREATE TABLE IF NOT EXISTS quality_prescriber_calls(
  operator_name TEXT NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS planning_applied BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS cancelled_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS leave_schedule_changes(
+ request_id INTEGER NOT NULL REFERENCES leave_requests(id) ON DELETE CASCADE,
+ day DATE NOT NULL,
+ week DATE NOT NULL REFERENCES schedule_weeks(week),
+ draft_before JSONB NOT NULL,
+ draft_after JSONB NOT NULL,
+ published_before JSONB NOT NULL,
+ published_after JSONB NOT NULL,
+ PRIMARY KEY(request_id,day)
+);
