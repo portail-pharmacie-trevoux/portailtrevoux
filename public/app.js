@@ -577,8 +577,8 @@ async function refreshHomeExtras(){
       const data=results[4].status==='fulfilled'?results[4].value:null,block=node('span','','tile-schedule');
       block.append(node('span','Mes horaires aujourd’hui','tile-schedule-title'));
       const list=node('span','','tile-schedule-list');
-      if(data?.slots?.length)data.slots.forEach(slot=>{const line=node('span','','tile-schedule-line');line.append(node('b',slot.start+'–'+slot.end),node('span',(['travail','formation','ecole_cfa'].includes(slot.kind||data.kind)?slot.post:null)||({formation:'Formation',ecole_cfa:'École CFA',conge:'Congés',maladie:'Arrêt maladie',absence_injustifiee:'Absence injustifiée',recuperation:'Récupération',absence:'Absence',repos:'Repos'}[slot.kind||data.kind]||'Poste non renseigné')));list.append(line);});for(const d of data?.durations||[])list.append(node('span',(scheduleLabels[d.kind]||d.kind)+' · '+formatHours(d.minutes),'tile-schedule-line'));
-      if(!data?.slots?.length&&!data?.durations?.length)list.append(node('span',data?({conge:'Congés',maladie:'Arrêt maladie',recuperation:'Récupération',absence_injustifiee:'Absence',absence:'Absence',repos:'Repos',mixte:'Journée mixte'}[data.kind]||'Aucun créneau publié aujourd’hui'):'Horaires indisponibles'));
+      if(data?.slots?.length)data.slots.forEach(slot=>{const line=node('span','','tile-schedule-line');line.append(node('b',slot.start+'–'+slot.end),node('span',(['travail','formation','ecole_cfa'].includes(slot.kind||data.kind)&&slot.post?(scheduleLabels[slot.kind||data.kind]?.split(' ')[0]||'💼')+' '+slot.post:null)||(scheduleLabels[slot.kind||data.kind]||'Poste non renseigné')));list.append(line);});for(const d of data?.durations||[])list.append(node('span',(scheduleLabels[d.kind]||d.kind)+' · '+formatHours(d.minutes),'tile-schedule-line'));
+      if(!data?.slots?.length&&!data?.durations?.length)list.append(node('span',data?(scheduleLabels[data.kind]||'Aucun créneau publié aujourd’hui'):'Horaires indisponibles'));
       list.addEventListener('click',e=>e.stopPropagation());block.append(list);planning.append(block);
     }
     renderCelebrations(celebrations);
@@ -621,7 +621,7 @@ setInterval(()=>{
 },60000);
 
 let scheduleWeek='',scheduleScope='',scheduleData=null,scheduleRequest=0,scheduleTemplatesView=false,scheduleView='day',scheduleDay='';
-const scheduleLabels={travail:'Travail',formation:'🎓 Formation',ecole_cfa:'🎓 École CFA',conge:'🏝️ Congés',maladie:'Arrêt maladie',recuperation:'Récupération',absence_injustifiee:'Absence injustifiée',absence:'Absence',repos:'Repos',mixte:'Journée mixte'};
+const scheduleLabels={travail:'💼 Travail',formation:'📚 Formation',ecole_cfa:'🎓 École CFA',conge:'🏝️ Congés',maladie:'🩺 Arrêt maladie',recuperation:'🔄 Récupération',absence_injustifiee:'⚠️ Absence injustifiée',absence:'⏸️ Absence',repos:'🛌 Repos',mixte:'🧩 Journée mixte'};
 function mondayOf(day){const date=new Date(day+'T12:00:00Z');return moveDay(day,-((date.getUTCDay()+6)%7));}
 function formatHours(minutes){return Math.floor(minutes/60)+' h'+(minutes%60?' '+String(minutes%60).padStart(2,'0'):'');}
 function scheduleWeekNumber(day){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));return Math.ceil(((d-Date.UTC(d.getUTCFullYear(),0,1))/86400000+1)/7);}
