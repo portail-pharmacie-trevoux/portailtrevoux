@@ -577,7 +577,7 @@ async function refreshHomeExtras(){
       const data=results[4].status==='fulfilled'?results[4].value:null,block=node('span','','tile-schedule');
       block.append(node('span','Mes horaires aujourd’hui','tile-schedule-title'));
       const list=node('span','','tile-schedule-list');
-      if(data?.slots?.length)data.slots.forEach(slot=>{const line=node('span','','tile-schedule-line');line.append(node('b',slot.start+'–'+slot.end),node('span',(['travail','formation','ecole_cfa'].includes(slot.kind||data.kind)&&slot.post?(scheduleLabels[slot.kind||data.kind]?.split(' ')[0]||'💼')+' '+slot.post:null)||(scheduleLabels[slot.kind||data.kind]||'Poste non renseigné')));list.append(line);});for(const d of data?.durations||[])list.append(node('span',(scheduleLabels[d.kind]||d.kind)+' · '+formatHours(d.minutes),'tile-schedule-line'));
+      if(data?.slots?.length)data.slots.forEach(slot=>{const line=node('span','','tile-schedule-line');line.append(node('b',slot.start+'–'+slot.end),node('span',(['travail','formation','ecole_cfa','reunion'].includes(slot.kind||data.kind)&&slot.post?(scheduleLabels[slot.kind||data.kind]?.split(' ')[0]||'💼')+' '+slot.post:null)||(scheduleLabels[slot.kind||data.kind]||'Poste non renseigné')));list.append(line);});for(const d of data?.durations||[])list.append(node('span',(scheduleLabels[d.kind]||d.kind)+' · '+formatHours(d.minutes),'tile-schedule-line'));
       if(!data?.slots?.length&&!data?.durations?.length)list.append(node('span',data?((scheduleLabels[data.kind]||'Aucun créneau publié aujourd’hui')+(data.leavePart==='morning'?' · matin':data.leavePart==='afternoon'?' · après-midi':'')):'Horaires indisponibles'));
       list.addEventListener('click',e=>e.stopPropagation());block.append(list);planning.append(block);
     }
@@ -621,11 +621,11 @@ setInterval(()=>{
 },60000);
 
 let scheduleWeek='',scheduleScope='',scheduleData=null,scheduleRequest=0,scheduleTemplatesView=false,scheduleView='day',scheduleDay='';
-const scheduleLabels={travail:'💼 Travail',formation:'📚 Formation',ecole_cfa:'🎓 École CFA',conge:'🏝️ Congés',maladie:'🩺 Arrêt maladie',recuperation:'🔄 Récupération',absence_injustifiee:'⚠️ Absence injustifiée',absence:'⏸️ Absence',repos:'🛌 Repos',mixte:'🧩 Journée mixte'};
+const scheduleLabels={travail:'💼 Travail',formation:'📚 Formation',ecole_cfa:'🎓 École CFA',reunion:'🗣️ Réunion',conge:'🏝️ Congés',maladie:'🩺 Arrêt maladie',recuperation:'🔄 Récupération',absence_injustifiee:'⚠️ Absence injustifiée',absence:'⏸️ Absence',repos:'🛌 Repos',mixte:'🧩 Journée mixte'};
 function mondayOf(day){const date=new Date(day+'T12:00:00Z');return moveDay(day,-((date.getUTCDay()+6)%7));}
 function formatHours(minutes){return Math.floor(minutes/60)+' h'+(minutes%60?' '+String(minutes%60).padStart(2,'0'):'');}
 function scheduleWeekNumber(day){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));return Math.ceil(((d-Date.UTC(d.getUTCFullYear(),0,1))/86400000+1)/7);}
-function scheduleMinutes(entry){return (entry?.slots||[]).reduce((sum,[a,b],i)=>{if(!['travail','formation','ecole_cfa'].includes(entry.slotKinds?.[i]||entry.kind))return sum;const parse=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};return sum+parse(b)-parse(a);},0);}
+function scheduleMinutes(entry){return (entry?.slots||[]).reduce((sum,[a,b],i)=>{if(!['travail','formation','ecole_cfa','reunion'].includes(entry.slotKinds?.[i]||entry.kind))return sum;const parse=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};return sum+parse(b)-parse(a);},0);}
 
 function scheduleDate(day,options={day:'numeric',month:'long'}){return new Date(day+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',...options});}
 function schedulePreference(){try{return localStorage.getItem('portail-plus:schedule-scope:'+session.user.id);}catch{return null;}}
@@ -683,7 +683,7 @@ async function renderSchedule(){
   });table.append(body);wrap.append(table);root.append(wrap);
   if(!data.people.length)root.append(node('p','Aucun collaborateur dans cette vue.','empty'));
   if(!isAdmin&&!data.publishedAt)root.append(node('p','Vous serez averti dans les nouveautés lorsque le planning sera publié.','field-note'));
-  root.append(node('p','Total des créneaux de travail, de formation et d’école CFA, hors congés, absences et repos.','field-note'));
+  root.append(node('p','Total des créneaux de travail, de formation, d’école CFA et de réunion, hors congés, absences et repos.','field-note'));
   content.replaceChildren(root);
 }
 async function copyScheduleWeek(from,data){
@@ -699,7 +699,7 @@ function openScheduleCopy(from,data){
 function paintSchedulePost(element,color){if(!/^#[0-9a-f]{6}$/i.test(color))return;element.style.backgroundColor=color;const n=parseInt(color.slice(1),16),channels=[n>>16,(n>>8)&255,n&255].map(v=>{const c=v/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;}),light=channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;element.style.color=light>.179?'#000000':'#ffffff';}
 function editScheduleDay(person,day,entry,data,options={}){
  const changed=async()=>data.templateId?data.onChanged():renderSchedule(),weekday=Math.round((Date.parse(day)-Date.parse(data.week))/86400000),dialog=scheduleDialog(person.name+' · '+(data.templateId?['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'][weekday]+' (semaine type)':scheduleDate(day,{weekday:'long',day:'numeric',month:'long'}))),form=node('form'),slots=node('div','','schedule-slot-editor'),items=[],status=node('p','','error'),total=node('p','','field-note');status.setAttribute('role','alert');
- const work=k=>['travail','formation','ecole_cfa'].includes(k),parse=v=>{if(!/^\d{2}:\d{2}$/.test(v))return null;const [h,m]=v.split(':').map(Number);return h*60+m;},clock=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+ const work=k=>['travail','formation','ecole_cfa','reunion'].includes(k),parse=v=>{if(!/^\d{2}:\d{2}$/.test(v))return null;const [h,m]=v.split(':').map(Number);return h*60+m;},clock=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
  function typeOptions(select,value){Object.entries(scheduleLabels).filter(([k])=>k!=='mixte'&&(k!=='absence'||value==='absence')&&(session.user.role==='admin'||!['maladie','absence_injustifiee'].includes(k))).forEach(([k,text])=>{const o=node('option',text);o.value=k;select.append(o);});select.value=value;}
  const quick=node('div','','schedule-day-shortcut'),quickLabel=node('label','Type pour toute la journée'),kind=node('select');typeOptions(kind,entry?.kind&&entry.kind!=='mixte'?entry.kind:'travail');quickLabel.append(kind);quick.append(quickLabel,button('Appliquer à tous les créneaux',()=>{items.forEach(item=>{item.type.value=kind.value;item.mode.value=work(kind.value)?'horaires':item.mode.value;});update();}));form.append(node('p','Chaque créneau possède son type et ses horaires. Pour une absence sans horaires précis, choisissez « Durée seule » et indiquez les heures et minutes.','field-note'),quick);
 

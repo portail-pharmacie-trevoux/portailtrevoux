@@ -417,3 +417,5 @@ body:has(#login:not(.hidden)) .login-card{margin:0;width:min(460px,100%);box-siz
 .news-message.news-reply{border-left:5px solid #7750a4}.news-reply-badge{display:inline-block;background:#eee6f8;color:#583181;border-radius:7px;padding:5px 9px;font-size:12px;font-weight:750;margin-top:10px}.news-reply-context{margin:10px 0 12px;padding:10px 12px;border-left:3px solid #c6b1de;background:#f7f3fb;border-radius:0 7px 7px 0;color:#574b61}.news-reply-context small{font-weight:650}.news-reply-context p{margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}.news-reply-context summary{cursor:pointer;font-size:12px;margin-top:7px;color:#65418a}
 
 .news-challenge-digest{list-style:none;padding:0;margin:12px 0;display:grid;gap:10px}.news-challenge-digest li{padding:10px 12px;background:#f0f7f4;border-radius:8px;border-left:3px solid #087b65}.news-challenge-digest strong,.news-challenge-digest span{display:block;overflow-wrap:anywhere}.news-challenge-digest span{font-size:13px;margin-top:4px;color:#425a50}
+
+.schedule-kind.reunion,.schedule-day.reunion,.schedule-slot.reunion,.timeline-slot.reunion{background:#e4edfc;color:#234d83}

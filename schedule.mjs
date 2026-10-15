@@ -2,7 +2,7 @@ import {slotKind,workMinutes,hasSensitiveKinds,redactScheduleEntry,timedWorkKind
 import {registerScheduleMonth} from './schedule-month.mjs';
 import {registerScheduleTemplates} from './schedule-templates.mjs';
 import {registerScheduleTools} from './schedule-tools.mjs';
-export const scheduleKinds=['travail','formation','ecole_cfa','conge','maladie','recuperation','absence_injustifiee','absence','repos','mixte'];
+export const scheduleKinds=['travail','formation','ecole_cfa','reunion','conge','maladie','recuperation','absence_injustifiee','absence','repos','mixte'];
 const invalid=message=>Object.assign(new Error(message),{status:400});
 export function validDate(value){
   if(typeof value!=='string'||!/^20\d{2}-\d{2}-\d{2}$/.test(value))throw invalid('Date invalide.');
@@ -38,7 +38,7 @@ export function validateDay(body,week){
   if(typed&&slots.reduce((sum,[a,b])=>sum+minutes(b)-minutes(a),0)+(durations||[]).reduce((sum,d)=>sum+d.minutes,0)>840)throw invalid('Le total des durées ne doit pas dépasser 14 heures.');
   const postIds=body.postIds;if(postIds!==undefined&&(!Array.isArray(postIds)||postIds.length!==slots.length||postIds.some(id=>id!==null&&(!Number.isSafeInteger(id)||id<1))))throw invalid('Choisissez un poste valide pour chaque créneau.');
   if(body.mealTicket!==undefined&&typeof body.mealTicket!=='boolean')throw invalid('Attribution de ticket restaurant invalide.');
-  if(body.actualMinutes!==undefined&&body.actualMinutes!==null&&(!Number.isInteger(body.actualMinutes)||body.actualMinutes<0||body.actualMinutes>840||(!timed&&body.actualMinutes>0)))throw invalid('Renseignez une durée réalisée entre 0 et 14 heures, uniquement pour le travail, la formation ou l’école CFA.');
+  if(body.actualMinutes!==undefined&&body.actualMinutes!==null&&(!Number.isInteger(body.actualMinutes)||body.actualMinutes<0||body.actualMinutes>840||(!timed&&body.actualMinutes>0)))throw invalid('Renseignez une durée réalisée entre 0 et 14 heures, uniquement pour le travail, la formation, l’école CFA ou une réunion.');
   const comments=body.comments;if(comments!==undefined&&(!Array.isArray(comments)||comments.length!==slots.length||comments.some(v=>typeof v!=='string'||v.length>500)))throw invalid('Renseignez un commentaire de 500 caractères maximum par créneau.');
   const usedKinds=typed?[...new Set([...(kinds||slots.map(()=>kind)),...(durations||[]).map(d=>d.kind)])]:[kind];if(!usedKinds.length)throw invalid('Ajoutez un créneau ou videz la journée.');
   return {userId,day,kind:typed?(usedKinds.length===1?usedKinds[0]:'mixte'):kind,slots,...(typed?{slotKinds:kinds||slots.map(()=>kind),durations:durations||[]}:{}),...(comments!==undefined?{comments:comments.map(v=>v.trim())}:{}),...(body.actualMinutes!==undefined?{actualMinutes:body.actualMinutes}:{}),...(postIds!==undefined?{postIds}: {}),...(body.mealTicket!==undefined?{mealTicket:body.mealTicket}: {})};

@@ -1,4 +1,4 @@
-export const timedWorkKinds=['travail','formation','ecole_cfa'];
+export const timedWorkKinds=['travail','formation','ecole_cfa','reunion'];
 export const slotKind=(entry,index)=>entry.slotKinds?.[index]||entry.kind;
 const minutes=value=>{const [h,m]=value.split(':').map(Number);return h*60+m;};
 export function minutesByKind(entry){const result={};for(const [i,[start,end]]of (entry?.slots||[]).entries()){const kind=slotKind(entry,i);result[kind]=(result[kind]||0)+minutes(end)-minutes(start);}for(const item of entry?.durations||[])result[item.kind]=(result[item.kind]||0)+item.minutes;return result;}
