@@ -198,6 +198,13 @@ export function createApp(db,config) {
     })().catch(async error=>{await setSetting('sync_error',error.status?error.message:'Échec de la synchronisation. Réessayez plus tard.');throw error;}).finally(()=>{syncing=null;});return syncing;
   }
   const youtube=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt});
+  const youtubeMusic=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt,playlistTarget:'music'});
+  app.get('/api/youtube-music/status',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await youtubeMusic.status()));
+  app.get('/api/youtube-music/playlists',auth,ready,admin,async(req,res)=>res.json(await youtubeMusic.playlists()));
+  app.post('/api/youtube-music/playlist',auth,ready,admin,csrf,async(req,res)=>res.json(await youtubeMusic.choosePlaylist(req.body.id)));
+  app.post('/api/youtube-music/playlists',auth,ready,admin,csrf,async(req,res)=>res.status(201).json(await youtubeMusic.createPlaylist(req.body.title)));
+  app.post('/api/youtube-music/candidates',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtubeMusic.candidates(req.body.trackId)));
+  app.post('/api/youtube-music/add',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtubeMusic.add(req.body)));
   app.get('/api/youtube/status',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await youtube.status()));
   app.post('/api/youtube/connect',auth,ready,admin,csrf,async(req,res)=>{
     if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
@@ -212,7 +219,7 @@ export function createApp(db,config) {
   app.post('/api/youtube/candidates',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtube.candidates(req.body.trackId)));
   app.post('/api/youtube/add',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtube.add(req.body)));
   app.post('/api/youtube/disconnect',auth,ready,admin,csrf,async(req,res)=>{
-    await db.query("DELETE FROM settings WHERE key IN ('youtube_tokens','youtube_channel_id','youtube_channel_name','youtube_playlist_id','youtube_playlist_name')");
+    await db.query("DELETE FROM settings WHERE key IN ('youtube_tokens','youtube_channel_id','youtube_channel_name','youtube_playlist_id','youtube_playlist_name','youtube_music_playlist_id','youtube_music_playlist_name')");
     res.json({ok:true});
   });
   app.post('/api/mail/connect',auth,ready,admin,csrf,async(req,res)=>{

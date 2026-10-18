@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createYouTube } from '../youtube.mjs';
-function fixture(){
+function fixture(playlistTarget='youtube'){
   const values=new Map([['youtube_tokens',JSON.stringify({access_token:'test-token',refresh_token:'test-refresh',expires_at:Date.now()+3600000})],['youtube_channel_id','channel-one'],['youtube_playlist_id','playlist-one']]);
   const calls=[],videos=new Set();let quota=false,owner='channel-one';
   const tracks=new Map([[1,{id:1,artist:'Artist',title:'Song',track_key:'song-key'}]]);
@@ -10,7 +10,7 @@ function fixture(){
     const u=new URL(url),path=u.pathname.split('/').pop();calls.push({path,params:u.searchParams,options});
     let data={};
     if(path==='channels')data={items:[{id:'channel-one',snippet:{title:'Test channel'}}]};
-    if(path==='playlists')data={items:[{id:'playlist-one',snippet:{channelId:owner,title:'Playlist'}}]};
+    if(path==='playlists')data=options.method==='POST'?{id:'playlist-music',snippet:{title:'Music Playlist'}}:{items:[{id:'playlist-one',snippet:{channelId:owner,title:'Playlist'}}]};
     if(path==='search'){
       if(quota)return {ok:false,status:403,json:async()=>({error:{errors:[{reason:'quotaExceeded'}]}})};
       data={items:[{id:{videoId:'abcdefghijk'},snippet:{title:'Matched song',channelTitle:'Official channel'}}]};
@@ -22,7 +22,7 @@ function fixture(){
     if(path==='token')data={access_token:'fresh-token',expires_in:3600};
     return {ok:true,status:200,json:async()=>data};
   };
-  const service=createYouTube({db,config:{googleId:'client',googleSecret:'secret'},secret:'key',getSetting:async k=>values.get(k),setSetting:async(k,v)=>values.set(k,v),fail:(status,message)=>Object.assign(new Error(message),{status}),encrypt:JSON.stringify,decrypt:JSON.parse,fetchImpl});
+  const service=createYouTube({playlistTarget,db,config:{googleId:'client',googleSecret:'secret'},secret:'key',getSetting:async k=>values.get(k),setSetting:async(k,v)=>values.set(k,v),fail:(status,message)=>Object.assign(new Error(message),{status}),encrypt:JSON.stringify,decrypt:JSON.parse,fetchImpl});
   return {service,values,calls,videos,quota:()=>{quota=true;},foreignOwner:()=>{owner='foreign-channel';}};
 }
 test('search cache avoids repeated quota usage and validates music IDs',async()=>{
@@ -44,4 +44,14 @@ test('playlist must belong to the connected channel and grant must include YouTu
   const f=fixture();f.foreignOwner();await assert.rejects(f.service.choosePlaylist('playlist-one'),{status:403});
   await assert.rejects(f.service.connect({scope:'calendar',refresh_token:'refresh'}),{status:400});
   assert.equal(f.values.get('youtube_playlist_id'),'playlist-one');
+});
+
+
+test('Playlist YouTube Music indépendante du réglage classique, création et ajout protégés',async()=>{
+ const f=fixture('music');assert.equal((await f.service.status()).playlistId,'');
+ await f.service.createPlaylist('Ma sélection Music');assert.equal(f.values.get('youtube_music_playlist_id'),'playlist-music');assert.equal(f.values.get('youtube_playlist_id'),'playlist-one');
+ assert.equal((await f.service.status()).playlistName,'Music Playlist');await f.service.candidates(1);
+ await assert.rejects(f.service.add({trackId:1,videoId:'abcdefghijk',playlistId:'playlist-one'}),/playlist a changé/);
+ assert.equal((await f.service.add({trackId:1,videoId:'abcdefghijk',playlistId:'playlist-music'})).added,true);
+ assert.equal(JSON.parse(f.calls.find(c=>c.path==='playlists'&&c.options.method==='POST').options.body).status.privacyStatus,'private');
 });

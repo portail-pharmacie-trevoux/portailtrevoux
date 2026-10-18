@@ -1,5 +1,6 @@
-export function createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt,fetchImpl=fetch}){
+export function createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt,fetchImpl=fetch,playlistTarget='youtube'}){
   let refresh=null,writing=Promise.resolve();
+  const playlistKey=part=>(playlistTarget==='music'?'youtube_music':'youtube')+'_playlist_'+part;
   const scope='https://www.googleapis.com/auth/youtube.force-ssl';
   async function tokens(){
     const stored=await getSetting('youtube_tokens');if(!stored)throw fail(409,'Connectez YouTube dans les paramètres de Fun.');
@@ -29,11 +30,11 @@ export function createYouTube({db,config,secret,getSetting,setSetting,fail,encry
     if(!(access.scope||'').split(' ').includes(scope)||!access.refresh_token)throw fail(400,'Autorisez la gestion YouTube pour permettre les prochains ajouts.');
     const channels=await request('channels',{part:'snippet',mine:'true'},'GET',undefined,access.access_token),channel=channels.items?.[0];
     if(!channel)throw fail(409,'Ce compte ne possède pas de chaîne YouTube. Créez-en une sur YouTube, puis reconnectez-le.');
-    if(await getSetting('youtube_channel_id')!==channel.id){await setSetting('youtube_playlist_id','');await setSetting('youtube_playlist_name','');}
+    if(await getSetting('youtube_channel_id')!==channel.id){for(const prefix of ['youtube','youtube_music']){await setSetting(prefix+'_playlist_id','');await setSetting(prefix+'_playlist_name','');}}
     access.expires_at=Date.now()+access.expires_in*1000;
     await setSetting('youtube_tokens',encrypt(access,secret));await setSetting('youtube_channel_id',channel.id);await setSetting('youtube_channel_name',channel.snippet.title);
   }
-  async function status(){return {configured:!!(config.googleId&&config.googleSecret),connected:!!await getSetting('youtube_tokens'),channel:await getSetting('youtube_channel_name')||'',playlistId:await getSetting('youtube_playlist_id')||'',playlistName:await getSetting('youtube_playlist_name')||''};}
+  async function status(){return {configured:!!(config.googleId&&config.googleSecret),connected:!!await getSetting('youtube_tokens'),channel:await getSetting('youtube_channel_name')||'',playlistId:await getSetting(playlistKey('id'))||'',playlistName:await getSetting(playlistKey('name'))||''};}
   async function playlists(){
     const all=[];let page;
     do{const d=await request('playlists',{part:'snippet',mine:'true',maxResults:'50',...(page?{pageToken:page}:{})});all.push(...(d.items||[]).map(p=>({id:p.id,name:p.snippet.title})));page=d.nextPageToken;if(all.length>2000)throw fail(400,'Trop de playlists sur ce compte.');}while(page);return all;
@@ -42,12 +43,12 @@ export function createYouTube({db,config,secret,getSetting,setSetting,fail,encry
     if(typeof id!=='string'||!/^[-\w]{10,100}$/.test(id))throw fail(400,'Playlist invalide.');
     const d=await request('playlists',{part:'snippet',id}),p=d.items?.[0];
     if(!p||p.snippet.channelId!==await getSetting('youtube_channel_id'))throw fail(403,'Choisissez une playlist appartenant à la chaîne YouTube connectée.');
-    await setSetting('youtube_playlist_id',p.id);await setSetting('youtube_playlist_name',p.snippet.title);return {id:p.id,name:p.snippet.title};
+    await setSetting(playlistKey('id'),p.id);await setSetting(playlistKey('name'),p.snippet.title);return {id:p.id,name:p.snippet.title};
   }
   async function createPlaylist(title){
     if(typeof title!=='string'||!title.trim()||title.trim().length>150)throw fail(400,'Indiquez un nom de playlist (150 caractères maximum).');
     const p=await request('playlists',{part:'snippet,status'},'POST',{snippet:{title:title.trim(),description:'Sélection musicale de l’équipe — PORTAIL +'},status:{privacyStatus:'private'}});
-    await setSetting('youtube_playlist_id',p.id);await setSetting('youtube_playlist_name',p.snippet.title);return {id:p.id,name:p.snippet.title};
+    await setSetting(playlistKey('id'),p.id);await setSetting(playlistKey('name'),p.snippet.title);return {id:p.id,name:p.snippet.title};
   }
   async function track(id){if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Morceau invalide.');const t=(await db.query('SELECT id,artist,title,track_key FROM music_tracks WHERE id=$1',[id])).rows[0];if(!t)throw fail(404,'Morceau introuvable.');return t;}
   async function candidates(id){
@@ -62,7 +63,7 @@ export function createYouTube({db,config,secret,getSetting,setSetting,fail,encry
     const action=async()=>{
       const t=await track(trackId);
       if(!/^[\w-]{11}$/.test(videoId||''))throw fail(400,'Vidéo invalide.');
-      if(!playlistId||playlistId!==await getSetting('youtube_playlist_id'))throw fail(409,'La playlist a changé. Relancez la préparation.');
+      if(!playlistId||playlistId!==await getSetting(playlistKey('id')))throw fail(409,'La playlist a changé. Relancez la préparation.');
       const raw=await getSetting('youtube_candidates:'+trackId),cached=raw?JSON.parse(raw):null;
       if(cached?.trackKey!==t.track_key||Date.now()-cached.at>=30*86400000||!cached.items.some(v=>v.id===videoId))throw fail(400,'Préparez les vidéos et choisissez une correspondance proposée.');
       let page,total=0;
@@ -73,3 +74,4 @@ export function createYouTube({db,config,secret,getSetting,setSetting,fail,encry
   }
   return {scope,connect,status,playlists,choosePlaylist,createPlaylist,candidates,add};
 }
+
