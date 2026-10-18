@@ -433,3 +433,22 @@ body:has(#login:not(.hidden)) .login-card{margin:0;width:min(460px,100%);box-siz
 .order-mfa-actions .order-exit-button{background:#c84712;color:#fff;border:2px solid #a63609;font-weight:750;font-size:16px;padding:13px 20px;box-shadow:0 3px 8px #b13a142b}.order-mfa-actions .order-exit-button:hover{background:#a8370b;border-color:#8d2c08}.order-mfa-actions .order-exit-button:focus-visible{outline:3px solid #182d3d;outline-offset:4px}.order-mfa-actions .order-exit-button:disabled{opacity:.7;cursor:wait}
 
 .order-auth-options{flex:1 1 100%;border:1px solid #d7e2e6;border-radius:9px;background:#f6f9fa;padding:10px 12px}.order-auth-options>summary{font-weight:650;cursor:pointer;color:#3c5261}.order-auth-options-body{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:12px}.order-auth-options-body .field-note{flex-basis:100%;margin:0}
+
+/* Icônes natives : une seule animation courte sur la tuile active, sans requête réseau. */
+#home .tile-icon-motion{transform-box:fill-box;transform-origin:center;--icon-animation:home-icon-nod}
+#home .icon-tick{--icon-animation:home-icon-tick}#home .icon-clock{--icon-animation:home-icon-clock;transform-box:view-box;transform-origin:12px 12px}#home .icon-send{--icon-animation:home-icon-send}#home .icon-bubble{--icon-animation:home-icon-bubble}#home .icon-spark,#home .icon-key{--icon-animation:home-icon-spark}#home .icon-lines{--icon-animation:home-icon-lines}#home .icon-page{--icon-animation:home-icon-page}#home .icon-ring{--icon-animation:home-icon-ring}#home .icon-music,#home .icon-wheel{--icon-animation:home-icon-music}#home .icon-link{--icon-animation:home-icon-link}#home .icon-box{--icon-animation:home-icon-box}
+@media(prefers-reduced-motion:no-preference){#home .grid>.tile:focus-visible .tile-icon-motion{animation:var(--icon-animation) .85s ease-in-out 1}}
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){#home .grid>.tile:hover .tile-icon-motion{animation:var(--icon-animation) .85s ease-in-out 1}}
+@keyframes home-icon-nod{0%,100%{transform:translateY(0) rotate(0)}35%{transform:translateY(-1px) rotate(-10deg)}65%{transform:rotate(7deg)}}
+@keyframes home-icon-tick{0%,100%{transform:scale(1);opacity:1}35%{transform:scale(.7);opacity:.35}70%{transform:scale(1.16);opacity:1}}
+@keyframes home-icon-clock{0%,100%{transform:rotate(0)}55%{transform:rotate(100deg)}}
+@keyframes home-icon-send{0%,100%{transform:translate(0,0)}50%{transform:translate(2px,-2px)}70%{transform:translate(-1px,1px)}}
+@keyframes home-icon-bubble{0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(-2px);opacity:.4}}
+@keyframes home-icon-spark{0%,100%{transform:scale(1)}45%{transform:scale(1.25)}70%{transform:scale(.9)}}
+@keyframes home-icon-lines{0%,100%{transform:translateX(0)}35%{transform:translateX(1.5px)}65%{transform:translateX(-.5px)}}
+@keyframes home-icon-page{0%,100%{transform:scaleX(1)}45%{transform:scaleX(.75)}}
+@keyframes home-icon-ring{0%,100%{transform:rotate(0)}25%,65%{transform:rotate(-12deg)}45%,80%{transform:rotate(10deg)}}
+@keyframes home-icon-music{0%,100%{transform:translateY(0)}30%{transform:translateY(-1.5px)}65%{transform:translateY(1px)}}
+@keyframes home-icon-link{0%,100%{transform:translate(0,0)}45%{transform:translate(1.5px,-1.5px)}}
+@keyframes home-icon-box{0%,100%{transform:translateY(0)}45%{transform:translateY(-2px)}70%{transform:translateY(.5px)}}
+@media(prefers-reduced-motion:reduce){#home .tile-icon-motion{animation:none!important;transform:none!important}}
