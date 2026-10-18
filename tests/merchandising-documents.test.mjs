@@ -14,3 +14,16 @@ test('Documents merchandising : droits, CSRF, import et téléchargement puis re
  const downloaded=await fetch(url+'/1/file');assert.equal(downloaded.status,200);assert.match(downloaded.headers.get('content-disposition'),/attachment/);assert.equal(await downloaded.text(),'%PDF-1.4\n%%EOF');
  assert.equal((await write('/1','PUT',{title:' Nouvelle charte ',revision:1})).status,200);assert.equal(row.title,'Nouvelle charte');assert.equal((await write('/1','PUT',{title:'Écrasement',revision:1})).status,409);editable=false;assert.equal((await write('/1','PUT',{title:'Interdit',revision:2})).status,403);assert.equal((await (await fetch(url)).json()).canEdit,false);allowed=false;assert.equal((await fetch(url+'/1/file')).status,403);
 });
+test('Charte graphique : fichiers de plus de 10 Mo acceptés, limite 50 Mo, autres rubriques inchangées',async()=>{
+ const {maxMerchDocumentBytes}=await import('../merchandising-documents.mjs'),{validateProcedureFile}=await import('../procedure-files.mjs');assert.equal(maxMerchDocumentBytes,50*1024*1024);
+ const pdf=Buffer.alloc(11*1024*1024,32);pdf.write('%PDF-1.4\n');pdf.write('%%EOF',pdf.length-5);const body={fileName:'Grande charte.pdf',fileData:pdf.toString('base64')};assert.equal(validateMerchDocument(body,fail).bytes.length,pdf.length);assert.throws(()=>validateProcedureFile(body,fail),e=>e.status===413);
+ const png=Buffer.alloc(11*1024*1024);Buffer.from([137,80,78,71,13,10,26,10]).copy(png);assert.equal(validateMerchDocument({fileName:'Affiche.png',fileData:png.toString('base64')},fail).bytes.length,png.length);
+ const oversized='A'.repeat(Math.ceil(maxMerchDocumentBytes/3)*4+4);assert.throws(()=>validateMerchDocument({fileName:'Trop grand.pdf',fileData:oversized},fail));assert.throws(()=>validateMerchDocument({fileName:'Trop grand.png',fileData:oversized},fail));
+});
+test('Charte graphique : import réel au-delà du parseur standard, authentification et CSRF préalables',async t=>{
+ const {createApp}=await import('../server.mjs');let inserted=false;const actor={id:1,name:'Nicolas',role:'admin',rights:[],edit_rights:[],permissions_configured:true,must_change:false,csrf:'csrf'};
+ const db={query:async(sql,args)=>{if(sql.startsWith('SELECT s.id'))return{rows:[actor]};if(sql.startsWith('INSERT INTO merchandising_documents')){inserted=true;assert(args[3].length>16384);return{rows:[{id:1,title:args[0],file_name:args[1],revision:1}]};}throw Error('Unexpected query');}};
+ const {app}=createApp(db,{origin:'https://portal.test',secret:'s'.repeat(32)}),server=app.listen(0);t.after(()=>server.close());const pdf=Buffer.alloc(32768,32);pdf.write('%PDF-1.4');pdf.write('%%EOF',pdf.length-5);
+ const send=(cookie,token='csrf')=>fetch('http://127.0.0.1:'+server.address().port+'/api/merchandising/documents/import',{method:'POST',headers:{origin:'https://portal.test',cookie,'content-type':'application/json','x-csrf-token':token},body:JSON.stringify({fileName:'Charte.pdf',fileData:pdf.toString('base64')})});
+ assert.equal((await send('')).status,401);assert.equal(inserted,false);assert.equal((await send('trevoux_session='+'a'.repeat(43),'bad')).status,403);assert.equal(inserted,false);assert.equal((await send('trevoux_session='+'a'.repeat(43))).status,201);assert(inserted);
+});

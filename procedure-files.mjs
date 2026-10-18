@@ -28,15 +28,15 @@ function isDocx(bytes){
   }
   return position===end&&names.has('[Content_Types].xml')&&names.has('word/document.xml');
 }
-export function validateProcedureFile(body,fail){
+export function validateProcedureFile(body,fail,maxBytes=maxProcedureFileBytes){
   const name=body?.fileName,data=body?.fileData;
   if(typeof name!=='string'||name.length>240||/[\x00-\x1f\x7f/\\]/.test(name)||!name.trim())throw fail(400,'Nom de fichier invalide.');
   const fileName=name.trim(),extension=fileName.toLowerCase().match(/\.(pdf|docx)$/)?.[1];
   if(!extension)throw fail(400,'Choisissez un document PDF ou Word (.docx).');
-  if(typeof data!=='string'||!data||data.length>Math.ceil(maxProcedureFileBytes/3)*4)throw fail(413,'Le fichier dépasse la limite de 10 Mo ou est vide.');
+  if(typeof data!=='string'||!data||data.length>Math.ceil(maxBytes/3)*4)throw fail(413,`Le fichier dépasse la limite de ${maxBytes/1024/1024} Mo ou est vide.`);
   if(!/^[A-Za-z0-9+/]*={0,2}$/.test(data)||data.length%4!==0)throw fail(400,'Le fichier n’a pas pu être lu.');
   const bytes=Buffer.from(data,'base64');
-  if(!bytes.length||bytes.length>maxProcedureFileBytes)throw fail(413,'Le fichier dépasse la limite de 10 Mo ou est vide.');
+  if(!bytes.length||bytes.length>maxBytes)throw fail(413,`Le fichier dépasse la limite de ${maxBytes/1024/1024} Mo ou est vide.`);
   if(bytes.toString('base64')!==data)throw fail(400,'Le fichier n’a pas pu être lu.');
   const valid=extension==='pdf'?bytes.subarray(0,5).toString('ascii')==='%PDF-'&&bytes.subarray(Math.max(0,bytes.length-2048)).includes(Buffer.from('%%EOF')):isDocx(bytes);
   if(!valid)throw fail(400,'Le contenu ne correspond pas à un document '+(extension==='pdf'?'PDF':'Word (.docx)')+' valide.');
