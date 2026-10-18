@@ -364,6 +364,8 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,laboratoryImport:env.LABORATORIES_IMPORT_JSON,laboratoryLogosImport:env.LABORATORY_LOGOS_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
+  // Render lance directement node server.mjs : préparer les médias avant de servir le portail.
+  await import('./cache-portal-media.mjs');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync,mailer}=createApp(db,config);
