@@ -563,3 +563,11 @@ dialog .ux-form-actions{position:sticky;bottom:0;background:white;padding-bottom
 .portal-brand .portal-logo-lockup .portal-logo{display:block;width:100%;height:100%;max-height:none;object-fit:cover;object-position:center;clip-path:none}
 @media(max-width:1100px){.portal-brand{flex-basis:350px}.portal-brand .portal-logo-lockup{max-width:350px}}
 @media(max-width:560px){.portal-brand{flex:0 1 100%;width:100%}.portal-brand .portal-logo-lockup{max-width:330px}}
+
+/* Header matches the navy background sampled from the logo. */
+body>header{background:#010b26;border-bottom-color:#17243e;color:#f1f5ff}
+body>header .portal-logo-lockup{background:#010b26}
+body>header .account-actions .badge{background:#211b40;color:#eadfff;border:1px solid #4d3b70}
+body>header .account-actions .btn{background:#0c1935;color:#f3f6ff;border-color:#52617c}
+body>header .account-actions .btn:hover{background:#1a2b4c;border-color:#9ab0d1}
+body>header .account-actions .btn:focus-visible,body>header #portal-home:focus-visible{outline-color:#b8fce7}
