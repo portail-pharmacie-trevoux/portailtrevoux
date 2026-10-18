@@ -523,3 +523,6 @@ body:has(#login:not(.hidden)) .login-card{display:grid;grid-template-columns:min
 @media(max-width:900px){body:has(#login:not(.hidden)) .login-card{grid-template-columns:minmax(0,1fr) minmax(300px,.9fr)}.login-fields-panel{padding:25px}.login-visual-panel{padding:14px}}
 @media(max-width:700px){body:has(#login:not(.hidden)) .login-card{grid-template-columns:1fr;max-width:530px}.login-visual-panel{padding:12px}.login-visual-caption{padding:9px 4px 5px}.login-visual-caption>span:last-child{display:none}.login-fields-panel{padding:24px}.login-fields-panel .intro{margin-bottom:18px}.login-fields-panel .login-version{margin-top:14px}.login-fields-panel .login-version-history{display:none}}
 @media(max-height:700px) and (min-width:701px){.login-visual-caption{padding:10px 4px 0}.login-fields-panel{padding-top:15px;padding-bottom:15px}.login-fields-panel .intro{margin-bottom:15px}.login-fields-panel #login-email,.login-fields-panel #login-password{min-height:44px;margin-bottom:12px}.login-fields-panel .login-version-history{display:none}}
+
+/* Login heading follows the Portail+ brand typography. */
+.login-fields-panel h1.login-univers-title{font-family:Segoe UI,Arial,sans-serif;font-weight:800;letter-spacing:-1px;color:#00554e;line-height:1.15;margin:0 0 28px}
