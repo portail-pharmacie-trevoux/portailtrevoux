@@ -13,7 +13,7 @@ async function renderOrderTable({container,api,canEdit,isCurrent}){
  function filterRows(){const todayParts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value]));const today=todayParts.year+'-'+todayParts.month+'-'+todayParts.day,limit=new Date(today+'T12:00:00Z');limit.setUTCDate(limit.getUTCDate()+7);const end=limit.toISOString().slice(0,10);const terms=normalize(search.value).trim().split(/\s+/).filter(Boolean);for(const row of body.children){const text=normalize(('#'+(row.dataset.orderId||'')+' ')+['NOM','PRÉNOM','TRAITEMENT'].map(key=>row.querySelector('[aria-label^="'+key+' ·"]')?.value||'').join(' '));const suspended=row.dataset.suspended==='true',due=row.querySelector('[aria-label^="DATE PROCHAINE"]')?.value,waiting=row.dataset.waiting==='true',matches=stateFilter.value==='all'||(stateFilter.value==='suspended'?suspended:!suspended&&(stateFilter.value==='waiting'?waiting:stateFilter.value==='late'?!!due&&due<today&&!waiting:!!due&&due>=today&&due<=end&&!waiting));row.classList.toggle('hidden',!matches||!terms.every(term=>text.includes(term)));}updateEmpty();}
  stateFilter.addEventListener('change',filterRows);search.addEventListener('input',filterRows);search.addEventListener('search',filterRows);
  const empty=node('p','Aucune commande programmée.','empty');
- const names=new Intl.Collator('fr',{sensitivity:'base'});
+ const names=new Intl.Collator('fr',{sensitivity:'base'}),rowSavers=new WeakMap();
  function sortRows(){const items=[...body.children];items.sort((a,b)=>sortChoice.value==='number'?(Number(a.dataset.orderId)||Infinity)-(Number(b.dataset.orderId)||Infinity):names.compare(a.querySelector('[aria-label^="NOM ·"]')?.value.trim()||'\uffff',b.querySelector('[aria-label^="NOM ·"]')?.value.trim()||'\uffff'));items.forEach(r=>body.append(r));}
  function updateEmpty(){const visible=[...body.children].some(row=>!row.classList.contains('hidden'));empty.textContent=body.children.length?'Aucune commande ne correspond à votre recherche.':'Aucune commande programmée.';empty.classList.toggle('hidden',visible);}
  function addRow(record={mode:'grossiste'}){
@@ -44,13 +44,14 @@ async function renderOrderTable({container,api,canEdit,isCurrent}){
   inputs.lastName.addEventListener('change',sortRows);
   for(const input of Object.values(inputs))input.addEventListener('input',()=>{dirty();filterRows();});
   inputs.frequency.addEventListener('input',calculate);
-  function busy(value){Object.values(inputs).forEach(i=>i.disabled=value||!canEdit);save.disabled=remove.disabled=value;suspend.disabled=value||!saved.id||changed;checked.disabled=delivered.disabled=value||!canEdit||!saved.id||changed;}
+  function busy(value){row.classList.toggle('order-plan-busy',value);Object.values(inputs).forEach(i=>i.disabled=value||!canEdit);save.disabled=remove.disabled=value;suspend.disabled=value||!saved.id||changed;checked.disabled=delivered.disabled=value||!canEdit||!saved.id||changed;}
   save.onclick=async()=>{
-   for(const input of Object.values(inputs))if(!input.reportValidity())return;
+   for(const input of Object.values(inputs))if(!input.reportValidity())return false;
    const values=Object.fromEntries(Object.entries(inputs).map(([key,input])=>[key,key==='frequency'?(input.value?Number(input.value):null):input.value]));busy(true);status.textContent='Enregistrement…';
-   try{const result=await api('/api/order-planning'+(saved.id?'/'+saved.id:''),saved.id?'PUT':'POST',{...values,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';remove.textContent='Supprimer';status.textContent='Enregistré';busy(false);save.disabled=true;trackingState();sortRows();filterRows();}
-   catch(error){if(!isCurrent())return;status.textContent=error.message;busy(false);checked.disabled=delivered.disabled=true;}
+   try{const result=await api('/api/order-planning'+(saved.id?'/'+saved.id:''),saved.id?'PUT':'POST',{...values,revision:saved.revision});if(!isCurrent())return false;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';remove.textContent='Supprimer';status.textContent='Enregistré';busy(false);save.disabled=true;trackingState();sortRows();filterRows();return true;}
+   catch(error){if(!isCurrent())return false;status.textContent=error.message;busy(false);checked.disabled=delivered.disabled=true;return false;}
   };
+  rowSavers.set(row,()=>save.onclick());
   checked.onchange=async()=>{
    const enabled=checked.checked;busy(true);status.textContent='Validation…';
    try{const result=await api('/api/order-planning/'+saved.id+'/confirmation','POST',{enabled,revision:saved.revision});if(!isCurrent())return;saved=result;changed=false;row.classList.remove('order-plan-dirty');for(const [key,input]of Object.entries(inputs))input.value=result[key]??'';status.textContent=enabled?'Commande passée':'Validation retirée';busy(false);save.disabled=true;trackingState();sortRows();filterRows();}
@@ -80,4 +81,9 @@ async function renderOrderTable({container,api,canEdit,isCurrent}){
   try{const response=await fetch('/api/order-planning/export.xlsx',{credentials:'same-origin'});if(!response.ok){const error=await response.json().catch(()=>({}));if(error.code==='MFA_REQUIRED')await api('/api/order-mfa/touch','POST',{});throw Error(error.error||'Impossible d’exporter le tableau.');}const blob=await response.blob();if(!isCurrent())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=response.headers.get('content-disposition')?.match(/filename=([^;]+)/)?.[1]||'commandes-programmees.xlsx';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);exportStatus.textContent='Fichier Excel téléchargé.';}catch(error){if(isCurrent())exportStatus.textContent=error.message;}finally{exportButton.disabled=false;}
  };if(canManage)managementActions.append(exportButton,exportStatus);
  rows.forEach(addRow);const top=node('div','','universe-toolbar order-universe-toolbar');toolbar.classList.add('universe-actions');top.append(searchBox,toolbar);root.append(top);if(canManage)root.append(management);root.append(notice,empty,wrap);container.replaceChildren(root);updateEmpty();
+ return {saveBeforeExit:async()=>{
+  if(body.querySelector('.order-plan-busy')||document.querySelector('.order-import-dialog[open],.order-plan-dialog[open]'))throw Error('Terminez l’opération ou fermez la fenêtre ouverte avant de quitter.');
+  root.inert=true;
+  try{for(const row of [...body.children]){if(!row.classList.contains('order-plan-dirty'))continue;if(!await rowSavers.get(row)?.())throw Error('Une ligne n’a pas été enregistrée. Vérifiez les champs et le message affiché sur cette ligne.');}}finally{root.inert=false;}
+ }};
 }
