@@ -411,3 +411,15 @@ CREATE TABLE IF NOT EXISTS order_reminder_emails (
  email TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('sending','sent','failed','uncertain')),message_id TEXT,sent_at TIMESTAMPTZ,
  PRIMARY KEY(period,user_id)
 );
+
+-- Quality workflow v1.11: additive changes preserve existing registers.
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'declared' CHECK(status IN ('declared','in_progress','closed'));
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS status_history JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS follow_up TEXT NOT NULL DEFAULT '';
+ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS follow_up_date DATE;
+ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS follow_up_done_at TIMESTAMPTZ;
+ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS follow_up_done_name TEXT;
+ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS updated_by_name TEXT;
+ALTER TABLE quality_tp_months ADD COLUMN IF NOT EXISTS corrective_actions TEXT NOT NULL DEFAULT '';

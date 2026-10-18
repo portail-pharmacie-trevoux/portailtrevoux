@@ -1,3 +1,4 @@
+import {temperatureCoverage} from './temperature-coverage.mjs';
 import {parseTemperatureWorkbook} from './temperature-xlsx.mjs';
 import {excursions,monthlySummary,parisStamp,stampMs} from './temperature-analysis.mjs';
 const universe="Outils d'aide à la démarche qualité";
@@ -12,7 +13,15 @@ export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,
   const summaries=sensors.map(s=>{const list=readings.filter(r=>r.sensor_id===s.id).map(r=>[r.time,r.value]);return {...s,...monthlySummary(list,month,s.low_threshold,s.high_threshold,today()),excursionCount:excursions(list,s.low_threshold,s.high_threshold).length};});
   const imports=(await db.query('SELECT id,file_name,imported_at,operator_name,added,ignored,first_reading,last_reading FROM temperature_imports ORDER BY imported_at DESC LIMIT 8')).rows;
   const references=(await db.query("SELECT s.collaborator_name,u.name,u.active FROM quality_services s LEFT JOIN users u ON u.id=s.collaborator_id WHERE regexp_replace(lower(translate(s.service,'âàäéèêëîïôöùûüç','aaaeeeeiioouuuc')),'[^a-z]','','g')='chainedufroid'")).rows;
-  res.json({month,today:today(),isAdmin:req.auth.role==='admin',sensors:summaries,imports,references});
+  const daily=(await db.query(`WITH samples AS (
+   SELECT sensor_id,recorded_at,recorded_at AT TIME ZONE 'Europe/Paris' AS local_time,
+   EXTRACT(EPOCH FROM recorded_at-lag(recorded_at) OVER(PARTITION BY sensor_id,(recorded_at AT TIME ZONE 'Europe/Paris')::date ORDER BY recorded_at)) AS gap
+   FROM temperature_readings WHERE recorded_at>=now()-interval '3 years'
+  ) SELECT sensor_id,to_char(local_time,'YYYY-MM-DD') AS day,count(*)::int AS count,
+   EXTRACT(EPOCH FROM min(local_time)::time) AS first_seconds,EXTRACT(EPOCH FROM max(local_time)::time) AS last_seconds,COALESCE(max(gap),0) AS max_gap
+   FROM samples GROUP BY sensor_id,to_char(local_time,'YYYY-MM-DD') ORDER BY sensor_id,day`)).rows;
+  const coverage=temperatureCoverage(sensors,daily,today());
+  res.json({month,today:today(),isAdmin:req.auth.role==='admin',sensors:summaries,imports,references,coverage});
  });
  app.get('/api/quality/temperatures/:sensor',...read,async(req,res)=>{
   const month=validMonth(req.query.month),sensor=(await db.query('SELECT * FROM temperature_sensors WHERE id=$1',[req.params.sensor])).rows[0];if(!sensor)throw fail(404,'Sonde introuvable.');

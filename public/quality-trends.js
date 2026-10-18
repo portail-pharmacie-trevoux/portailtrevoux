@@ -1,0 +1,4 @@
+import {rejectionRate} from './tiers-payant-model.js';
+export function previousMonth(month){const d=new Date(month+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);}
+export function monthlyRateChange(rows,row){const previous=rows.find(r=>r.month===previousMonth(row.month));if(!previous)return null;const before=rejectionRate(previous.invoices,previous.rejections),now=rejectionRate(row.invoices,row.rejections);return before===null||now===null?null:now-before;}
+export function recentThreeMonths(rows){if(!rows.length)return null;const last=rows.map(r=>r.month).sort().at(-1),months=[last,previousMonth(last),previousMonth(previousMonth(last))],values=months.map(m=>rows.find(r=>r.month===m));if(values.some(r=>!r))return null;return{first:months[2],last,rate:rejectionRate(values.reduce((n,r)=>n+r.invoices,0),values.reduce((n,r)=>n+r.rejections,0))};}
