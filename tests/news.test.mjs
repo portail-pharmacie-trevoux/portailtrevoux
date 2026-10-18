@@ -5,9 +5,9 @@ import {createApp} from '../server.mjs';
 import {validateMessage,purgeNews} from '../news.mjs';
 import {canAccess} from '../security.mjs';
 const fail=(status,message)=>Object.assign(Error(message),{status});
-test('Actualités est accessible par défaut, les droits personnalisés restent respectés',()=>{
+test('Communication est accessible à toute l’équipe, même avec des droits personnalisés',()=>{
   assert.equal(canAccess({role:'employee',rights:[]},'Actualités'),true);
-  assert.equal(canAccess({role:'employee',rights:[],permissions_configured:true},'Actualités'),false);
+  assert.equal(canAccess({role:'employee',rights:[],permissions_configured:true},'Actualités'),true);
 });
 test('messages : texte court, caractères Unicode, destinataires explicites et dédoublonnés',()=>{
   assert.deepEqual(validateMessage({text:' Bonjour ',recipients:[2,2,3]},fail),{priority:'normal',text:'Bonjour',recipients:[2,3]});
@@ -55,7 +55,7 @@ test('messagerie : accès, envoi atomique aux actifs, boîte personnelle, cases 
   assert.equal((await request('/api/news','POST',message,{'x-csrf-token':''})).status,403);
   assert.equal((await request('/api/news','POST',message,{origin:'https://evil.test'})).status,403);
   actor.must_change=true;assert.equal((await request('/api/news')).status,403);actor.must_change=false;
-  actor.rights=[];assert.equal((await request('/api/news')).status,403);actor.rights=['Actualités'];
+  actor.rights=[];assert.equal((await request('/api/news')).status,200);actor.rights=['Actualités'];
   assert.equal((await request('/api/news/recipients')).status,200);
   assert.equal((await request('/api/news','POST',{...message,recipients:[2,99]})).status,409);assert.equal(messages.length,0);
   const sent=await request('/api/news','POST',message);assert.equal(sent.status,201);assert.deepEqual(await sent.json(),{ok:true,sent:2});

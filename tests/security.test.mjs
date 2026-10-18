@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {hashPassword,verifyPassword,passwordValid,encrypt,decrypt,canAccess,token} from '../security.mjs';
+import {hashPassword,verifyPassword,passwordValid,encrypt,decrypt,canAccess,canModify,token} from '../security.mjs';
 test('password hashing verifies the original and rejects a wrong password',async()=>{
  const password=token(),stored=await hashPassword(password);
  assert.equal(await verifyPassword(password,stored),true);
@@ -25,3 +25,11 @@ test('employees need an explicit universe right; administrator can access all',(
  assert.equal(canAccess({role:'admin',rights:[]},'Agenda'),true);
 });
 
+
+test('Planning réservé aux admins malgré un ancien droit, Communication ouverte à tous',()=>{
+ const employee={role:'employee',permissions_configured:true,rights:['Emplois du temps'],edit_rights:['Emplois du temps']};
+ assert.equal(canModify(employee,'Emplois du temps'),false);assert.equal(canAccess(employee,'Emplois du temps'),true);
+ assert.equal(canModify({...employee,role:'admin'},'Emplois du temps'),true);
+ assert.equal(canAccess({...employee,rights:[]},'Actualités'),true);assert.equal(canModify({...employee,rights:[]},'Actualités'),true);
+ assert.equal(canAccess(null,'Actualités'),false);assert.equal(canModify(null,'Actualités'),false);
+});

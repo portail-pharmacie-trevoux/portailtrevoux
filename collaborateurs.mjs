@@ -78,7 +78,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     if(existing?.email&&!email)throw fail(400,'Archivez le collaborateur pour désactiver son accès.');
     if(data.password){if(!passwordValid(data.password))throw fail(400,'Le mot de passe provisoire doit comporter au moins 12 caractères.');}
     if(!email&&data.password)throw fail(400,'Renseignez une adresse e-mail pour créer un accès.');
-    return {email:email.trim().toLowerCase()||null,rights:[...new Set(rights)],editRights:[...new Set(editRights)],configured,hash:data.password?await hashPassword(data.password):existing?.password_hash||null};
+    return {email:email.trim().toLowerCase()||null,rights:[...new Set([...rights,'Actualités'])],editRights:[...new Set([...editRights.filter(r=>r!=='Emplois du temps'),'Actualités'])],configured,hash:data.password?await hashPassword(data.password):existing?.password_hash||null};
   }
   app.get('/api/users/:id/details',auth,ready,admin,async(req,res)=>{
     const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Profil invalide.');
