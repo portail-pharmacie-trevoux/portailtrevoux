@@ -1,6 +1,7 @@
 import {decrypt} from './security.mjs';
 import {orderNextDate} from './order-planning.mjs';
 export function parisDate(now){const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));return {day:p.year+'-'+p.month+'-'+p.day,hour:Number(p.hour)};}
+const humanDate=value=>String(value).replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g,'$3-$2-$1');
 const shift=(day,n)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
 export function reminderTuesday(now){const {day,hour}=parisDate(now),weekday=new Date(day+'T12:00:00Z').getUTCDay();let offset=(weekday+5)%7;if(!offset&&hour<8)offset=7;return shift(day,-offset);}
 export const isOrderService=name=>/^commandes? programmees?(?:\b|$)/.test(name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim());
@@ -9,9 +10,9 @@ export function orderDigest(rows,secret,day){
  for(const row of rows){let r;try{r=decrypt(row.content,secret);}catch{unreadable++;items.push({id:row.id,issues:['Ligne illisible : faire vérifier les données par un administrateur.']});continue;}if(r.suspended){suspended++;continue;}
   const due=orderNextDate(r),waiting=!!r.confirmation&&(!r.delivery||Date.parse(r.confirmation.at)>Date.parse(r.delivery.at)),issues=[];
   if(!due){counts.unplanned++;issues.push('Sans date de prochaine commande.');}
-  if(waiting){counts.waiting++;issues.push('Commande passée le '+(r.confirmation.date||'date inconnue')+' mais non délivrée.');}
-  if(due&&!waiting&&due<day){counts.late++;issues.push('Commande en retard depuis le '+due+'.');}
-  if(due&&!waiting&&due>=day&&due<=end){counts.soon++;issues.push('Commande à passer pour le '+due+'.');}
+  if(waiting){counts.waiting++;issues.push('Commande passée le '+humanDate(r.confirmation.date||'date inconnue')+' mais non délivrée.');}
+  if(due&&!waiting&&due<day){counts.late++;issues.push('Commande en retard depuis le '+humanDate(due)+'.');}
+  if(due&&!waiting&&due>=day&&due<=end){counts.soon++;issues.push('Commande à passer pour le '+humanDate(due)+'.');}
   const missing=[];if(!r.frequency)missing.push('fréquence');if(!r.treatment?.trim())missing.push('traitement');if(!r.mode?.trim())missing.push('mode de commande');if(missing.length){counts.incomplete++;issues.push('À compléter : '+missing.join(', ')+'.');}
   if(issues.length)items.push({id:row.id,issues});
  }
@@ -20,7 +21,7 @@ export function orderDigest(rows,secret,day){
 async function sendDigest(db,secret,userId,key,day,example=false){
  if((await db.query('SELECT 1 FROM order_weekly_reminders WHERE period=$1 AND user_id=$2',[key,userId])).rows.length)return;
  const rows=(await db.query('SELECT id,content FROM order_planning ORDER BY id')).rows,digest=orderDigest(rows,secret,day);
- const text=(example?'EXEMPLE — ':'')+'Commandes programmées : point du '+day.split('-').reverse().join('/')+' pour les 7 jours à venir. '+digest.items.length+' ligne(s) à vérifier. Consultez le détail ci-dessous puis le tableau sécurisé. Les lignes suspendues sont exclues.';
+ const text=(example?'EXEMPLE — ':'')+'Commandes programmées : point du '+day.split('-').reverse().join('-')+' pour les 7 jours à venir. '+digest.items.length+' ligne(s) à vérifier. Consultez le détail ci-dessous puis le tableau sécurisé. Les lignes suspendues sont exclues.';
  return db.query(`WITH target AS MATERIALIZED (SELECT id FROM users WHERE id=$1 AND active=TRUE FOR SHARE), due AS (
   INSERT INTO order_weekly_reminders(period,user_id) SELECT $2,id FROM target ON CONFLICT DO NOTHING RETURNING user_id
  ), message AS (
