@@ -90,10 +90,13 @@ const q=s=>document.querySelector(s);
 let session=null,people=[],editId=null,removeId=null,currentUniverse=null,universeViewRequest=0;
 function node(tag,text='',cls=''){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}
 async function api(path,method='GET',data){
+  const operation=window.PortalUX?.beginRequest(path,method);
+  try{
   const options={method,headers:{}};
   if(method!=='GET'){options.headers['Content-Type']='application/json';if(session)options.headers['X-CSRF-Token']=session.csrf;if(data!==undefined)options.body=JSON.stringify(data);}
   const response=await fetch(path,options);let body;try{body=await response.json();}catch{throw Error('Le service ne répond pas. Réessayez.');}
-  if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Object.assign(Error(body.error||'Demande impossible.'),{code:body.code,status:response.status});}return body;
+  if(!response.ok){if(response.status===401&&path!=='/api/login')showLogin();throw Object.assign(Error(body.error||'Demande impossible.'),{code:body.code,status:response.status});}operation?.success();return body;
+  }catch(error){operation?.failure(error);throw error;}
 }
 function error(e){q('#global-message').textContent=e.message;}
 function showLogin(){q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}

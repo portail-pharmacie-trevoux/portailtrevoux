@@ -533,3 +533,17 @@ body:has(#login:not(.hidden)) .login-card{display:grid;grid-template-columns:min
 
 /* Quality workflows: status, coverage and monthly rejection trend. */
 .quality-state{display:inline-block;padding:5px 9px;border-radius:8px;font-size:13px;font-weight:700;white-space:normal}.quality-state.declared{background:#fff0e0;color:#944300}.quality-state.in_progress{background:#e8effc;color:#244f95}.quality-state.closed{background:#e2f3e9;color:#116843}.quality-errors-table td select{display:block;max-width:180px;margin-top:8px}.quality-errors-table td details{min-width:160px;margin-top:8px}.quality-long-text{white-space:pre-wrap;min-width:210px;max-width:330px}.quality-trend-panel{margin:20px 0;padding:16px;border:1px solid #dce5eb;border-radius:12px;background:#fff}.quality-trend-chart{display:block;width:100%;max-width:850px;height:auto}.tp-trend-up{color:#ad263b;font-weight:650}.tp-trend-down{color:#08724e;font-weight:650}.quality-coverage{margin:22px 0}.quality-coverage>summary{font-weight:700;cursor:pointer}.quality-coverage th{min-width:120px}.quality-coverage td small{display:block;white-space:nowrap;color:#526675}.quality-coverage-month{border:1px solid transparent;border-radius:8px;padding:6px 9px;font:inherit;font-size:13px;white-space:nowrap}.quality-coverage-month.present{background:#e3f2eb;color:#176b48}.quality-coverage-month.partial{background:#fff1db;color:#8b5205}.quality-coverage-month.missing{background:#fce5e8;color:#a02d3e}.quality-coverage .tp-table-scroll{max-height:390px;overflow:auto}.quality-coverage th:first-child{position:sticky;left:0;background:#f4f7fa;z-index:1}
+
+/* Shared action hierarchy and save feedback across editing screens. */
+.ux-form-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;width:100%;grid-column:1/-1;margin-top:18px;padding-top:14px;border-top:1px solid #dce5eb}
+.ux-form-actions>.ux-cancel-action{order:1}.ux-form-actions>.ux-primary-action{order:2}
+button.ux-primary-action{background:#087b65;color:white;border:1px solid #087b65;font-weight:700;border-radius:9px;padding:10px 16px}
+button.ux-primary-action:hover{background:#056650}button.ux-delete-action{color:#a32c3f;border-color:#d9a2ab}
+dialog .ux-form-actions{position:sticky;bottom:0;background:white;padding-bottom:8px;z-index:3}
+.universe-toolbar{align-items:flex-end}.universe-toolbar>.universe-actions{margin-left:auto;justify-content:flex-end}
+.portal-save-feedback{position:fixed;right:20px;bottom:18px;z-index:1000;max-width:min(460px,calc(100vw - 32px));padding:12px 18px;border:1px solid #d3dde5;border-radius:12px;background:white;box-shadow:0 5px 22px #142b3e26;font-size:14px;font-weight:650;pointer-events:none}
+#portal-save-feedback[hidden]{display:none}.portal-save-feedback.saving{background:#eaf0fd;color:#244f95;border-color:#b8c9ee}.portal-save-feedback.success{background:#e3f4e9;color:#116843;border-color:#b1d7bf}.portal-save-feedback.failure{background:#fff0f1;color:#a2253a;border-color:#e7afb8}.portal-save-feedback.dirty{background:#fff5e4;color:#815009;border-color:#ecd3a4}
+@media(max-width:600px){.ux-form-actions{gap:8px}.ux-form-actions>.btn{min-height:42px}.portal-save-feedback{right:12px;bottom:10px;font-size:13px}}
+@media print{#portal-save-feedback{display:none!important}}
+
+.ux-save-state{grid-column:1/-1;margin:10px 0;font-size:13px;font-weight:650}.ux-save-state:empty{display:none}.ux-save-state.dirty{color:#815009}.ux-save-state.saving{color:#244f95}.ux-save-state.success{color:#116843}.ux-save-state.failure{color:#a2253a}
