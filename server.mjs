@@ -1,3 +1,4 @@
+import {registerMusicCSV} from './music-csv.mjs';
 import {orderReminderEmails} from './order-reminder-emails.mjs';
 import {registerMerchDocuments} from './merchandising-documents.mjs';
 import {orderWeeklyReminders,sendOrderExample} from './order-reminders.mjs';
@@ -203,8 +204,8 @@ export function createApp(db,config) {
   app.get('/api/youtube-music/playlists',auth,ready,admin,async(req,res)=>{const selected=await youtubeMusic.status();res.json(selected.playlistId?[{id:selected.playlistId,name:selected.playlistName}]:[]);});
   app.post('/api/youtube-music/playlist',auth,ready,admin,csrf,async(req,res)=>{const selected=await youtubeMusic.status();if(!selected.playlistId||req.body.id!==selected.playlistId)throw fail(409,'La playlist équipe est la seule destination autorisée.');res.json(await youtubeMusic.choosePlaylist(req.body.id));});
   app.post('/api/youtube-music/playlists',auth,ready,admin,csrf,async(req,res)=>{throw fail(409,'Utilisez la playlist équipe déjà configurée, créée dans YouTube Music.');});
-  app.post('/api/youtube-music/candidates',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtubeMusic.candidates(req.body.trackId)));
-  app.post('/api/youtube-music/add',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtubeMusic.add(req.body)));
+  app.post('/api/youtube-music/candidates',auth,ready,admin,csrf,async(req,res)=>res.json(await youtubeMusic.candidates(req.body.trackId)));
+  app.post('/api/youtube-music/add',auth,ready,admin,csrf,async(req,res)=>res.json(await youtubeMusic.add(req.body)));
   app.get('/api/youtube/status',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await youtube.status()));
   app.post('/api/youtube/connect',auth,ready,admin,csrf,async(req,res)=>{
     if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
@@ -295,6 +296,7 @@ export function createApp(db,config) {
   });
 
 
+  registerMusicCSV({app,db,auth,ready,admin,csrf,fail});
   app.post('/api/music/import',auth,ready,admin,csrf,async(req,res)=>{
     if(!Array.isArray(req.body.tracks)||!req.body.tracks.length||req.body.tracks.length>25)throw fail(400,'Importez de 1 à 25 morceaux par lot.');
     const tracks=req.body.tracks.map(validateMusic);

@@ -145,13 +145,12 @@ async function openUniverse(name){
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
 function personName(p){return [p.firstName,p.lastName?.toLocaleUpperCase('fr-FR')].filter(Boolean).join(' ');}
 async function reloadPeople(message=''){people=await api('/api/users');if(currentUniverse==='Collaborateurs'){renderPeople();q('#feedback').textContent=message;}}
-function setPeopleAddActions(show){q('#people-add-actions').classList.toggle('hidden',!show);}
+function setPeopleAddActions(show){q('#people-add-actions').classList.add('hidden');}
 function renderPeople(){
   employeeRecordRequest++;setPeopleAddActions(session.user.role==='admin');
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
   content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
-  if(isAdmin)content.append(node('p','Complétez les téléphones et, si besoin, créez les accès personnels depuis « Modifier ». Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));
-  if(isAdmin){renderEmployeeScan(content);renderPeopleImport(content);renderEmployeeDocument(content);renderInvitationMail(content);}
+  if(isAdmin){const administration=node('details','','people-administration calendar-tools'),body=node('div'),actions=node('div','','people-admin-actions');administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.append(administration);}
   for(const active of [true,false]){
     const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
@@ -371,7 +370,7 @@ q('#tile-order-save').onclick=()=>{
 async function renderMusic(){
   let tracks=await api('/api/music');if(currentUniverse!=='Fun')return;
   const selectedTracks=new Set();
-  const editable=canEditUniverse('Fun'),content=q('#content');content.replaceChildren();
+  const isMusicAdmin=session.user.role==='admin',editable=canEditUniverse('Fun'),content=q('#content');content.replaceChildren();
   const intro=node('div','','music-intro');intro.append(node('h3','La musique de toute l’équipe'),node('p','Ajoutez vos morceaux préférés à la sélection partagée de la pharmacie.'));
   const form=node('form','','music-form');
   const artistLabel=node('label','Artiste'),artist=node('input');artist.type='text';artist.id='music-artist';artist.maxLength=200;artist.required=true;artist.placeholder='Ex. : Adele';artistLabel.htmlFor=artist.id;
@@ -380,7 +379,7 @@ async function renderMusic(){
   const submit=node('button','Ajouter à la sélection','btn primary');submit.type='submit';
   const message=node('p','','music-feedback');message.setAttribute('role','status');
   form.append(artistField,titleField,submit);content.append(intro);if(editable)content.append(form);else content.append(node('p','Vous consultez la sélection musicale. L’ajout et la suppression de titres nécessitent un droit de modification.','field-note'));content.append(message);
-  content.append(node('p','Cochez les titres de l’équipe puis ouvrez YouTube Music. Créez ou choisissez la playlist, recherchez les correspondances, vérifiez les versions et ajoutez les titres. L’ancien export YouTube reste provisoirement disponible.','status-line'));
+  content.append(node('p','La sélection musicale est partagée par l’équipe. L’administrateur dispose des imports CSV, de l’export des titres cochés et du transfert vers la playlist équipe YouTube Music.','status-line'));
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
   const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
 
@@ -391,11 +390,16 @@ async function renderMusic(){
   const youtubeMusicTransfer=button('',async()=>{await renderYouTubePanel(youtubePanel,tracks.filter(t=>selectedTracks.has(t.id)),'music');},'btn youtube-music-button');
   youtubeMusicTransfer.innerHTML='<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor"/><circle cx="12" cy="12" r="7" fill="none" stroke="white" stroke-width="1.2"/><path d="m10 8 6 4-6 4Z" fill="white"/></svg><span>Ajouter à YouTube Music</span>';
   youtubeMusicTransfer.title='Ajouter les titres cochés et ouvrir la playlist sur music.youtube.com';
+  const csvExport=button('Exporter les titres sélectionnés en CSV',async()=>{
+    const ids=tracks.filter(t=>selectedTracks.has(t.id)).map(t=>t.id);if(!ids.length)return;csvExport.disabled=true;message.textContent='Préparation du CSV…';
+    try{const response=await fetch('/api/music/export.csv',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrf},body:JSON.stringify({ids})});if(!response.ok){const error=await response.json();throw Error(error.error||'Export impossible.');}const blob=await response.blob();if(currentUniverse!=='Fun')return;const url=URL.createObjectURL(blob),link=node('a');link.href=url;link.download='Playlist_PortailPlus_Trevoux.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message.textContent=ids.length+' titre(s) exporté(s).';}catch(error){if(currentUniverse==='Fun')message.textContent=error.message;}finally{updateSelection();}
+  },'btn primary');
+  const adminPanel=node('details','','calendar-tools music-admin-panel'),adminActions=node('div','','music-admin-actions');adminPanel.append(node('summary','Administration'),node('p','Importez une liste ou cochez les titres à exporter / ajouter à la playlist équipe.','field-note'),adminActions);adminActions.append(csvExport,youtubeMusicTransfer,youtubeTransfer);
   const selectionCount=node('span','','status-line');selectionCount.setAttribute('role','status');
   function updateSelection(){
     const total=tracks.filter(t=>selectedTracks.has(t.id)).length;
     selectionCount.textContent=total+' titre'+(total!==1?'s':'')+' coché'+(total!==1?'s':'');
-    youtubeMusicTransfer.disabled=false;
+    youtubeMusicTransfer.disabled=!total;csvExport.disabled=!total;
   }
   function filteredTracks(){
     const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
@@ -405,8 +409,8 @@ async function renderMusic(){
   const selectNone=button('Tout décocher',()=>{selectedTracks.clear();display();});
   const selectionTools=node('div','','music-selection-tools');selectionTools.append(selectAll,selectNone,node('span','« Tout cocher » sélectionne tous les résultats de la recherche, y compris les lignes non affichées.','field-note'));
   toolbar.append(selectionTools);
-  const actions=node('div','','agenda-navigation');actions.append(youtubeMusicTransfer,youtubeTransfer,selectionCount);
-  if(!editable){youtubeTransfer.classList.add('hidden');youtubeMusicTransfer.classList.add('hidden');}content.append(actions,youtubePanel,toolbar,count,list,more);
+  const actions=node('div','','agenda-navigation');actions.append(selectionCount);
+  if(isMusicAdmin){adminPanel.append(youtubePanel);content.append(adminPanel);}content.append(actions,toolbar,count,list,more);
   if(session.user.role==='admin'){
     const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
     const label=node('label','Fichier CSV avec les colonnes Artist et Title'),file=node('input');file.type='file';file.accept='.csv,text/csv';file.id='music-csv-import';label.htmlFor=file.id;
@@ -425,7 +429,7 @@ async function renderMusic(){
       pending=[];importButton.disabled=true;state.textContent='';
       try{const selected=file.files[0];if(!selected)return;if(selected.size>2000000)throw Error('Le fichier CSV est trop volumineux.');pending=parseMusicCSV(await selected.text());state.textContent=pending.length+' morceaux prêts à être importés.';importButton.disabled=false;}catch(e){state.textContent=e.message;}
     };
-    importPanel.append(label,file,state,importButton);content.insertBefore(importPanel,toolbar);
+    importPanel.append(label,file,state,importButton);adminPanel.append(importPanel);
   }
 
   function display(){
