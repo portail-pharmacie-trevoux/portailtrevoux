@@ -547,3 +547,12 @@ dialog .ux-form-actions{position:sticky;bottom:0;background:white;padding-bottom
 @media print{#portal-save-feedback{display:none!important}}
 
 .ux-save-state{grid-column:1/-1;margin:10px 0;font-size:13px;font-weight:650}.ux-save-state:empty{display:none}.ux-save-state.dirty{color:#815009}.ux-save-state.saving{color:#244f95}.ux-save-state.success{color:#116843}.ux-save-state.failure{color:#a2253a}
+
+/* Communication: explicit message origin and chronological conversations. */
+.news-origin-badge{display:inline-flex;align-items:center;margin:0 0 9px;padding:4px 9px;border-radius:8px;font-size:12px;font-weight:750;line-height:1.4}
+.news-origin-badge.colleague{background:#e4f3e9;color:#146546}.news-origin-badge.reply{background:#e5edfd;color:#27539a}.news-origin-badge.automatic{background:#eee8f8;color:#64428c}
+.news-message.news-origin-colleague{border-left:4px solid #27825d}.news-message.news-origin-reply{border-left:4px solid #4976bc}.news-message.news-origin-automatic{border-left:4px solid #8766ae}
+.news-thread{margin-bottom:20px}.news-thread-toggle{display:block;margin:8px 0 0 auto;color:#315d91;border-color:#b7cbe0}.news-thread-content>h4{margin:0 0 12px;padding:10px 12px;background:#edf2f8;border-radius:9px;color:#294b75}
+.news-thread-content:has(>h4){border-left:2px solid #d4dfed;padding-left:14px}.news-thread-content:has(>h4)>.news-message{margin-right:5%;margin-bottom:12px}.news-thread-content:has(>h4)>.news-message-outgoing{margin-left:5%;margin-right:0;background:#f0f5fb}
+.news-message-outgoing>strong{display:block}.news-message-outgoing .news-message-text{white-space:pre-wrap}
+@media(max-width:650px){.news-thread-content:has(>h4){padding-left:7px}.news-thread-content:has(>h4)>.news-message{margin-right:0}.news-thread-content:has(>h4)>.news-message-outgoing{margin-left:10px}}

@@ -48,7 +48,7 @@
   const button=e.target.closest?.('button,a');if(!button)return;
   const text=button.textContent.trim(),form=button.closest('form');
   const exit=button.id==='portal-home'||button.id==='back'||button.id==='logout'||button.hasAttribute('data-universe')||/^(?:[←↩]\s*)?(retour|annuler|fermer|quitter)\b/i.test(text)||button.tagName==='A'&&!button.hasAttribute('download')&&button.target!=='_blank'&&button.getAttribute('href')&&!button.getAttribute('href').startsWith('#');
-  const outside=button.tagName==='BUTTON'&&!form&&dirtyRecords().length&&button.type!=='submit'&&!button.closest('.ux-form-actions')&&!/enregistrer|ajouter un créneau|ajouter une plage/i.test(text)&&!/^(tout cocher|tout décocher|afficher davantage|imprimer|télécharger|exporter|ouvrir|csv vers|messages reçus|messages envoyés|non vus)/i.test(text);
+  const outside=button.tagName==='BUTTON'&&!button.hasAttribute('data-ux-stay')&&!form&&dirtyRecords().length&&button.type!=='submit'&&!button.closest('.ux-form-actions')&&!/enregistrer|ajouter un créneau|ajouter une plage/i.test(text)&&!/^(tout cocher|tout décocher|afficher davantage|imprimer|télécharger|exporter|ouvrir|csv vers|messages reçus|messages envoyés|non vus)/i.test(text);
   if((exit||outside)&&!canLeave(button)){e.preventDefault();e.stopImmediatePropagation();return;}
   rememberIntent(button);
  },true);

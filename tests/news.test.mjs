@@ -15,9 +15,9 @@ test('messages : texte court, caractères Unicode, destinataires explicites et d
   assert.equal(validateMessage({text:'Important',priority:'important',recipients:[2]},fail).priority,'important');assert.throws(()=>validateMessage({text:'Test',priority:'unknown',recipients:[2]},fail));
   for(const body of [{text:' ',recipients:[2]},{text:'x'.repeat(501),recipients:[2]},{text:'Bonjour',recipients:[]},{text:'Bonjour',recipients:['2']},{text:'Bonjour',recipients:[-1]}])assert.throws(()=>validateMessage(body,fail),e=>e.status===400);
 });
-test('purge : expiration à 30 jours, archives par destinataire et suppression des messages sans copie',async()=>{
+test('purge : expiration à 15 jours, archives par destinataire et suppression des messages sans copie',async()=>{
   const queries=[];await purgeNews({query:async sql=>{queries.push(sql);return {rows:[]};}});
-  assert.match(queries[0],/NOT r.archived/);assert.match(queries[0],/created_at<=now\(\)-interval '30 days'/);
+  assert.match(queries[0],/NOT r.archived/);assert.match(queries[0],/interval '15 days'/);assert.match(queries[0],/LEAST/);assert.match(queries[0],/expires_on/);
   assert.match(queries[1],/NOT EXISTS/);assert.match(queries[1],/r.message_id=m.id/);
 });
 test('messagerie : accès, envoi atomique aux actifs, boîte personnelle, cases indépendantes et badge privé',async t=>{
@@ -29,7 +29,7 @@ test('messagerie : accès, envoi atomique aux actifs, boîte personnelle, cases 
     if(sql.startsWith('WITH targets')){
       assert.match(sql,/active=TRUE/);assert.match(sql,/FOR SHARE/);assert.match(sql,/COUNT\(\*\).*cardinality/s);
       if(args[0].some(id=>!active.has(id)))return {rows:[]};
-      const m={id:++nextId,sender:args[2],text:args[3],created_at:new Date().toISOString(),expires_at:new Date(Date.now()+30*86400000).toISOString(),sender_id:args[1],priority:args[4]};messages.push(m);
+      const m={id:++nextId,sender:args[2],text:args[3],created_at:new Date().toISOString(),expires_at:new Date(Date.now()+15*86400000).toISOString(),sender_id:args[1],priority:args[4]};messages.push(m);
       args[0].forEach(id=>copies.push({message_id:m.id,user_id:id,seen:false,archived:false}));return {rows:[{id:m.id,sent:args[0].length}]};
     }
     if(sql.startsWith('DELETE FROM team_message'))return {rows:[]};
@@ -39,12 +39,12 @@ test('messagerie : accès, envoi atomique aux actifs, boîte personnelle, cases 
       return {rows:copies.filter(c=>c.user_id===args[0]).map(c=>({...messages.find(m=>m.id===c.message_id),seen:c.seen,archived:c.archived})).reverse()};
     }
     if(sql.startsWith('UPDATE team_message_recipients')){
-      assert.match(sql,/r.user_id=\$2/);assert.match(sql,/r.archived OR m.created_at>now\(\)-interval '30 days'/);
+      assert.match(sql,/r.user_id=\$2/);assert.match(sql,/r.archived OR LEAST/);assert.match(sql,/interval '15 days'/);
       const copy=copies.find(c=>c.message_id===args[0]&&c.user_id===args[1]);if(!copy)return {rows:[]};
       if(args[2]!==null){copy.seen=args[2];copy.seen_at=args[2]?new Date().toISOString():null;assert.match(sql,/seen_at=CASE/);}if(args[3]!==null)copy.archived=args[3];return {rows:[copy]};
     }
     if(sql.startsWith('SELECT p.universe'))return {rows:[]};
-    if(sql.startsWith('SELECT COUNT(*)::int AS unread')){assert.match(sql,/r.user_id=\$1 AND NOT r.seen/);assert.match(sql,/r.archived OR m.created_at/);return {rows:[{unread:copies.filter(c=>c.user_id===args[0]&&!c.seen).length}]};}
+    if(sql.startsWith('SELECT COUNT(*)::int AS unread')){assert.match(sql,/r.user_id=\$1 AND NOT r.seen/);assert.match(sql,/r.archived OR LEAST/);return {rows:[{unread:copies.filter(c=>c.user_id===args[0]&&!c.seen).length}]};}
     throw Error('Unexpected query '+sql);
   }};
   const {app}=createApp(db,{origin:'https://portal.test',secret:'s'.repeat(32)}),server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>server.close());

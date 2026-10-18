@@ -423,3 +423,12 @@ ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS revision INTEGER N
 ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
 ALTER TABLE quality_prescriber_calls ADD COLUMN IF NOT EXISTS updated_by_name TEXT;
 ALTER TABLE quality_tp_months ADD COLUMN IF NOT EXISTS corrective_actions TEXT NOT NULL DEFAULT '';
+
+-- Message threads retain an identifier even when an older message expires.
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS expires_on DATE;
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS thread_id INTEGER;
+WITH RECURSIVE threads AS (
+ SELECT id,id AS root FROM team_messages WHERE reply_to_id IS NULL
+ UNION ALL SELECT m.id,t.root FROM team_messages m JOIN threads t ON m.reply_to_id=t.id
+) UPDATE team_messages m SET thread_id=t.root FROM threads t WHERE m.id=t.id AND m.thread_id IS NULL;
+CREATE INDEX IF NOT EXISTS team_messages_thread_idx ON team_messages((COALESCE(thread_id,id)),created_at,id);
