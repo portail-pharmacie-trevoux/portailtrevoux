@@ -313,7 +313,7 @@ export function createApp(db,config) {
     await publish('Fun',title+' — '+artist,'music:'+rows[0].id);
     res.status(201).json(rows[0]);
   });
-  app.delete('/api/music/:id',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>{
+  app.delete('/api/music/:id',auth,ready,admin,csrf,async(req,res)=>{
     const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Morceau invalide.');
     const {rowCount}=await db.query('DELETE FROM music_tracks WHERE id=$1',[id]);
     if(!rowCount)throw fail(404,'Ce morceau ne figure plus dans la sélection.');

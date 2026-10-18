@@ -378,12 +378,12 @@ async function renderMusic(){
   const artistField=node('div'),titleField=node('div');artistField.append(artistLabel,artist);titleField.append(titleLabel,title);
   const submit=node('button','Ajouter à la sélection','btn primary');submit.type='submit';
   const message=node('p','','music-feedback');message.setAttribute('role','status');
-  form.append(artistField,titleField,submit);content.append(intro);if(editable)content.append(form);else content.append(node('p','Vous consultez la sélection musicale. L’ajout et la suppression de titres nécessitent un droit de modification.','field-note'));content.append(message);
+  form.append(artistField,titleField,submit);content.append(intro);if(editable)content.append(form);else content.append(node('p','Vous consultez la sélection musicale. L’ajout de titres nécessite un droit de modification. La suppression est réservée aux administrateurs.','field-note'));content.append(message);
   content.append(node('p','La sélection musicale est partagée par l’équipe. L’administrateur peut importer une liste CSV, exporter les titres cochés et préparer leur transfert vers Deezer avec TuneMyMusic.','status-line'));
   const toolbar=node('div','','music-toolbar'),searchLabel=node('label','Retrouver un morceau'),search=node('input');search.type='search';search.id='music-search';search.placeholder='Artiste ou titre…';searchLabel.htmlFor=search.id;toolbar.append(searchLabel,search);
   const list=node('div','','music-list');list.setAttribute('role','list');const count=node('p','','status-line'),more=button('Afficher davantage',()=>{limit+=40;display();});let limit=40;
 
-  let exportingCSV=false;
+  let exportingCSV=false,deletingTracks=false;
   async function downloadMusicCSV(){
     const ids=tracks.filter(t=>selectedTracks.has(t.id)).map(t=>t.id);if(!ids.length||exportingCSV)return false;exportingCSV=true;updateSelection();message.textContent='Préparation du CSV…';
     try{const response=await fetch('/api/music/export.csv',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrf},body:JSON.stringify({ids})});if(!response.ok){const error=await response.json();throw Error(error.error||'Export impossible.');}const blob=await response.blob();if(currentUniverse!=='Fun')return;const url=URL.createObjectURL(blob),link=node('a');link.href=url;link.download='Playlist_PortailPlus_Trevoux.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message.textContent=ids.length+' titre(s) exporté(s).';return true;}catch(error){if(currentUniverse==='Fun')message.textContent=error.message;return false;}finally{exportingCSV=false;updateSelection();}
@@ -392,11 +392,25 @@ async function renderMusic(){
   const tuneTransfer=button('CSV vers TuneMyMusic / Deezer',async()=>{if(exportingCSV||!selectedTracks.size)return;window.open('https://www.tunemymusic.com/fr/transfer/csv-to-deezer','_blank','noopener,noreferrer');if(await downloadMusicCSV())message.textContent='CSV téléchargé. Dans TuneMyMusic, importez Playlist_PortailPlus_Trevoux.csv puis connectez Deezer pour terminer le transfert.';},'btn primary');
   const tuneLink=node('a','Ouvrir TuneMyMusic','btn small');tuneLink.href='https://www.tunemymusic.com/fr/transfer/csv-to-deezer';tuneLink.target='_blank';tuneLink.rel='noopener noreferrer';
   const adminPanel=node('details','','calendar-tools music-admin-panel admin-menu'),adminActions=node('div','','music-admin-actions');adminPanel.append(node('summary','Administration'),node('p','Importez une liste ou cochez les titres à exporter / ajouter à la playlist équipe.','field-note'),adminActions);adminActions.append(csvExport,tuneTransfer,tuneLink);adminPanel.append(node('p','TuneMyMusic : le bouton télécharge le CSV et ouvre le service. Chargez ensuite ce fichier dans TuneMyMusic et connectez votre compte Deezer.','field-note'));
+  const deleteSelected=button('Supprimer les titres sélectionnés',async()=>{
+    const ids=tracks.filter(t=>selectedTracks.has(t.id)).map(t=>t.id);
+    if(!ids.length||deletingTracks||exportingCSV)return;
+    if(!confirm('Supprimer définitivement les '+ids.length+' titre(s) sélectionné(s) de la liste partagée, y compris ceux masqués par la recherche ?'))return;
+    deletingTracks=true;updateSelection();message.textContent='Suppression en cours…';
+    try{
+      const result=await api('/api/music/delete-selected','POST',{ids});
+      if(currentUniverse!=='Fun')return;
+      const removed=new Set(result.ids);tracks=tracks.filter(t=>!removed.has(t.id));ids.forEach(id=>selectedTracks.delete(id));display();
+      message.textContent=result.ids.length+' titre(s) supprimé(s).';
+    }catch(error){if(currentUniverse==='Fun')message.textContent=error.message;}
+    finally{deletingTracks=false;updateSelection();}
+  },'btn danger');
+  adminActions.append(deleteSelected);
   const selectionCount=node('span','','status-line');selectionCount.setAttribute('role','status');
   function updateSelection(){
     const total=tracks.filter(t=>selectedTracks.has(t.id)).length;
     selectionCount.textContent=total+' titre'+(total!==1?'s':'')+' coché'+(total!==1?'s':'');
-    csvExport.disabled=exportingCSV||!total;tuneTransfer.disabled=exportingCSV||!total;
+    csvExport.disabled=exportingCSV||deletingTracks||!total;tuneTransfer.disabled=exportingCSV||deletingTracks||!total;deleteSelected.disabled=exportingCSV||deletingTracks||!total;
   }
   function filteredTracks(){
     const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
@@ -405,7 +419,7 @@ async function renderMusic(){
   const selectAll=button('Tout cocher',()=>{filteredTracks().forEach(t=>selectedTracks.add(t.id));display();});
   const selectNone=button('Tout décocher',()=>{selectedTracks.clear();display();});
   const selectionTools=node('div','','music-selection-tools');selectionTools.append(selectAll,selectNone,node('span','« Tout cocher » sélectionne tous les résultats de la recherche, y compris les lignes non affichées.','field-note'));
-  toolbar.append(selectionTools);
+  adminPanel.append(selectionTools);
   const actions=node('div','','agenda-navigation');actions.append(selectionCount);
   if(isMusicAdmin)content.prepend(adminPanel);content.append(actions,toolbar,count,list,more);
   if(session.user.role==='admin'){
@@ -436,23 +450,12 @@ async function renderMusic(){
     list.replaceChildren();
     visible.slice(0,limit).forEach(t=>{
       const row=node('div','','music-row');row.setAttribute('role','listitem');
-      const check=node('input','','music-row-check');check.type='checkbox';check.checked=selectedTracks.has(t.id);check.setAttribute('aria-label','Exporter '+t.title+' de '+t.artist);
+      const check=node('input','','music-row-check');check.type='checkbox';check.checked=selectedTracks.has(t.id);check.setAttribute('aria-label','Sélectionner '+t.title+' de '+t.artist);
       check.onchange=()=>{if(check.checked)selectedTracks.add(t.id);else selectedTracks.delete(t.id);updateSelection();};
       const song=node('span',t.title,'music-row-title'),artistName=node('span',t.artist,'music-row-artist');
       const added=node('time','','music-row-date'),addedDate=new Date(t.created_at);
       if(t.created_at&&!Number.isNaN(addedDate.getTime())){added.dateTime=addedDate.toISOString();added.textContent='Ajouté le '+addedDate.toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});}else added.textContent='Date inconnue';
-      const actions=node('div','','music-row-actions');
-      const remove=button('Supprimer',async()=>{
-        if(!confirm('Retirer « '+t.title+' » de '+t.artist+' de la sélection partagée de l’équipe ?'))return;
-        remove.disabled=true;message.textContent='';
-        try{
-          await api('/api/music/'+t.id,'DELETE');
-          if(currentUniverse!=='Fun')return;
-          tracks=tracks.filter(track=>track.id!==t.id);selectedTracks.delete(t.id);display();message.textContent='« '+t.title+' » a été retiré de la sélection.';
-        }catch(e){message.textContent=e.message;}finally{remove.disabled=false;}
-      },'btn small danger');
-      remove.setAttribute('aria-label','Supprimer '+t.title+' de '+t.artist+' de la sélection');
-      if(editable)actions.append(remove);row.append(check,song,artistName,added,actions);list.append(row);
+      row.append(check,song,artistName,added);list.append(row);
     });
     if(!visible.length)list.append(node('div','Aucun morceau ne correspond à votre recherche.','empty'));
     more.classList.toggle('hidden',visible.length<=limit);
