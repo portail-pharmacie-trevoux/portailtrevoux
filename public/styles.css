@@ -495,3 +495,31 @@ header{padding-top:8px;padding-bottom:8px;min-height:0;gap:12px}
 @media(max-width:1100px){header{padding-top:6px;padding-bottom:6px}.portal-logo{width:min(445px,100%);max-height:123px}}
 @media(max-width:800px){.portal-logo{width:min(370px,100%);max-height:104px}.portal-brand{max-width:calc(100% - 115px)}}
 @media(max-width:560px){header{gap:6px;flex-wrap:wrap}.portal-brand{max-width:100%}.portal-logo{width:min(100%,340px);max-height:95px}}
+
+/* Connexion v1.11 : expérience immersive, vidéo grand format et formulaire dédié. */
+body:has(#login:not(.hidden)){background:radial-gradient(ellipse at 15% 10%,#19345e 0%,#0b1933 50%,#071124 100%)}
+body:has(#login:not(.hidden)) main{max-width:none;width:100%;padding:clamp(16px,3vw,42px);min-height:100dvh;display:grid;place-items:center}
+body:has(#login:not(.hidden)) .login-card{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(330px,.85fr);width:min(1320px,100%);max-width:none;margin:0;padding:0;border:1px solid #e0e9f13d;border-radius:24px;background:#fff;box-shadow:0 30px 85px #0008;overflow:hidden}
+.login-visual-panel{min-width:0;display:flex;flex-direction:column;justify-content:center;background:#081733;color:#fff;padding:clamp(12px,2vw,28px)}
+.login-visual-panel .login-film-wrap{margin:0;border-radius:16px;aspect-ratio:16/9;box-shadow:0 10px 40px #0006}
+.login-visual-panel .login-higgsfield-video{width:100%;height:100%;object-fit:contain}
+.login-visual-caption{display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;padding:18px 8px 5px;color:#e9f3ff}
+.login-visual-caption strong{font-size:clamp(16px,1.6vw,23px);font-weight:650}
+.login-visual-caption>span:last-child{font-size:13px;color:#adbed9}
+.login-visual-pill{font-size:12px;font-weight:800;letter-spacing:2px;color:#b8fce7;border:1px solid #4c9e98;padding:5px 13px;border-radius:999px}
+.login-fields-panel{min-width:0;padding:clamp(25px,3.3vw,52px);display:flex;flex-direction:column;justify-content:center}
+.login-eyebrow{font-size:11px;letter-spacing:2px;font-weight:800;color:#7652a8}
+.login-fields-panel h1{font-size:clamp(25px,2.4vw,34px);line-height:1.2;margin:12px 0 8px;color:#162844}
+.login-fields-panel .intro{color:#60718a;margin:0 0 28px}
+.login-fields-panel label{display:block;color:#243550;font-size:14px;font-weight:700;margin-bottom:7px}
+.login-fields-panel #login-email,.login-fields-panel #login-password{border:1px solid #cbd5e3;border-radius:12px;background:#f8fafd;padding:15px 16px;margin:0 0 19px;min-height:52px;transition:border-color .2s,box-shadow .2s}
+.login-fields-panel #login-email:focus,.login-fields-panel #login-password:focus{outline:0;border-color:#7551ad;box-shadow:0 0 0 3px #7551ad22;background:#fff}
+.login-fields-panel #login-form .primary{min-height:52px;border-radius:12px;font-size:16px;font-weight:750;background:#7043a0;border-color:#7043a0}
+.login-fields-panel #login-form .primary:hover{background:#5d318d}
+.login-fields-panel .field-note{font-size:12px;color:#69778a;margin:20px 0 0;line-height:1.5}
+.login-fields-panel .login-version{display:block;font-size:11px;color:#748195;margin-top:24px;padding-top:13px}
+.login-fields-panel .login-version>p{margin:4px 0}
+.login-fields-panel .login-version-history{font-size:10px}
+@media(max-width:900px){body:has(#login:not(.hidden)) .login-card{grid-template-columns:minmax(0,1fr) minmax(300px,.9fr)}.login-fields-panel{padding:25px}.login-visual-panel{padding:14px}}
+@media(max-width:700px){body:has(#login:not(.hidden)) .login-card{grid-template-columns:1fr;max-width:530px}.login-visual-panel{padding:12px}.login-visual-caption{padding:9px 4px 5px}.login-visual-caption>span:last-child{display:none}.login-fields-panel{padding:24px}.login-fields-panel .intro{margin-bottom:18px}.login-fields-panel .login-version{margin-top:14px}.login-fields-panel .login-version-history{display:none}}
+@media(max-height:700px) and (min-width:701px){.login-visual-caption{padding:10px 4px 0}.login-fields-panel{padding-top:15px;padding-bottom:15px}.login-fields-panel .intro{margin-bottom:15px}.login-fields-panel #login-email,.login-fields-panel #login-password{min-height:44px;margin-bottom:12px}.login-fields-panel .login-version-history{display:none}}
