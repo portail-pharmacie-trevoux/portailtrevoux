@@ -315,7 +315,7 @@ setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
 let draftTileOrder=[],draftHiddenTiles=new Set();
 function tileOrderKey(){return 'portail-plus:tile-order:'+session.user.id;}
-function tileAllowed(name){if(["Outils d'aide à la démarche qualité",'Actualités'].includes(name))return true;return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires',"Outils d'aide au merchandising","Outils d'aide à la démarche qualité"].includes(name)||session.user.rights.includes(name)));}
+function tileAllowed(name){if(["Outils d'aide à la démarche qualité",'Actualités','Agenda'].includes(name))return true;return session.user.role==='admin'||(session.user.permissionsConfigured?session.user.rights.includes(name):(['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires',"Outils d'aide au merchandising","Outils d'aide à la démarche qualité"].includes(name)||session.user.rights.includes(name)));}
 function canEditUniverse(name){if(name==='Emplois du temps')return session.user.role==='admin';if(name==='Actualités')return true;if(['Laboratoires',"Outils d'aide aux commandes"].includes(name))return tileAllowed(name);if(name==='Ressources humaines')return session.user.role==='admin';return session.user.role==='admin'||(tileAllowed(name)&&(session.user.permissionsConfigured?session.user.editRights?.includes(name):name==='Fun'));}
 function tilePreferences(){
   let saved;try{saved=JSON.parse(localStorage.getItem(tileOrderKey())||'null');}catch{}

@@ -19,7 +19,7 @@ test('Google credentials survive encryption and reject tampering or the wrong ke
 });
 test('employees need an explicit universe right; administrator can access all',()=>{
  assert.equal(canAccess({role:'employee',rights:['Agenda']},'Agenda'),true);
- assert.equal(canAccess({role:'employee',rights:[]},'Agenda'),false);
+ assert.equal(canAccess({role:'employee',rights:[]},'Agenda'),true);
  assert.equal(canAccess({role:'employee',rights:['Agenda']},'Ressources humaines'),true,'Les documents RH collectifs sont accessibles par défaut');
  assert.equal(canAccess({role:'employee',permissions_configured:true,rights:[]},'Ressources humaines'),false);
  assert.equal(canAccess({role:'admin',rights:[]},'Agenda'),true);
@@ -32,4 +32,9 @@ test('Planning réservé aux admins malgré un ancien droit, Communication ouver
  assert.equal(canModify({...employee,role:'admin'},'Emplois du temps'),true);
  assert.equal(canAccess({...employee,rights:[]},'Actualités'),true);assert.equal(canModify({...employee,rights:[]},'Actualités'),true);
  assert.equal(canAccess(null,'Actualités'),false);assert.equal(canModify(null,'Actualités'),false);
+});
+
+test('Agenda reste accessible même sans droit explicite et avec droits configurés',()=>{
+ assert.equal(canAccess({role:'employee',rights:[],permissions_configured:true},'Agenda'),true);
+ assert.equal(canAccess(null,'Agenda'),false);
 });
