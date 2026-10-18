@@ -1,3 +1,4 @@
+import {orderReminderEmails} from './order-reminder-emails.mjs';
 import {registerMerchDocuments} from './merchandising-documents.mjs';
 import {orderWeeklyReminders,sendOrderExample} from './order-reminders.mjs';
 import {registerCalendarTasks} from './calendar-tasks.mjs';
@@ -326,7 +327,7 @@ export function createApp(db,config) {
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message,...(error.code==='MFA_REQUIRED'?{code:'MFA_REQUIRED'}:{})});
   });
-  return {app,sync};
+  return {app,sync,mailer};
 }
 
 export async function initialize(db,config){
@@ -360,9 +361,9 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
   await initialize(db,config);config.dummyHash=await hashPassword(token());
-  const {app,sync}=createApp(db,config);
+  const {app,sync,mailer}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await orderWeeklyReminders(db,config.secret);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }

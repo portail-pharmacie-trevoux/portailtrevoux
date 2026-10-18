@@ -575,7 +575,7 @@ async function refreshHomeExtras(){
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
-      if(tile.classList.contains('tool-tile')||['Collaborateurs','Contacts utiles','Agenda','Emplois du temps','Fun'].includes(tile.dataset.universe))return;
+      if(tile.classList.contains('tool-tile')||['Collaborateurs','Contacts utiles','Agenda','Emplois du temps','Fun','Passerelle groupement'].includes(tile.dataset.universe))return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
       const label=tile.dataset.universe==='Actualités'?(count?count+' message'+(count>1?'s':'')+' non vu'+(count>1?'s':''):'Aucun message non vu'):(count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue');

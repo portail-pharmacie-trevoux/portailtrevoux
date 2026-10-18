@@ -403,3 +403,11 @@ CREATE TABLE IF NOT EXISTS merchandising_documents (
  id SERIAL PRIMARY KEY,title TEXT NOT NULL,file_name TEXT NOT NULL,file_type TEXT NOT NULL,file_content BYTEA NOT NULL,
  revision INTEGER NOT NULL DEFAULT 1,created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE order_weekly_reminders ADD COLUMN IF NOT EXISTS digest JSONB;
+ALTER TABLE order_weekly_reminders ADD COLUMN IF NOT EXISTS heading TEXT;
+CREATE TABLE IF NOT EXISTS order_reminder_emails (
+ period TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ email TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('sending','sent','failed','uncertain')),message_id TEXT,sent_at TIMESTAMPTZ,
+ PRIMARY KEY(period,user_id)
+);

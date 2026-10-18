@@ -1,3 +1,4 @@
+import {orderAlerts} from './public/order-alerts.js';
 import {isOrderService} from './order-service.mjs';
 export {isOrderService} from './order-service.mjs';
 import {decrypt} from './security.mjs';
@@ -8,14 +9,9 @@ const shift=(day,n)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDa
 export function reminderTuesday(now){const {day,hour}=parisDate(now),weekday=new Date(day+'T12:00:00Z').getUTCDay();let offset=(weekday+5)%7;if(!offset&&hour<8)offset=7;return shift(day,-offset);}
 export function orderDigest(rows,secret,day){
  const end=shift(day,7),items=[];let suspended=0,unreadable=0;const counts={unplanned:0,waiting:0,late:0,soon:0,incomplete:0};
- for(const row of rows){let r;try{r=decrypt(row.content,secret);}catch{unreadable++;items.push({id:row.id,issues:['Ligne illisible : faire vérifier les données par un administrateur.']});continue;}if(r.suspended){suspended++;continue;}
-  const due=orderNextDate(r),waiting=!!r.confirmation&&(!r.delivery||Date.parse(r.confirmation.at)>Date.parse(r.delivery.at)),issues=[];
-  if(!due){counts.unplanned++;issues.push('Sans date de prochaine commande.');}
-  if(waiting){counts.waiting++;issues.push('Commande passée le '+humanDate(r.confirmation.date||'date inconnue')+' mais non délivrée.');}
-  if(due&&!waiting&&due<day){counts.late++;issues.push('Commande en retard depuis le '+humanDate(due)+'.');}
-  if(due&&!waiting&&due>=day&&due<=end){counts.soon++;issues.push('Commande à passer pour le '+humanDate(due)+'.');}
-  const missing=[];if(!r.frequency)missing.push('fréquence');if(!r.treatment?.trim())missing.push('traitement');if(!r.mode?.trim())missing.push('mode de commande');if(missing.length){counts.incomplete++;issues.push('À compléter : '+missing.join(', ')+'.');}
-  if(issues.length)items.push({id:row.id,issues});
+ for(const row of rows){let r;try{r=decrypt(row.content,secret);}catch{unreadable++;items.push({id:row.id,issues:['Ligne illisible : faire vérifier les données par un administrateur.'],alerts:[{code:'unreadable',text:'Ligne illisible : faire vérifier les données par un administrateur.'}]});continue;}if(r.suspended){suspended++;continue;}
+  const alerts=orderAlerts(r,day,orderNextDate(r));for(const alert of alerts)counts[alert.code]++;
+  if(alerts.length)items.push({id:row.id,issues:alerts.map(a=>a.text),alerts});
  }
  return {from:day,to:end,counts,suspended,unreadable,items:items.sort((a,b)=>a.id-b.id)};
 }
@@ -24,7 +20,7 @@ async function sendDigest(db,secret,userId,key,day,example=false){
  const rows=(await db.query('SELECT id,content FROM order_planning ORDER BY id')).rows,digest=orderDigest(rows,secret,day);
  const text=(example?'EXEMPLE — ':'')+'Commandes programmées : point du '+day.split('-').reverse().join('-')+' pour les 7 jours à venir. '+digest.items.length+' ligne(s) à vérifier. Consultez le détail ci-dessous puis le tableau sécurisé. Les lignes suspendues sont exclues.';
  return db.query(`WITH target AS MATERIALIZED (SELECT id FROM users WHERE id=$1 AND active=TRUE FOR SHARE), due AS (
-  INSERT INTO order_weekly_reminders(period,user_id) SELECT $2,id FROM target ON CONFLICT DO NOTHING RETURNING user_id
+  INSERT INTO order_weekly_reminders(period,user_id,digest,heading) SELECT $2,id,$4::jsonb,$3 FROM target ON CONFLICT DO NOTHING RETURNING user_id
  ), message AS (
   INSERT INTO team_messages(sender_name,text,priority,can_archive,order_digest) SELECT 'Portail+',$3,'important',TRUE,$4::jsonb FROM due RETURNING id
  ) INSERT INTO team_message_recipients(message_id,user_id) SELECT message.id,due.user_id FROM message CROSS JOIN due RETURNING message_id`,[userId,key,text,JSON.stringify(digest)]);

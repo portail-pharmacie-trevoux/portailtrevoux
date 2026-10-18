@@ -27,8 +27,12 @@ export function documentMessage({sender,email,subject,text,fileName,bytes}){
  const mime=[`From: Pharmacie de Trevoux <${sender}>`,`To: ${email}`,`Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/mixed; boundary="${boundary}"`,'',`--${boundary}`,'Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64','',encode(text),`--${boundary}`,'Content-Type: application/pdf',`Content-Disposition: attachment; filename="bilan-challenge.pdf"; filename*=UTF-8''${encodeURIComponent(fileName)}`,'Content-Transfer-Encoding: base64','',encode(bytes),`--${boundary}--`,''].join('\r\n');
  return {raw:Buffer.from(mime).toString('base64url')};
 }
-export function textMessage({sender,email,subject,text}){
+export function textMessage({sender,email,subject,text,html}){
  if(!emailValid(sender)||!emailValid(email)||typeof subject!=='string'||/[\r\n\x00]/.test(subject)||typeof text!=='string')throw Error('Invalid mail message');
+ if(html!==undefined){
+  if(typeof html!=='string')throw Error('Invalid HTML message');const boundary='portal_'+token(),encode=value=>Buffer.from(value).toString('base64').match(/.{1,76}/g)?.join('\r\n')||'';
+  const mime=[`From: Pharmacie de Trevoux <${sender}>`,`To: ${email}`,`Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,`MIME-Version: 1.0`,`Content-Type: multipart/alternative; boundary="${boundary}"`,'',`--${boundary}`,'Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64','',encode(text),`--${boundary}`,'Content-Type: text/html; charset=UTF-8','Content-Transfer-Encoding: base64','',encode(html),`--${boundary}--`,''].join('\r\n');return {raw:Buffer.from(mime).toString('base64url')};
+ }
  const mime=[`From: Pharmacie de Trevoux <${sender}>`,`To: ${email}`,`Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,`MIME-Version: 1.0`,`Content-Type: text/plain; charset=UTF-8`,`Content-Transfer-Encoding: base64`,'',Buffer.from(text).toString('base64').match(/.{1,76}/g)?.join('\r\n')||''].join('\r\n');
  return {raw:Buffer.from(mime).toString('base64url')};
 }
