@@ -1,0 +1,16 @@
+import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';
+import {registerMerchDocuments,validateMerchDocument} from '../merchandising-documents.mjs';
+const fail=(status,message)=>Object.assign(Error(message),{status});
+test('Documents merchandising : formats vérifiés, taille et noms sûrs',()=>{
+ const png=Buffer.from([137,80,78,71,13,10,26,10]).toString('base64');assert.equal(validateMerchDocument({fileName:'Affiche.png',fileData:png},fail).fileType,'image/png');
+ for(const body of [{fileName:'../image.png',fileData:png},{fileName:'image.jpg',fileData:png},{fileName:'image.png',fileData:'a==='},{fileName:'script.svg',fileData:png}])assert.throws(()=>validateMerchDocument(body,fail));
+ assert.equal(validateMerchDocument({fileName:'Charte.pdf',fileData:Buffer.from('%PDF-1.4\n%%EOF').toString('base64')},fail).fileType,'application/pdf');
+});
+test('Documents merchandising : droits, CSRF, import et téléchargement puis renommage concurrent',async t=>{
+ let allowed=true,editable=true,row=null;const pass=(req,res,next)=>next(),auth=(req,res,next)=>{req.auth={id:7};next();};
+ const db={query:async(sql,args=[])=>{if(sql.startsWith('INSERT')){row={id:1,title:args[0],file_name:args[1],file_type:args[2],file_content:args[3],revision:1};return {rows:[row]};}if(sql.startsWith('UPDATE')){if(row.revision!==args[2])return {rows:[]};row={...row,title:args[0],revision:row.revision+1};return {rows:[row]};}return {rows:row?[row]:[]};}};
+ const app=express();app.use(express.json());registerMerchDocuments({app,db,auth,ready:pass,csrf:(req,res,next)=>req.headers['x-csrf-token']==='ok'?next():next(fail(403,'CSRF')),viewUniverse:()=>((req,res,next)=>allowed?next():next(fail(403,'Lecture'))),editUniverse:()=>((req,res,next)=>allowed&&editable?next():next(fail(403,'Modification'))),canModify:()=>editable,fail,uploadParser:pass});app.use((e,req,res,next)=>res.status(e.status||500).json({error:e.message}));const server=app.listen(0);t.after(()=>server.close());const url='http://127.0.0.1:'+server.address().port+'/api/merchandising/documents';const body={fileName:'Charte.pdf',fileData:Buffer.from('%PDF-1.4\n%%EOF').toString('base64')};const write=(path,method,b=body,token='ok')=>fetch(url+path,{method,headers:{'content-type':'application/json','x-csrf-token':token},body:JSON.stringify(b)});
+ assert.equal((await write('/import','POST',body,'bad')).status,403);editable=false;assert.equal((await write('/import','POST')).status,403);editable=true;assert.equal((await write('/import','POST')).status,201);
+ const downloaded=await fetch(url+'/1/file');assert.equal(downloaded.status,200);assert.match(downloaded.headers.get('content-disposition'),/attachment/);assert.equal(await downloaded.text(),'%PDF-1.4\n%%EOF');
+ assert.equal((await write('/1','PUT',{title:' Nouvelle charte ',revision:1})).status,200);assert.equal(row.title,'Nouvelle charte');assert.equal((await write('/1','PUT',{title:'Écrasement',revision:1})).status,409);editable=false;assert.equal((await write('/1','PUT',{title:'Interdit',revision:2})).status,403);assert.equal((await (await fetch(url)).json()).canEdit,false);allowed=false;assert.equal((await fetch(url+'/1/file')).status,403);
+});

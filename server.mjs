@@ -1,3 +1,4 @@
+import {registerMerchDocuments} from './merchandising-documents.mjs';
 import {orderWeeklyReminders,sendOrderExample} from './order-reminders.mjs';
 import {registerCalendarTasks} from './calendar-tasks.mjs';
 import {challengeMonthlyReminders} from './challenge-reminders.mjs';
@@ -78,6 +79,7 @@ export function createApp(db,config) {
   }
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
+  registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser:express.json({limit:'15mb'})});
   registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify});
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
   registerTiersPayant({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'200kb'})});

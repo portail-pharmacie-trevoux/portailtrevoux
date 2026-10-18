@@ -398,3 +398,8 @@ ALTER TABLE quality_service_evaluations ADD COLUMN IF NOT EXISTS mission_scores 
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS order_digest JSONB;
 CREATE TABLE IF NOT EXISTS order_weekly_reminders(period TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(period,user_id));
 INSERT INTO settings(key,value) VALUES('order_reminder_start','2026-10-20') ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS merchandising_documents (
+ id SERIAL PRIMARY KEY,title TEXT NOT NULL,file_name TEXT NOT NULL,file_type TEXT NOT NULL,file_content BYTEA NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1,created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
