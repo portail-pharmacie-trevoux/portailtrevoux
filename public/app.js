@@ -425,6 +425,8 @@ async function renderMusic(){
   if(session.user.role==='admin'){
     const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
     const label=node('label','Fichier CSV avec les colonnes Artist et Title'),file=node('input');file.type='file';file.accept='.csv,text/csv';file.id='music-csv-import';label.htmlFor=file.id;
+    const importCSV=button('Importer depuis CSV',()=>{importPanel.open=true;file.click();},'btn primary');
+    adminActions.prepend(importCSV);
     const state=node('p','','status-line');state.setAttribute('role','status');
     let pending=[];
     const importButton=button('Importer dans le portail',async()=>{
