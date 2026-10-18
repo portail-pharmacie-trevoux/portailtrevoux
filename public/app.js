@@ -390,16 +390,20 @@ async function renderMusic(){
   const youtubeMusicTransfer=button('',async()=>{await renderYouTubePanel(youtubePanel,tracks.filter(t=>selectedTracks.has(t.id)),'music');},'btn youtube-music-button');
   youtubeMusicTransfer.innerHTML='<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor"/><circle cx="12" cy="12" r="7" fill="none" stroke="white" stroke-width="1.2"/><path d="m10 8 6 4-6 4Z" fill="white"/></svg><span>Ajouter à YouTube Music</span>';
   youtubeMusicTransfer.title='Ajouter les titres cochés et ouvrir la playlist sur music.youtube.com';
-  const csvExport=button('Exporter les titres sélectionnés en CSV',async()=>{
-    const ids=tracks.filter(t=>selectedTracks.has(t.id)).map(t=>t.id);if(!ids.length)return;csvExport.disabled=true;message.textContent='Préparation du CSV…';
-    try{const response=await fetch('/api/music/export.csv',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrf},body:JSON.stringify({ids})});if(!response.ok){const error=await response.json();throw Error(error.error||'Export impossible.');}const blob=await response.blob();if(currentUniverse!=='Fun')return;const url=URL.createObjectURL(blob),link=node('a');link.href=url;link.download='Playlist_PortailPlus_Trevoux.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message.textContent=ids.length+' titre(s) exporté(s).';}catch(error){if(currentUniverse==='Fun')message.textContent=error.message;}finally{updateSelection();}
-  },'btn primary');
-  const adminPanel=node('details','','calendar-tools music-admin-panel admin-menu'),adminActions=node('div','','music-admin-actions');adminPanel.append(node('summary','Administration'),node('p','Importez une liste ou cochez les titres à exporter / ajouter à la playlist équipe.','field-note'),adminActions);adminActions.append(csvExport,youtubeMusicTransfer,youtubeTransfer);
+  let exportingCSV=false;
+  async function downloadMusicCSV(){
+    const ids=tracks.filter(t=>selectedTracks.has(t.id)).map(t=>t.id);if(!ids.length||exportingCSV)return false;exportingCSV=true;updateSelection();message.textContent='Préparation du CSV…';
+    try{const response=await fetch('/api/music/export.csv',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrf},body:JSON.stringify({ids})});if(!response.ok){const error=await response.json();throw Error(error.error||'Export impossible.');}const blob=await response.blob();if(currentUniverse!=='Fun')return;const url=URL.createObjectURL(blob),link=node('a');link.href=url;link.download='Playlist_PortailPlus_Trevoux.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message.textContent=ids.length+' titre(s) exporté(s).';return true;}catch(error){if(currentUniverse==='Fun')message.textContent=error.message;return false;}finally{exportingCSV=false;updateSelection();}
+  }
+  const csvExport=button('Exporter les titres sélectionnés en CSV',()=>downloadMusicCSV(),'btn primary');
+  const tuneTransfer=button('CSV vers TuneMyMusic / Deezer',async()=>{if(exportingCSV||!selectedTracks.size)return;window.open('https://www.tunemymusic.com/fr/transfer/csv-to-deezer','_blank','noopener,noreferrer');if(await downloadMusicCSV())message.textContent='CSV téléchargé. Dans TuneMyMusic, importez Playlist_PortailPlus_Trevoux.csv puis connectez Deezer pour terminer le transfert.';},'btn primary');
+  const tuneLink=node('a','Ouvrir TuneMyMusic','btn small');tuneLink.href='https://www.tunemymusic.com/fr/transfer/csv-to-deezer';tuneLink.target='_blank';tuneLink.rel='noopener noreferrer';
+  const adminPanel=node('details','','calendar-tools music-admin-panel admin-menu'),adminActions=node('div','','music-admin-actions');adminPanel.append(node('summary','Administration'),node('p','Importez une liste ou cochez les titres à exporter / ajouter à la playlist équipe.','field-note'),adminActions);adminActions.append(csvExport,tuneTransfer,tuneLink,youtubeMusicTransfer,youtubeTransfer);adminPanel.append(node('p','TuneMyMusic : le bouton télécharge le CSV et ouvre le service. Chargez ensuite ce fichier dans TuneMyMusic et connectez votre compte Deezer.','field-note'));
   const selectionCount=node('span','','status-line');selectionCount.setAttribute('role','status');
   function updateSelection(){
     const total=tracks.filter(t=>selectedTracks.has(t.id)).length;
     selectionCount.textContent=total+' titre'+(total!==1?'s':'')+' coché'+(total!==1?'s':'');
-    youtubeMusicTransfer.disabled=!total;csvExport.disabled=!total;
+    youtubeMusicTransfer.disabled=!total;csvExport.disabled=exportingCSV||!total;tuneTransfer.disabled=exportingCSV||!total;
   }
   function filteredTracks(){
     const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
