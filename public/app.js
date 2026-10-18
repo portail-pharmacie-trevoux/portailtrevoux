@@ -23,14 +23,26 @@ function loungeIcon(title){
   icon.innerHTML='<svg viewBox="0 0 32 24" width="26" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12V8a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v4M4 11h2v4h13v-4h2v8H4zM6 19v2M19 19v2M12 7v7M24 8h6l-2-5h-2zM27 8v12M24 21h6M23 15h7M24 15v3M29 15v3"/><path d="M2 22h29"/></svg>';
   return icon;
 }
+function personalTaskForm(task=null){
+  const box=node('details','','calendar-tools');box.open=!!task;box.append(node('summary',task?'Modifier ma tâche':'Ajouter une tâche personnelle'));
+  box.append(node('p','Visible uniquement par vous dans Portail+, sans synchronisation Google. Rappel automatique sur l’accueil de J−7 au jour prévu.','field-note'));
+  const form=node('form'),title=node('input'),date=node('input'),icon=node('select'),description=node('textarea'),status=node('p','','status-line');
+  title.required=true;title.maxLength=150;title.value=task?.title||'';date.type='date';date.required=true;date.value=task?.start.date||calendarDay||parisDay();description.maxLength=1000;description.value=task?.description||'';
+  ['✅','📌','📞','✉️','📦','📝','💊','🗣️','🎓','⭐'].forEach(x=>icon.append(new Option(x,x)));icon.value=task?.icon||'✅';
+  for(const [text,input] of [['Titre',title],['Date',date],['Icône',icon],['Détails (facultatifs)',description]]){const label=node('label',text,'field');label.append(input);form.append(label);}
+  const save=node('button',task?'Enregistrer les modifications':'Créer ma tâche','btn primary');save.type='submit';
+  form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{await api('/api/calendar/tasks'+(task?'/'+task.taskId:''),task?'PUT':'POST',{title:title.value,date:date.value,icon:icon.value,description:description.value});await renderCalendar();void refreshHomeExtras();}catch(error){status.textContent=error.message;save.disabled=false;}};
+  form.append(save,status);box.append(form);return box;
+}
 function eventCard(e){
   const card=node('article','','event'),heading=node('h3'),icons=eventIcons(e.title);
   const meeting=meetingIcon(e.title);if(meeting)heading.append(meeting);const lounge=loungeIcon(e.title);if(lounge)heading.append(lounge);
   if(icons){const icon=node('span',icons+' ');icon.setAttribute('aria-hidden','true');heading.append(icon);}
-  heading.append(node('span',e.title));card.append(heading);let when;
+  heading.append(node('span',(e.personalTask?e.icon+' ':'')+e.title));card.append(heading);let when;
   if(e.start?.date){const {start,end}=eventDays(e);when=start.split('-').reverse().join('/')+(start!==end?' — '+end.split('-').reverse().join('/'):'')+' · Toute la journée';}
   else {const format=d=>new Date(d).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});when=format(e.start.dateTime)+' — '+format(e.end?.dateTime||e.start.dateTime);}
   card.append(node('p',when,'event-time'));if(e.location)card.append(node('p',e.location));if(e.description)card.append(node('p',e.description));
+  if(e.personalTask){card.append(node('p','Tâche personnelle · Portail+ uniquement','field-note'),personalTaskForm(e));const status=node('p','','status-line'),remove=button('Supprimer ma tâche',async()=>{if(!confirm('Supprimer cette tâche personnelle ?'))return;remove.disabled=true;try{await api('/api/calendar/tasks/'+e.taskId,'DELETE');await renderCalendar();void refreshHomeExtras();}catch(error){status.textContent=error.message;remove.disabled=false;}},'btn small danger');card.append(remove,status);return card;}
   const reminder=node('label','','event-reminder'),check=node('input'),bell=node('span','🔔','reminder-bell'),status=node('span','','reminder-status');
   check.type='checkbox';check.checked=!!e.remind;check.disabled=!e.id;bell.setAttribute('aria-hidden','true');reminder.classList.toggle('enabled',check.checked);
   reminder.append(check,bell,node('span','Me le rappeler'));status.setAttribute('role','status');
@@ -64,7 +76,7 @@ function renderCalendarResults(data,container){
     }).sort((a,b)=>(a.start.date||a.start.dateTime).localeCompare(b.start.date||b.start.dateTime));
     const label=query?'Résultats à venir':(calendarDay===today?'Aujourd’hui · ':'')+new Date(calendarDay+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',weekday:'long',day:'numeric',month:'long',year:'numeric'});
     results.append(node('h3',label,'agenda-day-title'),node('p',events.length+' événement'+(events.length!==1?'s':''),'status-line'));
-    if(!events.length)results.append(node('div',!data.connected?'L’agenda n’est pas encore connecté.':query?'Aucun événement à venir ne correspond à votre recherche.':'Aucun événement pour cette journée.','empty'));
+    if(!events.length)results.append(node('div',query?'Aucun événement à venir ne correspond à votre recherche.':'Aucun événement pour cette journée.','empty'));
     events.forEach(e=>{
       if(query){const day=eventDays(e).start;const go=button('Voir cette journée',()=>{calendarDay=day<today?today:day;calendarQuery='';redraw();});const card=eventCard(e);card.append(go);results.append(card);}else results.append(eventCard(e));
     });
@@ -289,7 +301,7 @@ async function renderCalendar(){
     }
     content.append(tools);
   }
-  content.append(node('h3',data.name));
+  content.append(personalTaskForm(),node('h3',data.name));
   if(data.syncedAt)content.append(node('p','Dernière synchronisation : '+new Date(data.syncedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' · Actualisation toutes les 15 minutes.','status-line'));
   if(data.error)content.append(node('p',data.error+' Les événements affichés peuvent ne pas être à jour.','calendar-warning'));
   const results=node('section','','agenda-results');content.append(results);renderCalendarResults(data,results);
@@ -733,10 +745,10 @@ function homeAgendaEvents(events,today){
   const last=moveDay(today,7);
   const order=(a,b)=>eventDays(a).start.localeCompare(eventDays(b).start)||Number(!a.start.date)-Number(!b.start.date)||new Date(a.start.dateTime||a.start.date+'T00:00:00Z')-new Date(b.start.dateTime||b.start.date+'T00:00:00Z');
   const valid=events.filter(e=>e.start?.date||e.start?.dateTime);
-  const reminders=valid.filter(e=>e.remind&&eventDays(e).start>today&&eventDays(e).start<=last).sort(order);
+  const reminders=valid.filter(e=>e.remind&&(eventDays(e).start>today||(e.personalTask&&eventDays(e).start===today))&&eventDays(e).start<=last).sort(order);
   const todayEvents=valid.filter(e=>{
     const title=normalizeSearch(e.title||''),days=eventDays(e);
-    return (e.remind||/\brdv\b|\brendez[ -]+vous\b|\bformations?\b/.test(title))&&days.start<=today&&days.end>=today;
+    return !e.personalTask&&(e.remind||/\brdv\b|\brendez[ -]+vous\b|\bformations?\b/.test(title))&&days.start<=today&&days.end>=today;
   }).sort(order);
   return [...todayEvents,...reminders];
 }
@@ -748,15 +760,15 @@ function renderHomeAgenda(data){
     const day=eventDays(e).start,when=e.start.date?'Journée':day<today?'En cours':new Date(e.start.dateTime).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'});
     return (day>today?day.split('-').slice(1).reverse().join('/')+' · ':'')+when+' · '+(e.title||'Événement');
   };
-  if(!data||data.error)block.append(node('span','Agenda momentanément indisponible'));
-  else if(!data.connected)block.append(node('span','Agenda à connecter'));
+  if(!data||(data.error&&!events.length))block.append(node('span','Agenda momentanément indisponible'));
+  else if(!data.connected&&!events.length)block.append(node('span','Agenda Google à connecter · vos tâches restent disponibles')); 
   else {
-    const daily=events.filter(e=>eventDays(e).start<=today),reminders=events.filter(e=>eventDays(e).start>today);
+    const daily=events.filter(e=>!e.personalTask&&eventDays(e).start<=today),reminders=events.filter(e=>e.personalTask||eventDays(e).start>today);
     const daySection=node('span','','agenda-today'),reminderSection=node('span','','agenda-reminders');
     daySection.append(node('span','Aujourd’hui','agenda-group-title'));
     reminderSection.append(node('span',reminders.length?'🔔 Rappels · 7 prochains jours':'🔔 Aucun rappel à venir','agenda-group-title'));
     const addRows=(section,list,limit,isReminder)=>{
-      list.slice(0,limit).forEach((e,i)=>{const icon=isReminder?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ';const text=icon+label(e)+(i===limit-1&&list.length>limit?' · +'+(list.length-limit):'');const row=node('span','','agenda-event-line'+(isReminder?' personal-reminder':''));row.append(node('span',text,'agenda-event-text'));const meeting=meetingIcon(e.title);if(meeting)row.prepend(meeting);const lounge=loungeIcon(e.title);if(lounge)row.prepend(lounge);row.title=label(e);section.append(row);});
+      list.slice(0,limit).forEach((e,i)=>{const icon=e.personalTask?e.icon+' ':isReminder?'🔔 ':normalizeSearch(e.title||'').includes('formation')?'🎓 ':'📅 ';const text=icon+label(e)+(i===limit-1&&list.length>limit?' · +'+(list.length-limit):'');const row=node('span','','agenda-event-line'+(isReminder?' personal-reminder':''));row.append(node('span',text,'agenda-event-text'));const meeting=meetingIcon(e.title);if(meeting)row.prepend(meeting);const lounge=loungeIcon(e.title);if(lounge)row.prepend(lounge);row.title=label(e);section.append(row);});
     };
     if(!daily.length)daySection.append(node('span','Aucun rendez-vous ni formation','agenda-event-line'));
     addRows(daySection,daily,reminders.length?3:5,false);addRows(reminderSection,reminders,2,true);

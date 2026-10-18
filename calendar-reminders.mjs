@@ -1,3 +1,4 @@
+import {taskEvent} from './calendar-tasks.mjs';
 export function registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,fail,getSetting}) {
  app.post('/api/calendar/reminders',auth,ready,viewUniverse('Agenda'),csrf,async(req,res)=>{
   const {eventId,enabled}=req.body||{};
@@ -13,6 +14,7 @@ export function registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,f
  return async function personalEvents(userId,events){
   const calendarId=await getSetting('calendar_id');
   const ids=new Set((await db.query('SELECT event_id FROM calendar_reminders WHERE user_id=$1 AND calendar_id=$2',[userId,calendarId||''])).rows.map(r=>r.event_id));
-  return events.map(e=>({...e,remind:ids.has(e.id)}));
+  const tasks=(await db.query("SELECT id,title,description,to_char(task_date,'YYYY-MM-DD') AS task_date,icon FROM calendar_tasks WHERE user_id=$1 ORDER BY task_date,id",[userId])).rows;
+  return [...events.map(e=>({...e,remind:ids.has(e.id)})),...tasks.map(taskEvent)];
  };
 }

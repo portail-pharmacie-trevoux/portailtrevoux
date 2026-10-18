@@ -1,3 +1,4 @@
+import {registerCalendarTasks} from './calendar-tasks.mjs';
 import {challengeMonthlyReminders} from './challenge-reminders.mjs';
 import {qualityMonthlyReminders} from './quality-reminders.mjs';
 import {registerTiersPayant} from './quality-tiers-payant.mjs';
@@ -272,6 +273,7 @@ export function createApp(db,config) {
     res.json({ok:true});
   });
   app.post('/api/google/sync',auth,ready,admin,csrf,async(req,res)=>{await sync();res.json({ok:true});});
+  registerCalendarTasks({app,db,auth,ready,csrf,viewUniverse,fail});
   const personalCalendarEvents=registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,fail,getSetting});
   app.get('/api/calendar',auth,ready,async(req,res)=>{
     if(!canAccess(req.auth,'Agenda'))throw fail(403,'Vous n’avez pas accès à l’agenda.');

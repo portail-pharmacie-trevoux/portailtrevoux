@@ -385,3 +385,10 @@ CREATE TABLE IF NOT EXISTS challenge_monthly_digests(
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  PRIMARY KEY(month,user_id)
 );
+
+CREATE TABLE IF NOT EXISTS calendar_tasks (
+ id SERIAL PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ title TEXT NOT NULL CHECK(length(title) BETWEEN 1 AND 150),description TEXT NOT NULL DEFAULT '',
+ task_date DATE NOT NULL,icon TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS calendar_tasks_owner_date ON calendar_tasks(user_id,task_date);
