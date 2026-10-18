@@ -509,11 +509,13 @@ async function renderYouTubePanel(panel,chosen,target='youtube'){
       if(status.connected){
         try{
           const playlists=await api(endpoint+'/playlists');if(currentUniverse!=='Fun')return;
-          const label=node('label','Playlist à alimenter'),select=node('select','','calendar-select');select.id='youtube-playlist-choice';label.htmlFor=select.id;select.append(new Option('Choisir une playlist',''));playlists.forEach(p=>select.append(new Option(p.name,p.id)));select.value=status.playlistId;
-          const save=button('Utiliser cette playlist',async()=>{save.disabled=true;try{if(!select.value)throw Error('Choisissez une playlist.');await api(endpoint+'/playlist','POST',{id:select.value});await renderYouTubePanel(panel,chosen,target);}catch(e){state.textContent=e.message;save.disabled=false;}});settings.append(label,select,save);
+          const label=node('label','Playlist à alimenter'),select=node('select','','calendar-select');select.id='youtube-playlist-choice';label.htmlFor=select.id;if(!music)select.append(new Option('Choisir une playlist',''));playlists.filter(p=>!music||p.id===status.playlistId).forEach(p=>select.append(new Option(p.name,p.id)));select.value=status.playlistId;select.disabled=music;
+          const save=button('Utiliser cette playlist',async()=>{save.disabled=true;try{if(!select.value)throw Error('Choisissez une playlist.');await api(endpoint+'/playlist','POST',{id:select.value});await renderYouTubePanel(panel,chosen,target);}catch(e){state.textContent=e.message;save.disabled=false;}});settings.append(label,select);if(!music)settings.append(save);
         }catch(e){settings.append(node('p',e.message,'error'));}
+        if(!music){
         const newLabel=node('label','Ou créer une playlist privée'),newName=node('input');newName.type='text';newName.maxLength=150;newName.id='youtube-new-playlist';newName.value=music?'PORTAIL + — YouTube Music — Pharmacie de Trévoux':'PORTAIL + — Pharmacie de Trévoux';newLabel.htmlFor=newName.id;
         const create=button(music?'Créer ma playlist YouTube Music':'Créer cette playlist privée',async()=>{create.disabled=true;try{await api(endpoint+'/playlists','POST',{title:newName.value});await renderYouTubePanel(panel,chosen,target);}catch(e){state.textContent=e.message;create.disabled=false;}});settings.append(newLabel,newName,create);
+        }
         const disconnect=button('Déconnecter le compte Google',async()=>{disconnect.disabled=true;try{await api('/api/youtube/disconnect','POST');await renderYouTubePanel(panel,chosen,target);}catch(e){state.textContent=e.message;disconnect.disabled=false;}});settings.append(disconnect);
       }panel.append(settings);
     }
