@@ -392,3 +392,5 @@ CREATE TABLE IF NOT EXISTS calendar_tasks (
  task_date DATE NOT NULL,icon TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS calendar_tasks_owner_date ON calendar_tasks(user_id,task_date);
+
+ALTER TABLE quality_service_evaluations ADD COLUMN IF NOT EXISTS mission_scores JSONB NOT NULL DEFAULT '[]'::jsonb;
