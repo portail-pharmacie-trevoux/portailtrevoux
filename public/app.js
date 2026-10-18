@@ -398,11 +398,14 @@ async function renderMusic(){
   const youtubeTransfer=button('',async()=>{await renderYouTubePanel(youtubePanel,tracks.filter(t=>selectedTracks.has(t.id)));},'btn small music-platform-button youtube-button');
   youtubeTransfer.innerHTML="<svg aria-hidden=\"true\" focusable=\"false\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path fill=\"currentColor\" d=\"M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z\"/></svg>";
   youtubeTransfer.title='Ajouter directement les titres cochés à YouTube';youtubeTransfer.setAttribute('aria-label',youtubeTransfer.title);
+  const youtubeMusicTransfer=button('',async()=>{await renderYouTubePanel(youtubePanel,tracks.filter(t=>selectedTracks.has(t.id)),'music');},'btn youtube-music-button');
+  youtubeMusicTransfer.innerHTML='<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor"/><circle cx="12" cy="12" r="7" fill="none" stroke="white" stroke-width="1.2"/><path d="m10 8 6 4-6 4Z" fill="white"/></svg><span>Ajouter à YouTube Music</span>';
+  youtubeMusicTransfer.title='Ajouter les titres cochés et ouvrir la playlist sur music.youtube.com';
   const selectionCount=node('span','','status-line');selectionCount.setAttribute('role','status');
   function updateSelection(){
     const total=tracks.filter(t=>selectedTracks.has(t.id)).length;
     selectionCount.textContent=total+' titre'+(total!==1?'s':'')+' coché'+(total!==1?'s':'');
-    exportButton.disabled=!total;
+    exportButton.disabled=!total;youtubeMusicTransfer.disabled=!total;
   }
   function filteredTracks(){
     const terms=normalizeSearch(search.value).split(/\s+/).filter(Boolean);
@@ -412,8 +415,8 @@ async function renderMusic(){
   const selectNone=button('Tout décocher',()=>{selectedTracks.clear();display();});
   const selectionTools=node('div','','music-selection-tools');selectionTools.append(selectAll,selectNone,node('span','« Tout cocher » sélectionne tous les résultats de la recherche, y compris les lignes non affichées.','field-note'));
   toolbar.append(selectionTools);
-  const actions=node('div','','agenda-navigation');actions.append(exportButton,youtubeTransfer,selectionCount);
-  if(!editable){youtubeTransfer.classList.add('hidden');}content.append(actions,youtubePanel,toolbar,count,list,more);
+  const actions=node('div','','agenda-navigation');actions.append(exportButton,youtubeTransfer,youtubeMusicTransfer,selectionCount);
+  if(!editable){youtubeTransfer.classList.add('hidden');youtubeMusicTransfer.classList.add('hidden');}content.append(actions,youtubePanel,toolbar,count,list,more);
   if(session.user.role==='admin'){
     const importPanel=node('details','','calendar-tools');importPanel.open=!tracks.length;importPanel.append(node('summary','Importer des morceaux (CSV)'),node('p','Choisissez votre CSV, puis cliquez sur « Importer dans le portail ». Les morceaux déjà présents sont ignorés.','field-note'));
     const label=node('label','Fichier CSV avec les colonnes Artist et Title'),file=node('input');file.type='file';file.accept='.csv,text/csv';file.id='music-csv-import';label.htmlFor=file.id;
@@ -497,11 +500,12 @@ function parseMusicCSV(text){
   return tracks;
 }
 
-async function renderYouTubePanel(panel,chosen){
+async function renderYouTubePanel(panel,chosen,target='youtube'){
+  const music=target==='music',platform=music?'YouTube Music':'YouTube';
   panel.classList.remove('hidden');panel.replaceChildren(node('p','Chargement de YouTube…','status-line'));
   try{
     const status=await api('/api/youtube/status');if(currentUniverse!=='Fun')return;
-    panel.replaceChildren(node('h3','Ajouter les titres cochés à YouTube'));
+    panel.replaceChildren(node('h3','Ajouter les titres cochés à '+platform));
     const state=node('p','','status-line');state.setAttribute('role','status');
     panel.append(node('p',status.connected?'Chaîne connectée : '+status.channel:'YouTube n’est pas encore connecté.'));
     if(session.user.role==='admin'){
@@ -516,20 +520,20 @@ async function renderYouTubePanel(panel,chosen){
         try{
           const playlists=await api('/api/youtube/playlists');if(currentUniverse!=='Fun')return;
           const label=node('label','Playlist à alimenter'),select=node('select','','calendar-select');select.id='youtube-playlist-choice';label.htmlFor=select.id;select.append(new Option('Choisir une playlist',''));playlists.forEach(p=>select.append(new Option(p.name,p.id)));select.value=status.playlistId;
-          const save=button('Utiliser cette playlist',async()=>{save.disabled=true;try{if(!select.value)throw Error('Choisissez une playlist.');await api('/api/youtube/playlist','POST',{id:select.value});await renderYouTubePanel(panel,chosen);}catch(e){state.textContent=e.message;save.disabled=false;}});settings.append(label,select,save);
+          const save=button('Utiliser cette playlist',async()=>{save.disabled=true;try{if(!select.value)throw Error('Choisissez une playlist.');await api('/api/youtube/playlist','POST',{id:select.value});await renderYouTubePanel(panel,chosen,target);}catch(e){state.textContent=e.message;save.disabled=false;}});settings.append(label,select,save);
         }catch(e){settings.append(node('p',e.message,'error'));}
         const newLabel=node('label','Ou créer une playlist privée'),newName=node('input');newName.type='text';newName.maxLength=150;newName.id='youtube-new-playlist';newName.value='PORTAIL + — Pharmacie de Trévoux';newLabel.htmlFor=newName.id;
-        const create=button('Créer cette playlist privée',async()=>{create.disabled=true;try{await api('/api/youtube/playlists','POST',{title:newName.value});await renderYouTubePanel(panel,chosen);}catch(e){state.textContent=e.message;create.disabled=false;}});settings.append(newLabel,newName,create);
-        const disconnect=button('Déconnecter YouTube du portail',async()=>{disconnect.disabled=true;try{await api('/api/youtube/disconnect','POST');await renderYouTubePanel(panel,chosen);}catch(e){state.textContent=e.message;disconnect.disabled=false;}});settings.append(disconnect);
+        const create=button('Créer cette playlist privée',async()=>{create.disabled=true;try{await api('/api/youtube/playlists','POST',{title:newName.value});await renderYouTubePanel(panel,chosen,target);}catch(e){state.textContent=e.message;create.disabled=false;}});settings.append(newLabel,newName,create);
+        const disconnect=button('Déconnecter YouTube du portail',async()=>{disconnect.disabled=true;try{await api('/api/youtube/disconnect','POST');await renderYouTubePanel(panel,chosen,target);}catch(e){state.textContent=e.message;disconnect.disabled=false;}});settings.append(disconnect);
       }panel.append(settings);
     }
     panel.append(state);
     if(!status.connected||!status.playlistId){if(session.user.role!=='admin')panel.append(node('p','Demandez à l’administrateur de connecter YouTube et de choisir la playlist.'));return;}
-    const playlist=node('a',status.playlistName,'btn small');playlist.href='https://www.youtube.com/playlist?list='+encodeURIComponent(status.playlistId);playlist.target='_blank';playlist.rel='noopener noreferrer';panel.append(node('p','Playlist choisie :'),playlist);
-    if(!chosen.length){panel.append(node('p','Cochez les titres dans la liste puis cliquez à nouveau sur le logo YouTube.'));return;}
+    const playlist=node('a',status.playlistName,'btn small');playlist.href=(music?'https://music.youtube.com/playlist?list=':'https://www.youtube.com/playlist?list=')+encodeURIComponent(status.playlistId);playlist.target='_blank';playlist.rel='noopener noreferrer';panel.append(node('p','Playlist choisie :'),playlist);if(music){playlist.textContent='Ouvrir dans YouTube Music — '+status.playlistName;panel.append(node('p','L’ajout utilise la playlist de la chaîne YouTube connectée ci-dessus. Sur YouTube Music, sélectionnez le même compte Google et la même chaîne. Seuls les contenus reconnus comme musicaux par YouTube Music y apparaîtront.','field-note'));}
+    if(!chosen.length){panel.append(node('p','Cochez les titres dans la liste puis cliquez à nouveau sur '+platform+'.'));return;}
     panel.append(node('p',chosen.length+' titres sélectionnés. Recherchez les vidéos, vérifiez les versions proposées puis validez leur ajout. Les vidéos déjà présentes seront ignorées.'));
     const results=node('div','','youtube-matches'),choices=[];
-    const add=button('Ajouter les vidéos vérifiées à la playlist',async()=>{
+    const add=button(music?'Ajouter les titres vérifiés à YouTube Music':'Ajouter les vidéos vérifiées à la playlist',async()=>{
       const pending=choices.filter(c=>c.select.value&&!c.done);if(!pending.length)return;
       add.disabled=true;prepare.disabled=true;let added=0,duplicates=0;
       choices.forEach(c=>c.select.disabled=true);
@@ -539,12 +543,12 @@ async function renderYouTubePanel(panel,chosen){
           c.done=true;if(result.added){added++;c.note.textContent='Ajouté';}else{duplicates++;c.note.textContent='Déjà présent';}
           state.textContent=added+' ajouté(s), '+duplicates+' déjà présent(s)…';if(currentUniverse!=='Fun')return;
         }
-        state.textContent='Terminé : '+added+' vidéo(s) ajoutée(s), '+duplicates+' déjà présente(s).';
+        state.textContent='Terminé : '+added+' vidéo(s) ajoutée(s), '+duplicates+' déjà présente(s).'+(music?' Cliquez sur « Ouvrir dans YouTube Music » pour écouter la playlist.':'');
       }catch(e){state.textContent=e.message+' '+added+' vidéo(s) ajoutée(s). Vous pouvez relancer les ajouts restants.';}
       finally{choices.forEach(c=>c.select.disabled=c.done);updateAdd();prepare.disabled=false;}
     },'btn primary');add.disabled=true;
     const updateAdd=()=>{add.disabled=!choices.some(c=>c.select.value&&!c.done);};
-    const prepare=button('Rechercher les vidéos sur YouTube',async()=>{
+    const prepare=button(music?'Rechercher les correspondances musicales':'Rechercher les vidéos sur YouTube',async()=>{
       prepare.disabled=true;add.disabled=true;
       try{
         for(const track of chosen){
