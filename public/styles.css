@@ -423,3 +423,5 @@ body:has(#login:not(.hidden)) .login-card{margin:0;width:min(460px,100%);box-siz
 .service-evaluation-dialog{width:min(720px,94vw);overflow:auto}.service-mission-score{display:grid;grid-template-columns:minmax(0,1fr) 65px;gap:8px 14px;padding:16px 0;border-bottom:1px solid #dce5eb}.service-mission-score span{white-space:pre-wrap;overflow-wrap:anywhere}.service-mission-score output{text-align:right;font-weight:700;color:#087b65}.service-mission-score input[type=range]{grid-column:1/-1;width:100%;accent-color:#087b65}.service-evaluation-dialog .dialog-actions{position:sticky;bottom:-28px;background:white;padding:14px 0;flex-wrap:wrap}
 
 .login-version{display:block;line-height:1.5}.login-version>strong{color:#087b65;font-size:14px}.login-version p{margin:6px 0}.login-version-history{border-top:1px solid #e5ebef;margin-top:12px;padding-top:10px}.login-version-history>strong{font-weight:600}
+
+.news-order-digest{padding:12px;background:#f2f7f5;border-radius:10px;margin:12px 0}.news-order-digest li{margin:7px 0;overflow-wrap:anywhere}
