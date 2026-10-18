@@ -526,3 +526,7 @@ body:has(#login:not(.hidden)) .login-card{display:grid;grid-template-columns:min
 
 /* Login heading follows the Portail+ brand typography. */
 .login-fields-panel h1.login-univers-title{font-family:Segoe UI,Arial,sans-serif;font-weight:800;letter-spacing:-1px;color:#00554e;line-height:1.15;margin:0 0 28px}
+
+/* Welcome uses the same brand typography as the login heading. */
+#home .welcome h1{font-family:Segoe UI,Arial,sans-serif;font-weight:800;letter-spacing:-1px;color:#7043a0}
+#home .welcome #welcome-name{font:inherit;font-style:normal;color:#006e60}
