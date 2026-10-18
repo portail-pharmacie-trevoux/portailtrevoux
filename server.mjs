@@ -204,8 +204,6 @@ export function createApp(db,config) {
   app.get('/api/youtube-music/playlists',auth,ready,admin,async(req,res)=>{const selected=await youtubeMusic.status();res.json(selected.playlistId?[{id:selected.playlistId,name:selected.playlistName}]:[]);});
   app.post('/api/youtube-music/playlist',auth,ready,admin,csrf,async(req,res)=>{const selected=await youtubeMusic.status();if(!selected.playlistId||req.body.id!==selected.playlistId)throw fail(409,'La playlist équipe est la seule destination autorisée.');res.json(await youtubeMusic.choosePlaylist(req.body.id));});
   app.post('/api/youtube-music/playlists',auth,ready,admin,csrf,async(req,res)=>{throw fail(409,'Utilisez la playlist équipe déjà configurée, créée dans YouTube Music.');});
-  app.post('/api/youtube-music/candidates',auth,ready,admin,csrf,async(req,res)=>res.json(await youtubeMusic.candidates(req.body.trackId)));
-  app.post('/api/youtube-music/add',auth,ready,admin,csrf,async(req,res)=>res.json(await youtubeMusic.add(req.body)));
   app.get('/api/youtube/status',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await youtube.status()));
   app.post('/api/youtube/connect',auth,ready,admin,csrf,async(req,res)=>{
     if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
@@ -217,8 +215,6 @@ export function createApp(db,config) {
   app.get('/api/youtube/playlists',auth,ready,admin,async(req,res)=>res.json(await youtube.playlists()));
   app.post('/api/youtube/playlist',auth,ready,admin,csrf,async(req,res)=>res.json(await youtube.choosePlaylist(req.body.id)));
   app.post('/api/youtube/playlists',auth,ready,admin,csrf,async(req,res)=>res.status(201).json(await youtube.createPlaylist(req.body.title)));
-  app.post('/api/youtube/candidates',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtube.candidates(req.body.trackId)));
-  app.post('/api/youtube/add',auth,ready,editUniverse('Fun'),csrf,async(req,res)=>res.json(await youtube.add(req.body)));
   app.post('/api/youtube/disconnect',auth,ready,admin,csrf,async(req,res)=>{
     await db.query("DELETE FROM settings WHERE key IN ('youtube_tokens','youtube_channel_id','youtube_channel_name','youtube_playlist_id','youtube_playlist_name','youtube_music_playlist_id','youtube_music_playlist_name')");
     res.json({ok:true});
