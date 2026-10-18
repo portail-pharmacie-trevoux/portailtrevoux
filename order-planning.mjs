@@ -1,3 +1,4 @@
+import {canManageOrderTools} from './order-service.mjs';
 import {exportOrderWorkbook} from './order-export.mjs';
 import {encrypt,decrypt} from './security.mjs';
 import {validDate,shiftDate} from './schedule.mjs';
@@ -26,20 +27,24 @@ export const compareOrders=(a,b)=>orderNames.compare(a.lastName.trim(),b.lastNam
 function orderDay(now){const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value]));return p.year+'-'+p.month+'-'+p.day;}
 export function registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret,now=()=>new Date()}){
  const universe="Outils d'aide aux commandes",access=viewUniverse(universe),guard=[auth,ready,editUniverse(universe),csrf];
+ const manager=async(req,res,next)=>{if(!await canManageOrderTools(db,req.auth))throw fail(403,'Ces outils sont réservés aux administrateurs et au référent du service commandes programmées.');next();};
+ app.get('/api/order-planning/options',auth,ready,access,async(req,res)=>res.json({canManage:await canManageOrderTools(db,req.auth)}));
  const clean=row=>{const data=decrypt(row.content,secret);return {id:row.id,revision:row.revision,...data,nextOrder:orderNextDate(data)};};
  app.get('/api/order-planning',auth,ready,access,async(req,res)=>{
   const rows=(await db.query('SELECT id,revision,content FROM order_planning')).rows.map(clean);
   rows.sort(compareOrders);res.json(rows);
  });
- app.get('/api/order-planning/export.xlsx',auth,ready,access,async(req,res)=>{
+ app.get('/api/order-planning/export.xlsx',auth,ready,access,manager,async(req,res)=>{
   const rows=(await db.query('SELECT id,revision,content FROM order_planning')).rows.map(clean);
   rows.sort(compareOrders);
   const day=orderDay(now());res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename=commandes-programmees-'+day+'.xlsx','Cache-Control':'no-store'}).send(exportOrderWorkbook(rows,day));
  });
- app.post('/api/order-planning',...guard,async(req,res)=>{
+ const createOrder=async(req,res)=>{
   const data=validateOrderPlan(req.body,fail);
   const row=(await db.query('INSERT INTO order_planning(content,updated_by) VALUES($1,$2) RETURNING id,revision,content',[encrypt(data,secret),req.auth.id])).rows[0];res.status(201).json(clean(row));
- });
+ };
+ app.post('/api/order-planning',...guard,createOrder);
+ app.post('/api/order-planning/import',...guard,manager,createOrder);
  app.put('/api/order-planning/:id',...guard,async(req,res)=>{
   const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||!Number.isSafeInteger(req.body?.revision))throw fail(400,'Actualisez la ligne avant de la modifier.');
   const current=(await db.query('SELECT id,revision,content FROM order_planning WHERE id=$1',[id])).rows[0];

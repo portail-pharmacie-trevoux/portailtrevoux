@@ -1,10 +1,11 @@
+import {isOrderService} from './order-service.mjs';
+export {isOrderService} from './order-service.mjs';
 import {decrypt} from './security.mjs';
 import {orderNextDate} from './order-planning.mjs';
 export function parisDate(now){const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));return {day:p.year+'-'+p.month+'-'+p.day,hour:Number(p.hour)};}
 const humanDate=value=>String(value).replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g,'$3-$2-$1');
 const shift=(day,n)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
 export function reminderTuesday(now){const {day,hour}=parisDate(now),weekday=new Date(day+'T12:00:00Z').getUTCDay();let offset=(weekday+5)%7;if(!offset&&hour<8)offset=7;return shift(day,-offset);}
-export const isOrderService=name=>/^commandes? programmees?(?:\b|$)/.test(name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim());
 export function orderDigest(rows,secret,day){
  const end=shift(day,7),items=[];let suspended=0,unreadable=0;const counts={unplanned:0,waiting:0,late:0,soon:0,incomplete:0};
  for(const row of rows){let r;try{r=decrypt(row.content,secret);}catch{unreadable++;items.push({id:row.id,issues:['Ligne illisible : faire vérifier les données par un administrateur.']});continue;}if(r.suspended){suspended++;continue;}

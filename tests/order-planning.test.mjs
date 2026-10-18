@@ -15,18 +15,20 @@ test('Prochaine commande : dernière délivrance, mois, année bissextile et abs
  assert.ok(canAccess({role:'employee',permissions_configured:false},"Outils d'aide aux commandes"));assert.ok(canModify({role:'employee',permissions_configured:false},"Outils d'aide aux commandes"));assert.equal(canAccess({role:'employee',permissions_configured:true,rights:[]},"Outils d'aide aux commandes"),false);
 });
 test('Tableau : chiffrement, validation passée/délivrée distincte, auteur fiable, annulation et concurrence',async t=>{
- const secret='test-secret-for-order-planning-32-characters';let row=null,allowed=true,editable=true;
+ const secret='test-secret-for-order-planning-32-characters';let row=null,allowed=true,editable=true,role='admin',referent=false;
  const db={query:async(sql,args=[])=>{
+  if(sql.startsWith('SELECT s.service'))return {rows:referent?[{service:'Commandes programmées et traitements chers'}]:[]};
   if(sql.startsWith('INSERT INTO order_planning')){row={id:1,revision:1,content:args[0]};return {rows:[row]};}
   if(sql.startsWith('SELECT id,revision'))return {rows:row?[row]:[]};
   if(sql.startsWith('UPDATE order_planning')){if(args[3]!==row.revision)return {rows:[]};row={...row,revision:row.revision+1,content:args[1]};return {rows:[row]};}
   if(sql.startsWith('DELETE FROM order_planning')){if(!row||args[1]!==row.revision)return {rows:[]};row=null;return {rows:[{id:1}]};}
   throw Error(sql);
  }};
- const app=express();app.use(express.json());const auth=(req,res,next)=>{req.auth={id:1,first_name:'Nicolas',last_name:'Marchand'};next();},pass=(req,res,next)=>next();
+ const app=express();app.use(express.json());const auth=(req,res,next)=>{req.auth={id:1,role,first_name:'Nicolas',last_name:'Marchand'};next();},pass=(req,res,next)=>next();
  registerOrderPlanning({app,db,auth,ready:pass,csrf:(req,res,next)=>req.headers['x-csrf-token']==='valid'?next():next(fail(403,'CSRF')),viewUniverse:()=>((req,res,next)=>allowed?next():next(fail(403,'Accès'))),editUniverse:()=>((req,res,next)=>allowed&&editable?next():next(fail(403,'Modification'))),fail,secret,now:()=>new Date('2026-10-07T22:30:00Z')});
  app.use((e,req,res,next)=>res.status(e.status||500).json({error:e.message}));const server=app.listen(0);t.after(()=>server.close());const url='http://127.0.0.1:'+server.address().port+'/api/order-planning';
  const write=(method,path,data)=>fetch(url+path,{method,headers:{'content-type':'application/json','x-csrf-token':'valid'},body:JSON.stringify(data)});
+ role='employee';assert.equal((await (await fetch(url+'/options')).json()).canManage,false);assert.equal((await fetch(url+'/export.xlsx')).status,403);assert.equal((await write('POST','/import',base)).status,403);referent=true;assert.equal((await (await fetch(url+'/options')).json()).canManage,true);assert.equal((await write('POST','/import',base)).status,201);referent=false;role='admin';
  let r=await write('POST','',base);assert.equal(r.status,201);assert.equal((await r.json()).nextOrder,'');assert.ok(!row.content.includes(base.treatment));assert.equal(decrypt(row.content,secret).treatment,base.treatment);
  r=await write('PUT','/1',{...base,frequency:30,revision:1});assert.equal(r.status,200);assert.equal((await r.json()).nextOrder,'');
  assert.equal((await write('PUT','/1',{...base,revision:1})).status,409);
