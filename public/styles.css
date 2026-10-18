@@ -480,3 +480,6 @@ header{padding-top:10px;padding-bottom:10px;min-height:92px}.portal-brand .sub{m
 
 /* Nouvelle bannière d’accueil : visuel validé, format compact pour écrans 4:3 */
 .home-space-banner{width:100%;margin:-18px auto 20px;max-width:1050px;overflow:hidden;border-radius:12px;background:#081a3a;box-shadow:0 3px 14px #152e4722}.home-space-banner img{display:block;width:100%;height:auto;max-height:170px;object-fit:contain;object-position:center}.welcome{margin-bottom:30px}@media(max-width:1050px){.home-space-banner img{max-height:145px}.home-space-banner{margin-top:-10px;margin-bottom:16px}}@media(max-width:800px){.home-space-banner img{max-height:125px}.home-space-banner{margin-top:0}}@media(max-width:560px){.home-space-banner img{max-height:110px}.home-space-banner{border-radius:8px}}
+
+/* Film original Higgsfield sur la connexion : aucun texte ajouté */
+.login-film-wrap{position:relative;overflow:hidden;aspect-ratio:16/9;background:#081733;border-radius:14px}.login-higgsfield-video{display:block;width:100%;height:100%;aspect-ratio:16/9;object-fit:contain;background:#081733}.login-film-wrap .film-replay{display:none}
