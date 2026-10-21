@@ -12,9 +12,11 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
  const editor=el('div'),feedback=el('p','','status-line');feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');
  const list=el('div','','hr-document-list'),history=el('section','','hr-signature-history');
  const category=el('select');category.setAttribute('aria-label','Type de documents RH');[['common','Documents communs'],['personal',isAdmin?'Documents personnels':'Mes documents personnels']].forEach(([value,text])=>{const option=el('option',text);option.value=value;category.append(option);});category.onchange=()=>display();container.replaceChildren(note,category,editor,feedback,list,history);
- if(isAdmin){const drop=el('div','Glissez-déposez un PDF ici, ou cliquez pour choisir un document.','hr-dropzone');drop.tabIndex=0;drop.setAttribute('role','button');drop.onclick=()=>importDocument();drop.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();importDocument();}};drop.ondragover=e=>{e.preventDefault();drop.classList.add('dragging');};drop.ondragleave=()=>drop.classList.remove('dragging');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('dragging');const files=[...e.dataTransfer.files];if(files.length!==1){feedback.textContent='Déposez un seul document à la fois.';return;}importDocument(files[0]);};container.insertBefore(drop,editor);const add=button('Importer un document',()=>importDocument(),'btn primary');add.id='hr-import-action';heading.append(add);}
- const settings=isAdmin?el('details','','hr-settings admin-menu'):null;
- if(settings){settings.append(el('summary','Administration — signatures Youtrust'),el('p','Youtrust envoie les invitations de signature par e-mail. Connectez le compte de la pharmacie pour utiliser « Envoyer pour signature ».','field-note'));container.prepend(settings);void loadConnection();}
+ const administration=isAdmin?el('details','','hr-settings admin-menu'):null;
+ if(administration){administration.append(el('summary','Administration'));container.prepend(administration);}
+ if(isAdmin){const drop=el('div','Glissez-déposez un PDF ici, ou cliquez pour choisir un document.','hr-dropzone');drop.tabIndex=0;drop.setAttribute('role','button');drop.onclick=()=>importDocument();drop.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();importDocument();}};drop.ondragover=e=>{e.preventDefault();drop.classList.add('dragging');};drop.ondragleave=()=>drop.classList.remove('dragging');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('dragging');const files=[...e.dataTransfer.files];if(files.length!==1){feedback.textContent='Déposez un seul document à la fois.';return;}importDocument(files[0]);};administration.append(drop);const add=button('Importer un document',()=>importDocument(),'btn primary');add.id='hr-import-action';administration.prepend(add);administration.prepend(administration.querySelector('summary'));administration.append(editor);}
+ const settings=isAdmin?el('details','','hr-settings'):null;
+ if(settings){settings.append(el('summary','Paramètres des signatures Youtrust'),el('p','Youtrust envoie les invitations de signature par e-mail. Connectez le compte de la pharmacie pour utiliser « Envoyer pour signature ».','field-note'));administration.append(settings);void loadConnection();}
  async function reload(message=''){
   const request=++listRequest,[freshDocuments,freshRequests]=await Promise.all([api('/api/hr/documents'),api('/api/hr/signatures')]);
   if(!isCurrent()||request!==listRequest)return;documents=freshDocuments;requests=freshRequests;display();displayHistory();if(message)feedback.textContent=message;
@@ -39,19 +41,19 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
   });list.append(grid);
  }
  function renameDocument(doc){
-  editor.replaceChildren();const form=el('form','','hr-form'),label=el('label','Nom affiché du document'),input=el('input');input.id='hr-rename';label.htmlFor=input.id;input.type='text';input.value=doc.title;input.maxLength=200;input.required=true;
+  administration.open=true;editor.replaceChildren();const form=el('form','','hr-form'),label=el('label','Nom affiché du document'),input=el('input');input.id='hr-rename';label.htmlFor=input.id;input.type='text';input.value=doc.title;input.maxLength=200;input.required=true;
   const error=el('p','','error'),save=el('button','Enregistrer le nom','btn primary');save.type='submit';
   form.append(el('h3','Renommer le document'),label,input,error,button('Annuler',()=>editor.replaceChildren()),save);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});editor.scrollIntoView?.({behavior:'smooth',block:'center'});
   form.onsubmit=async e=>{e.preventDefault();if(saving||!isCurrent())return;saving=true;save.disabled=true;try{await api('/api/hr/documents/'+doc.id,'PATCH',{title:input.value});if(!isCurrent())return;editor.replaceChildren();await reload('Nom du document enregistré.');}catch(e){if(isCurrent())error.textContent=e.message;}finally{saving=false;save.disabled=false;}};
  }
 
  function importDocument(droppedFile=null){
-  if(!isCurrent())return;editor.replaceChildren();const form=el('form','','hr-form'),title=el('h3','Importer un document RH');
+  if(!isCurrent())return;administration.open=true;editor.replaceChildren();const form=el('form','','hr-form'),title=el('h3','Importer un document RH');
   const label=el('label','Titre du document');label.htmlFor='hr-title';const input=el('input');input.id='hr-title';input.type='text';input.required=true;input.maxLength=200;
   const fileLabel=el('label','Document PDF ou Word (.docx)');fileLabel.htmlFor='hr-file';const file=el('input');file.id='hr-file';file.type='file';file.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';file.required=!droppedFile;
   let selectedFile=droppedFile;if(selectedFile)input.value=selectedFile.name.replace(/\.(pdf|docx)$/i,'').slice(0,200);
   const chosen=el('p',selectedFile?'Fichier déposé : '+selectedFile.name:'','field-note');file.onchange=()=>{selectedFile=file.files[0];if(selectedFile){input.value=selectedFile.name.replace(/\.(pdf|docx)$/i,'').slice(0,200);chosen.textContent='Fichier choisi : '+selectedFile.name;}};
-  const scopeLabel=el('label','Accès au document'),scope=el('select'),ownerLabel=el('label','Salarié concerné'),owner=el('select');scope.setAttribute('aria-label','Accès au document RH');owner.setAttribute('aria-label','Salarié destinataire du document personnel');[['common','Document commun — toute l’équipe'],['personal','Document personnel — salarié et administrateurs']].forEach(([v,t])=>{const o=el('option',t);o.value=v;scope.append(o);});scope.value=category.value;scopeLabel.append(scope);ownerLabel.append(owner);const none=el('option','Choisir le salarié');none.value='';owner.append(none);api('/api/hr/signatories').then(people=>{if(!isCurrent())return;people.forEach(p=>{const o=el('option',p.name);o.value=p.id;owner.append(o);});}).catch(e=>{error.textContent=e.message;});const toggle=()=>{ownerLabel.hidden=scope.value!=='personal';owner.disabled=scope.value!=='personal';owner.required=scope.value==='personal';};scope.onchange=toggle;toggle();
+  const scopeLabel=el('label','À qui ce document est-il destiné ?'),scope=el('select'),ownerLabel=el('label','Salarié concerné'),owner=el('select');scope.setAttribute('aria-label','Accès au document RH');owner.setAttribute('aria-label','Salarié destinataire du document personnel');[['common','Document commun — toute l’équipe'],['personal','Document personnel — salarié et administrateurs']].forEach(([v,t])=>{const o=el('option',t);o.value=v;scope.append(o);});scope.value=category.value;scopeLabel.append(scope);ownerLabel.append(owner);const none=el('option','Choisir le salarié');none.value='';owner.append(none);api('/api/hr/signatories').then(people=>{if(!isCurrent())return;people.forEach(p=>{const o=el('option',p.name);o.value=p.id;owner.append(o);});}).catch(e=>{error.textContent=e.message;});const toggle=()=>{ownerLabel.hidden=scope.value!=='personal';owner.disabled=scope.value!=='personal';owner.required=scope.value==='personal';};scope.onchange=toggle;toggle();
   const error=el('p','','error');error.setAttribute('role','alert');const actions=el('div','','dialog-actions'),cancel=button('Annuler',()=>editor.replaceChildren()),submit=el('button','Importer le document','btn primary');submit.type='submit';actions.append(cancel,submit);
   form.append(title,label,input,scopeLabel,ownerLabel,fileLabel,file,chosen,el('p','10 Mo maximum. Vérifiez le type d’accès et le salarié destinataire avant l’import.','field-note'),error,actions);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});
   form.onsubmit=async e=>{
@@ -63,11 +65,11 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
   };
  }
  async function signatureForm(doc){
-  editor.replaceChildren(el('p','Chargement des signataires…','field-note'));
+  administration.open=true;editor.replaceChildren(el('p','Chargement des signataires…','field-note'));
   let people;try{people=await api('/api/hr/signatories');}catch(e){if(isCurrent())editor.replaceChildren(el('p',e.message,'error'));return;}if(!isCurrent())return;if(doc.scope==='personal')people=people.filter(p=>p.id===Number(doc.owner_id));
   const form=el('form','','hr-form hr-signature-form'),selected=new Map(),requestKey=crypto.randomUUID();form.append(el('h3','Envoyer pour signature : '+doc.title),el('p','Youtrust enverra un e-mail à chaque signataire sélectionné. Le document sera accompagné d’une feuille avec un emplacement de signature pour chacun.','field-note'));
   const provider=el('p','','hr-provider-status');const providerState=()=>{provider.textContent=connection?.connected?(connection.environment==='demo'?'Compte Youtrust de démonstration : les demandes sont des essais.':'Compte Youtrust connecté : '+connection.accountName):'Connectez Youtrust dans les paramètres de cette page avant l’envoi.';};refreshProvider=providerState;providerState();
-  form.append(provider,button('Ouvrir les paramètres Youtrust',()=>{settings.open=true;settings.scrollIntoView?.({behavior:'smooth',block:'center'});}));
+  form.append(provider,button('Ouvrir les paramètres Youtrust',()=>{administration.open=true;settings.open=true;settings.scrollIntoView?.({behavior:'smooth',block:'center'});}));
   const label=el('label','Rechercher un collaborateur actif');label.htmlFor='hr-signatory-search';const search=el('input');search.type='search';search.id='hr-signatory-search';
   const choices=el('div','','hr-signatory-list'),count=el('p','Aucun signataire sélectionné.','field-note'),boxes=[];
   const updateCount=()=>{count.textContent=selected.size+' signataire'+(selected.size>1?'s':'')+' sélectionné'+(selected.size>1?'s':'');};
@@ -82,7 +84,7 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
   form.append(label,search,selection,choices,count,error,actions);editor.replaceChildren(form);
   form.onsubmit=async e=>{
    e.preventDefault();if(saving||!isCurrent())return;error.textContent='';
-   if(!connection?.connected){providerState();settings.open=true;error.textContent='Connectez d’abord votre compte Youtrust.';return;}
+   if(!connection?.connected){providerState();administration.open=true;settings.open=true;error.textContent='Connectez d’abord votre compte Youtrust.';return;}
    if(!selected.size){error.textContent='Sélectionnez au moins un signataire.';return;}
    saving=true;send.disabled=true;cancel.disabled=true;
    try{const result=await api('/api/hr/documents/'+doc.id+'/signatures','POST',{requestKey,recipients:[...selected].map(([id,email])=>({id,email}))});if(!isCurrent())return;
@@ -106,10 +108,10 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
   });
  }
  async function loadConnection(){
-  try{connection=await api('/api/youtrust/status');if(!isCurrent())return;settings.open=!connection.connected;drawConnection();refreshProvider();}catch(e){if(isCurrent())settings.append(el('p',e.message,'error'));}
+  try{connection=await api('/api/youtrust/status');if(!isCurrent())return;drawConnection();refreshProvider();}catch(e){if(isCurrent())settings.append(el('p',e.message,'error'));}
  }
  function drawConnection(){
-  settings.replaceChildren(el('summary','Administration — signatures Youtrust'),el('p',connection.connected?(connection.environment==='demo'?'Clé Youtrust vérifiée · Essais sandbox':'Clé Youtrust vérifiée · Envois réels'):'Renseignez votre clé API Youtrust pour activer les signatures.','field-note'));
+  settings.replaceChildren(el('summary','Paramètres des signatures Youtrust'),el('p',connection.connected?(connection.environment==='demo'?'Clé Youtrust vérifiée · Essais sandbox':'Clé Youtrust vérifiée · Envois réels'):'Renseignez votre clé API Youtrust pour activer les signatures.','field-note'));
   settings.append(el('p','Votre offre Youtrust doit inclure l’accès à l’API. Les invitations sont envoyées par Youtrust. La clé est conservée chiffrée et ne sera pas affichée.','field-note'),link('Comment créer ma clé API Youtrust','https://developers.youtrust.com/docs/set-up-your-account'));
   const form=el('form','','hr-form'),typeLabel=el('label','Environnement de la clé API');typeLabel.htmlFor='youtrust-environment';
   const environment=el('select');environment.id='youtrust-environment';[['production','Production : signatures réelles'],['demo','Sandbox : essais uniquement']].forEach(([value,title])=>{const option=el('option',title);option.value=value;environment.append(option);});environment.value=connection.environment;
