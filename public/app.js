@@ -124,7 +124,7 @@ function openPassword(){q('#password-form').reset();q('#password-error').textCon
 q('#password-dialog').addEventListener('cancel',e=>{if(session?.user.mustChange)e.preventDefault();});
 q('#password-cancel').onclick=()=>q('#password-dialog').close();
 q('#password-form').onsubmit=async e=>{e.preventDefault();if(q('#new-password').value!==q('#confirm-password').value){q('#password-error').textContent='Les nouveaux mots de passe ne correspondent pas.';return;}const btn=e.submitter;btn.disabled=true;try{session=await api('/api/password','POST',{currentPassword:q('#current-password').value,password:q('#new-password').value});q('#password-form').reset();q('#password-dialog').close();showHome();}catch(e){q('#password-error').textContent=e.message;}finally{btn.disabled=false;}};
-function displayUniverse(name){return name==='Formations'?'Formations & documents imprimables':name==='Actualités'?'Communication':name==='Outils de calculs rapides'?"Outils d’aide au calcul":name;}
+function displayUniverse(name){const titles={"Outils d'aide au merchandising":"Merchandising","Outils d'aide à la démarche qualité":"Démarche qualité","Outils d'aide aux commandes":"Commandes"};if(titles[name])return titles[name];return name==='Formations'?'Formations & documents imprimables':name==='Actualités'?'Communication':name==='Outils de calculs rapides'?"Outils d’aide au calcul":name;}
 const descriptions={'Outils de calculs rapides':'Les calculs utiles au quotidien.','Fun':'La sélection musicale de l’équipe pour l’espace de vente.','Passerelle groupement':'Accès direct Pharmascope.','Collaborateurs':'L’annuaire de l’équipe et votre accès personnel aux bulletins de paie.','Emplois du temps':'Les horaires de votre équipe.','Agenda':'Votre agenda équipe, synchronisé avec Google.','Procédures':'Les consignes et documents de référence.','Laboratoires':'Les contacts et ressources de vos partenaires.','Challenges':'Les objectifs et défis collectifs de la pharmacie.','Actualités':'échanges internes & informations','Formations':'Documents de référence, formations et supports à imprimer.','Contacts utiles':'Les coordonnées utiles au quotidien.','Ressources humaines':'Les documents internes de la pharmacie et leur signature en ligne.'};
 descriptions["Outils d'aide aux commandes"]='commandes programmées';descriptions["Outils d’aide au merchandising"]='';descriptions["Outils d'aide au merchandising"]='Organisation de l’espace de vente.';
 descriptions["Outils d'aide à la démarche qualité"]="Suivi et amélioration des pratiques.";
@@ -336,6 +336,11 @@ function tilePreferences(){
     const bottom=['Fun','Passerelle groupement','Outils de calculs rapides',"Outils d'aide au merchandising","Outils d'aide aux commandes","Outils d'aide à la démarche qualité"];
     order=[...order.filter(name=>!bottom.includes(name)),...initialTileOrder.filter(name=>!order.includes(name)&&!bottom.includes(name)),...bottom];
   }
+  if((saved?.version||0)<5){
+    const promoted=["Outils d'aide au merchandising","Outils d'aide à la démarche qualité","Outils d'aide aux commandes"],bottom=['Outils de calculs rapides','Passerelle groupement','Fun'];
+    const core=[...new Set([...order,...initialTileOrder])].filter(name=>initialTileOrder.includes(name)&&!promoted.includes(name)&&!bottom.includes(name));
+    order=[...core,...promoted,...bottom];
+  }
   return {order,hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
 }
 function applyTileVisibility(){
@@ -374,7 +379,7 @@ q('#organize-tiles').onclick=()=>{
 q('#tile-order-cancel').onclick=()=>q('#tile-order-dialog').close();
 q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(tileAllowed);draftHiddenTiles.clear();renderTileOrder();q('#tile-order-status').textContent='Ordre initial et toutes vos tuiles affichées.';};
 q('#tile-order-save').onclick=()=>{
-  try{localStorage.setItem(tileOrderKey(),JSON.stringify({version:4,order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
+  try{localStorage.setItem(tileOrderKey(),JSON.stringify({version:5,order:[...draftTileOrder,...initialTileOrder.filter(n=>!draftTileOrder.includes(n))],hidden:[...draftHiddenTiles]}));showHome();q('#tile-order-dialog').close();}
   catch{q('#tile-order-status').textContent='Ce navigateur ne permet pas de mémoriser votre ordre.';}
 };
 
@@ -516,7 +521,7 @@ async function refreshHomeExtras(){
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
-      if(tile.classList.contains('tool-tile')||['Collaborateurs','Contacts utiles','Agenda','Emplois du temps','Fun','Passerelle groupement'].includes(tile.dataset.universe))return;
+      if(tile.classList.contains('tool-tile')||tile.classList.contains('primary-space')||['Collaborateurs','Contacts utiles','Agenda','Emplois du temps','Fun','Passerelle groupement'].includes(tile.dataset.universe))return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
       const label=tile.dataset.universe==='Actualités'?(count?count+' message'+(count>1?'s':'')+' non vu'+(count>1?'s':''):'Aucun message non vu'):(count?count+' nouveauté'+(count>1?'s':'')+' non lue'+(count>1?'s':''):'Aucune nouveauté non lue');
