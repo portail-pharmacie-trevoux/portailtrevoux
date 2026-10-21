@@ -25,7 +25,7 @@ export function trainingOverview(people,documents,year,today){
 export function registerQualityTraining({app,db,auth,ready,viewUniverse,fail,now=()=>new Date()}){
  app.get('/api/quality/training',auth,ready,viewUniverse("Outils d'aide à la démarche qualité"),async(req,res)=>{
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now()).map(p=>[p.type,p.value])),today=parts.year+'-'+parts.month+'-'+parts.day;
-  const year=Number(req.query.year??parts.year);if(!Number.isInteger(year)||year<2026||year>Number(parts.year))throw fail(400,'Choisissez une année entre 2026 et l’année en cours.');
+  const year=Number(req.query.year??parts.year);if(!Number.isInteger(year)||year<2025||year>Number(parts.year))throw fail(400,'Choisissez une année entre 2025 et l’année en cours.');
   const isAdmin=req.auth.role==='admin';
   const people=(await db.query('SELECT id,name,job FROM users WHERE active=TRUE AND ($1::boolean OR id=$2) ORDER BY lower(last_name),lower(first_name),id',[isAdmin,req.auth.id])).rows.filter(person=>isTrainingProfession(person.job));
   const documents=(await db.query("SELECT owner_id,title FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND title LIKE 'Attestation%'",[people.map(p=>p.id)])).rows;
