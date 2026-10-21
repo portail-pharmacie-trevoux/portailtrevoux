@@ -5,7 +5,7 @@ const node=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textCont
 const button=(text,action,cls='btn small')=>{const e=node('button',text,cls);e.type='button';e.onclick=action;return e;};
 const attachmentLink=message=>{const link=node('a','📎 '+message.attachment_name,'btn small news-attachment');link.href='/api/news/'+message.id+'/attachment';link.download=message.attachment_name;return link;};
 const date=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});
-export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{},onOpenOrders=()=>{}}){
+export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{},onOpenOrders=()=>{},onOpenMerchandising=()=>{}}){
   const [recipients,initialMessages,initialSent]=await Promise.all([api('/api/news/recipients'),api('/api/news'),api('/api/news/sent')]);
   if(!isCurrent())return;
   const expandedThreads=new Set(),threadCache=new Map();let sentMessages=initialSent,view='inbox',replyTo=null;let messages=initialMessages,filter='all',request=0,sending=false;
@@ -75,6 +75,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
           finally{controls.forEach(c=>c.disabled=false);}
         };label.append(input,node('span',labelText));actions.append(label);
       }
+      if(message.merchandising_month)card.append(button('Consulter le planning merchandising',()=>onOpenMerchandising(message.merchandising_month),'btn primary small'));
       if(message.planning_week)card.append(button('Consulter le planning',()=>onOpenPlanning(message.planning_week?String(message.planning_week).slice(0,10):null),'btn primary small'));if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));return card;
   }
   function outgoingCard(message){const card=node('article','','news-message news-message-outgoing news-origin-'+messageKind(message));card.append(originBadge(message,true),node('strong','Vous · '+date(message.created_at)),node('p',message.text,'news-message-text'));if(message.attachment_name)card.append(attachmentLink(message));if(message.recipients){const seen=message.recipients.filter(p=>p.seen).length;card.append(node('p',seen+' / '+message.recipients.length+' destinataires ont coché « Vu »','field-note'));const people=node('ul');message.recipients.forEach(p=>people.append(node('li',p.name+' · '+(p.seen?'Vu'+(p.seenAt?' le '+date(p.seenAt):''):'Non vu'))));card.append(people);}card.append(button('Imprimer',()=>printNewsMessage(card,{sent:true,hasAttachment:!!message.attachment_name})));return card;}

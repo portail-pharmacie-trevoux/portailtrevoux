@@ -1,3 +1,4 @@
+import {merchandisingFreeReminders} from './merchandising-free-reminders.mjs';
 import {registerMusicCSV} from './music-csv.mjs';
 import {orderReminderEmails} from './order-reminder-emails.mjs';
 import {registerMerchDocuments} from './merchandising-documents.mjs';
@@ -370,7 +371,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync,mailer}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }

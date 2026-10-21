@@ -432,3 +432,11 @@ WITH RECURSIVE threads AS (
  UNION ALL SELECT m.id,t.root FROM team_messages m JOIN threads t ON m.reply_to_id=t.id
 ) UPDATE team_messages m SET thread_id=t.root FROM threads t WHERE m.id=t.id AND m.thread_id IS NULL;
 CREATE INDEX IF NOT EXISTS team_messages_thread_idx ON team_messages((COALESCE(thread_id,id)),created_at,id);
+
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS merchandising_month TEXT;
+CREATE TABLE IF NOT EXISTS merchandising_free_reminders(
+ period TEXT PRIMARY KEY,target_month TEXT NOT NULL,free_count INTEGER NOT NULL,
+ recipient_count INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('sent','no_free','no_recipients')),
+ checked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO settings(key,value) VALUES('merchandising_free_reminder_start',to_char(now() AT TIME ZONE 'Europe/Paris','YYYY-MM')) ON CONFLICT DO NOTHING;
