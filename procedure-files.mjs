@@ -1,6 +1,6 @@
 export const maxProcedureFileBytes=10*1024*1024;
 const docxType='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-function isDocx(bytes){
+function isDocx(bytes,mainFile='word/document.xml'){
   // Inspect the ZIP central directory without inflating untrusted content.
   if(bytes.length<22||bytes.readUInt32LE(0)!==0x04034b50)return false;
   let end=-1;
@@ -26,7 +26,7 @@ function isDocx(bytes){
     if(names.has(name))return false;
     names.add(name);position=next;
   }
-  return position===end&&names.has('[Content_Types].xml')&&names.has('word/document.xml');
+  return position===end&&names.has('[Content_Types].xml')&&names.has(mainFile);
 }
 export function validateProcedureFile(body,fail,maxBytes=maxProcedureFileBytes){
   const name=body?.fileName,data=body?.fileData;
@@ -42,3 +42,5 @@ export function validateProcedureFile(body,fail,maxBytes=maxProcedureFileBytes){
   if(!valid)throw fail(400,'Le contenu ne correspond pas à un document '+(extension==='pdf'?'PDF':'Word (.docx)')+' valide.');
   return {fileName,fileType:extension==='pdf'?'application/pdf':docxType,bytes};
 }
+
+export const isProcedureWorkbook=bytes=>isDocx(bytes,'xl/workbook.xml');

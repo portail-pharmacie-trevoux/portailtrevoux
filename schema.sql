@@ -440,3 +440,6 @@ CREATE TABLE IF NOT EXISTS merchandising_free_reminders(
  checked_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 INSERT INTO settings(key,value) VALUES('merchandising_free_reminder_start',to_char(now() AT TIME ZONE 'Europe/Paris','YYYY-MM')) ON CONFLICT DO NOTHING;
+
+ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS source_url TEXT;
+ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS source_imported_at TIMESTAMPTZ;

@@ -2,7 +2,7 @@ import { validateProcedureFile } from './procedure-files.mjs';
 
 export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser}){
  const fields={category:100,title:200,description:1500,keywords:500,url:1000};
- const columns='id,category,title,description,keywords,url,created_at,file_name,file_type';
+ const columns='id,category,title,description,keywords,url,created_at,file_name,file_type,source_url,source_imported_at,octet_length(file_content) AS file_size';
  function validate(body,storedUrl=null){
   const d={};
   for(const [k,max] of Object.entries(fields)){
