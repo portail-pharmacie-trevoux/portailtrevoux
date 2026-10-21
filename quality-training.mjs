@@ -1,4 +1,5 @@
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+export const isTrainingProfession=job=>/^(?:pharmacien(?:ne)?|preparateur|preparatrice)(?:$| (?:cienne|ne|trice|en pharmacie|en officine|adjoint|titulaire)\b)/.test(normalize(String(job||'')));
 export function parseTrainingAttestation(doc){
  const match=/^Attestation (DPC|de formation) — (.+) — (\d{2})\/(\d{2})\/(\d{4})$/.exec(doc.title||'');if(!match)return null;
  const [,kind,title,day,month,year]=match,date=`${year}-${month}-${day}`,parsed=new Date(date+'T12:00:00Z');
@@ -26,7 +27,7 @@ export function registerQualityTraining({app,db,auth,ready,viewUniverse,fail,now
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now()).map(p=>[p.type,p.value])),today=parts.year+'-'+parts.month+'-'+parts.day;
   const year=Number(req.query.year??parts.year);if(!Number.isInteger(year)||year<2026||year>Number(parts.year))throw fail(400,'Choisissez une année entre 2026 et l’année en cours.');
   const isAdmin=req.auth.role==='admin';
-  const people=(await db.query('SELECT id,name FROM users WHERE active=TRUE AND ($1::boolean OR id=$2) ORDER BY lower(last_name),lower(first_name),id',[isAdmin,req.auth.id])).rows;
+  const people=(await db.query('SELECT id,name,job FROM users WHERE active=TRUE AND ($1::boolean OR id=$2) ORDER BY lower(last_name),lower(first_name),id',[isAdmin,req.auth.id])).rows.filter(person=>isTrainingProfession(person.job));
   const documents=(await db.query("SELECT owner_id,title FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND title LIKE 'Attestation%'",[people.map(p=>p.id)])).rows;
   res.set('Cache-Control','no-store').json({...trainingOverview(people,documents,year,today),isAdmin});
  });
