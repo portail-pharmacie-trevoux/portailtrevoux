@@ -38,20 +38,21 @@ export function textMessage({sender,email,subject,text,html}){
 }
 export function createInvitationMailer({getSetting,setSetting,secret,clientId,clientSecret,sender='pharmacie.trevoux@gmail.com',fail,fetchImpl=fetch}){
  let refreshing=null;
- async function authorization(){
+ async function authorization(force=false){
   const stored=await getSetting('mail_tokens');if(!stored)throw fail(409,'Connectez d’abord la messagerie des invitations dans la page Collaborateurs.');
   let tokens=decrypt(stored,secret);
   if(tokens.sender!==sender||!(tokens.scope||'').split(' ').includes(gmailSendScope))throw fail(409,'Reconnectez la messagerie de la pharmacie en autorisant l’envoi des e-mails.');
-  if(tokens.expires_at>Date.now()+60000)return tokens;
+  if(!force&&tokens.expires_at>Date.now()+60000)return tokens;
   if(!refreshing)refreshing=(async()=>{
    if(!tokens.refresh_token||!clientId||!clientSecret)throw fail(409,'Reconnectez la messagerie des invitations.');
    let response;try{response=await fetchImpl('https://oauth2.googleapis.com/token',{method:'POST',redirect:'error',body:new URLSearchParams({client_id:clientId,client_secret:clientSecret,refresh_token:tokens.refresh_token,grant_type:'refresh_token'}),signal:AbortSignal.timeout(20000)});}catch{throw fail(502,'La messagerie est momentanément indisponible.');}
-   if(!response.ok)throw fail(409,'L’autorisation Gmail a expiré. Reconnectez la messagerie des invitations.');
+   if(!response.ok)throw fail(response.status===429||response.status>=500?502:409,response.status===429||response.status>=500?'La messagerie est momentanément indisponible.':'L’autorisation Gmail a expiré. Reconnectez la messagerie des invitations.');
    const fresh=await response.json();tokens={...tokens,...fresh,expires_at:Date.now()+fresh.expires_in*1000};await setSetting('mail_tokens',encrypt(tokens,secret));return tokens;
   })().finally(()=>{refreshing=null;});
   return refreshing;
  }
  return {
+  checkConnection:async()=>{await authorization(true);return {ok:true};},
   sendText:async(payload)=>{
    const tokens=await authorization();let response;
    try{response=await fetchImpl('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',redirect:'error',headers:{Authorization:'Bearer '+tokens.access_token,'Content-Type':'application/json'},body:JSON.stringify(textMessage({...payload,sender})),signal:AbortSignal.timeout(20000)});}catch{throw fail(502,'Gmail n’a pas confirmé l’envoi. Vérifiez les messages envoyés avant de réessayer.');}

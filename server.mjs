@@ -1,3 +1,4 @@
+import {createGoogleConnectionHealth} from './google-connection-health.mjs';
 import {merchandisingFreeReminders} from './merchandising-free-reminders.mjs';
 import {registerMusicCSV} from './music-csv.mjs';
 import {orderReminderEmails} from './order-reminder-emails.mjs';
@@ -168,7 +169,7 @@ export function createApp(db,config) {
     if(tokens.expires_at>Date.now()+60000)return tokens;
     if(!tokens.refresh_token)throw fail(409,'Reconnectez Google Agenda.');
     const result=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,refresh_token:tokens.refresh_token,grant_type:'refresh_token'}),signal:AbortSignal.timeout(20000)});
-    if(!result.ok)throw fail(409,'L’autorisation Google doit être renouvelée.');
+    if(!result.ok)throw fail(result.status===429||result.status>=500?502:409,result.status===429||result.status>=500?'Google Agenda est momentanément indisponible. Nouvelle tentative automatique.':'L’autorisation Google doit être renouvelée.');
     const fresh=await result.json();tokens={...tokens,...fresh,expires_at:Date.now()+fresh.expires_in*1000};
     await setSetting('google_tokens',encrypt(tokens,secret));return tokens;
   }
@@ -253,13 +254,15 @@ export function createApp(db,config) {
     if(forMail){
       if(!scopes.has(gmailSendScope)||!tokens.refresh_token)throw fail(400,'Autorisez l’envoi des e-mails depuis la pharmacie.');
       tokens.sender=mailSender;tokens.expires_at=Date.now()+tokens.expires_in*1000;
-      await setSetting('mail_tokens',encrypt(tokens,secret));return res.redirect('/?mail=connected');
+      await setSetting('mail_tokens',encrypt(tokens,secret));await setSetting('mail_connection_health','');return res.redirect('/?mail=connected');
     }
     if(!scopes.has('https://www.googleapis.com/auth/calendar.events.readonly')||!scopes.has('https://www.googleapis.com/auth/calendar.calendarlist.readonly'))throw fail(400,'Autorisez la lecture des agendas et des événements.');
     if(!tokens.refresh_token)throw fail(400,'Autorisation automatique absente. Relancez la connexion Google.');
     tokens.expires_at=Date.now()+tokens.expires_in*1000;
     await setSetting('google_tokens',encrypt(tokens,secret));res.redirect('/?google=connected');
   });
+  const connectionHealth=createGoogleConnectionHealth({getSetting,setSetting,mailer,configured:!!(config.googleId&&config.googleSecret),readCalendar:async()=>({tokens:!!await getSetting('google_tokens'),calendarId:await getSetting('calendar_id'),error:await getSetting('sync_error')||'',syncedAt:(await db.query('SELECT synced_at FROM calendar_cache WHERE singleton=TRUE')).rows[0]?.synced_at})});
+  app.get('/api/integrations/google-health',auth,ready,admin,async(req,res)=>{res.set('Cache-Control','no-store');res.json(await connectionHealth.status());});
   app.get('/api/google/status',auth,ready,admin,async(req,res)=>res.json({configured:!!(config.googleId&&config.googleSecret),connected:!!await getSetting('google_tokens'),calendarId:await getSetting('calendar_id')||'',calendarName:await getSetting('calendar_name')||'',error:await getSetting('sync_error')||'',callback}));
   app.get('/api/google/calendars',auth,ready,admin,async(req,res)=>{
     const items=[];let page;
@@ -333,7 +336,7 @@ export function createApp(db,config) {
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message,...(error.code==='MFA_REQUIRED'?{code:'MFA_REQUIRED'}:{})});
   });
-  return {app,sync,mailer};
+  return {app,sync,mailer,connectionHealth};
 }
 
 export async function initialize(db,config){
@@ -369,9 +372,9 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   await import('./cache-portal-media.mjs');
   const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
   await initialize(db,config);config.dummyHash=await hashPassword(token());
-  const {app,sync,mailer}=createApp(db,config);
+  const {app,sync,mailer,connectionHealth}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }

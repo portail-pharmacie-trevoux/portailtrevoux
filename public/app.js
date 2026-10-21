@@ -99,14 +99,22 @@ async function api(path,method='GET',data){
   }catch(error){operation?.failure(error);throw error;}
 }
 function error(e){q('#global-message').textContent=e.message;}
-function showLogin(){q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showLogin(){q('#google-connection-alert')?.remove();q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
   const whatsappUserId=session.user.id;void import('/whatsapp.js').then(module=>{if(session?.user.id===whatsappUserId)module.setupWhatsApp({button:q('#whatsapp-button'),status:q('#whatsapp-status'),api,getUser:()=>session?.user});}).catch(error);
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
   applyTileVisibility();
-  void refreshHomeExtras();
+  void refreshHomeExtras();void refreshGoogleConnections();
   q('.section-label>span').textContent=[...document.querySelectorAll('.grid .tile')].some(b=>!b.classList.contains('hidden'))?'Vos espaces autorisés':'Vos tuiles sont masquées. Utilisez « Organiser mes tuiles » pour les réafficher.';
+}
+
+let googleConnectionsPending=false;
+async function refreshGoogleConnections(){
+ if(!session||session.user.role!=='admin'||session.user.mustChange||googleConnectionsPending)return;googleConnectionsPending=true;const userId=session.user.id;
+ try{const [data,module]=await Promise.all([api('/api/integrations/google-health'),import('/google-connection-alert.js')]);if(session?.user.id!==userId||session.user.role!=='admin')return;let banner=q('#google-connection-alert');if(!banner){banner=node('aside');banner.id='google-connection-alert';q('body>header').after(banner);}module.renderGoogleConnectionAlert({container:banner,data,onOpenAgenda:()=>void openUniverse('Agenda'),onReconnect:async kind=>{const result=await api(kind==='mail'?'/api/mail/connect':'/api/google/connect','POST',{});window.location.assign(result.url);}});
+ }catch(e){if(session?.user.id===userId&&session.user.role==='admin'){let banner=q('#google-connection-alert');if(!banner){banner=node('aside');banner.id='google-connection-alert';q('body>header').after(banner);}banner.hidden=false;banner.className='google-connection-alert';banner.setAttribute('role','status');banner.textContent='⚠ Suivi des connexions Google momentanément indisponible. Nouvelle vérification automatique.';}}
+ finally{googleConnectionsPending=false;}
 }
 function afterLogin(){if(session.user.mustChange){q('#login').classList.add('hidden');q('#logout').classList.remove('hidden');openPassword();}else showHome();}
 q('#login-form').onsubmit=async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;q('#login-error').textContent='';try{session=await api('/api/login','POST',{email:q('#login-email').value,password:q('#login-password').value});q('#login-password').value='';afterLogin();}catch(e){q('#login-error').textContent=e.message;}finally{btn.disabled=false;}};
@@ -207,9 +215,9 @@ function renderInvitationMail(content){
   const panel=node('details','','invitation-mail');panel.id='invitation-mail';panel.append(node('summary','Messagerie des invitations'),node('p','Expéditeur : pharmacie.trevoux@gmail.com','field-note'));
   const state=node('p','Vérification de la connexion Gmail…','field-note'),controls=node('div','','news-selection-actions');panel.append(state,controls);content.append(panel);
   const userId=session.user.id;
-  api('/api/mail/status').then(status=>{
+  api('/api/integrations/google-health').then(({mail:status})=>{
     if(session?.user.id!==userId||!panel.isConnected)return;
-    panel.open=!status.connected;state.textContent=status.connected?'Gmail est connecté. Vous pouvez envoyer les invitations depuis la ligne de chaque collaborateur.':'Connectez le compte Gmail de la pharmacie et autorisez l’envoi des mails pour activer les invitations.';
+    panel.open=!status.connected||status.state!=='ok';state.textContent=status.state==='reconnect'||status.state==='temporary'?status.error:status.connected?'Gmail est connecté. Vous pouvez envoyer les invitations depuis la ligne de chaque collaborateur.':'Connectez le compte Gmail de la pharmacie et autorisez l’envoi des mails pour activer les invitations.';
     if(!status.configured){state.textContent='La configuration Google du portail doit être complétée avant de connecter Gmail.';return;}
     const connect=button(status.connected?'Renouveler l’autorisation Gmail':'Connecter Gmail pour les invitations',async()=>{
       connect.disabled=true;try{const result=await api('/api/mail/connect','POST',{});window.location.assign(result.url);}catch(e){state.textContent=e.message;connect.disabled=false;}
@@ -562,7 +570,7 @@ async function renderPublications(name){
 }
 setInterval(()=>{
   if(!session||session.user.mustChange||document.hidden)return;
-  if(currentUniverse)void renderPublications(currentUniverse);else void refreshHomeExtras();
+  void refreshGoogleConnections();if(currentUniverse)void renderPublications(currentUniverse);else void refreshHomeExtras();
 },60000);
 
 let scheduleWeek='',scheduleScope='',scheduleData=null,scheduleRequest=0,scheduleTemplatesView=false,scheduleView='day',scheduleDay='';
