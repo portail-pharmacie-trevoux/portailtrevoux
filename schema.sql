@@ -443,3 +443,16 @@ INSERT INTO settings(key,value) VALUES('merchandising_free_reminder_start',to_ch
 
 ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS source_url TEXT;
 ALTER TABLE procedure_documents ADD COLUMN IF NOT EXISTS source_imported_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS useful_contact_documents (
+ id SERIAL PRIMARY KEY,
+ contact_id INTEGER NOT NULL REFERENCES useful_contacts(id) ON DELETE CASCADE,
+ title TEXT NOT NULL,
+ file_name TEXT NOT NULL,
+ file_type TEXT NOT NULL,
+ file_content BYTEA NOT NULL,
+ sha256 TEXT NOT NULL,
+ created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ UNIQUE(contact_id,sha256)
+);

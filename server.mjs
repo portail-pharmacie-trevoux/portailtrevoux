@@ -1,3 +1,4 @@
+import {registerContactDocuments} from './contact-documents.mjs';
 import {migrateProcedureFiles} from './procedure-file-migration.mjs';
 import {createGoogleConnectionHealth} from './google-connection-health.mjs';
 import {merchandisingFreeReminders} from './merchandising-free-reminders.mjs';
@@ -58,7 +59,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -91,6 +92,7 @@ export function createApp(db,config) {
   registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
   registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'3mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
+  registerContactDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'15mb'})});
   const orderMFA=registerOrderMFA({app,db,auth,ready,csrf,viewUniverse,fail,secret});
   app.use('/api/order-planning',auth,ready,viewUniverse("Outils d'aide aux commandes"),orderMFA.guard);
   registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret});
