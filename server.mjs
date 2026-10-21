@@ -14,6 +14,7 @@ import {announceVersion11} from './version-announcement.mjs';
 import {registerTemperatures} from './temperatures.mjs';
 import {temperatureMaintenance} from './temperature-maintenance.mjs';
 import {registerQualityErrors} from './quality-errors.mjs';
+import {registerQualityTraining} from './quality-training.mjs';
 import {registerQualityServices} from './quality-services.mjs';
 import {importPortalManuals} from './portal-manuals.mjs';
 import {registerMerchandising} from './merchandising.mjs';
@@ -90,6 +91,7 @@ export function createApp(db,config) {
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
   registerTiersPayant({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'200kb'})});
   registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
+  registerQualityTraining({app,db,auth,ready,viewUniverse,fail});
   registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'3mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   registerContactDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'15mb'})});
