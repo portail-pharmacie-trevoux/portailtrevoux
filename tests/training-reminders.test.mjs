@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {trainingReminderPeriod,trainingQuarterlyReminders,trainingReminderText} from '../training-reminders.mjs';
+test('Quarter reminders run at 08:00 Paris on the last day of month two, including leap years and catch-up',()=>{
+ for(const day of ['2026-02-28','2026-05-31','2026-08-31','2026-11-30'])assert.equal(trainingReminderPeriod(new Date(day+'T10:00:00Z')).due,day);
+ assert.equal(trainingReminderPeriod(new Date('2028-02-28T12:00:00Z')),null);assert.equal(trainingReminderPeriod(new Date('2028-02-29T12:00:00Z')).due,'2028-02-29');
+ assert.equal(trainingReminderPeriod(new Date('2026-11-30T06:59:59Z')),null);assert.equal(trainingReminderPeriod(new Date('2026-11-30T07:00:00Z')).key,'2026-Q4');
+ assert.equal(trainingReminderPeriod(new Date('2026-10-22T12:00:00Z')),null);assert.equal(trainingReminderPeriod(new Date('2026-12-01T12:00:00Z')).key,'2026-Q4');assert.equal(trainingReminderPeriod(new Date('2027-01-01T12:00:00Z')),null);
+});
+test('Only active eligible staff without a completed course are reminded; one private atomic delivery per quarter',async()=>{
+ const claims=new Set(),delivered=[],people=[{id:1,name:'Pharmacien formé',job:'Pharmacien (cienne)'},{id:2,name:'Préparatrice à relancer',job:'Préparatrice'},{id:3,name:'Rayonniste',job:'Rayonniste'},{id:4,name:'Pharmacien à relancer',job:'Pharmacienne'}],calls=[];
+ const db={query:async(sql,args)=>{calls.push({sql,args});if(sql.startsWith('SELECT id,name')){assert.match(sql,/active=TRUE/);return{rows:people};}if(sql.startsWith('SELECT owner_id')){assert.deepEqual(args[0],[1,2,4]);return{rows:[{owner_id:1,title:'Attestation DPC — Formation — 10/10/2026'},{owner_id:2,title:'Attestation de formation — Ancienne — 10/09/2026'},{owner_id:4,title:'Attestation DPC — Futur — 20/12/2026'}]};}assert.match(sql,/ON CONFLICT DO NOTHING/);assert.match(sql,/FROM message CROSS JOIN due/);assert.match(sql,/job=\$4/);const key=args[0]+'|'+args[1];if(!claims.has(key)){claims.add(key);delivered.push(args);}return{rows:[]};}};
+ await trainingQuarterlyReminders(db,new Date('2026-10-22T12:00:00Z'));assert.equal(calls.length,0);
+ for(let i=0;i<2;i++)await trainingQuarterlyReminders(db,new Date('2026-11-30T12:00:00Z'));assert.deepEqual(delivered.map(d=>d[0]),[2,4]);assert.match(delivered[0][2],/31\/12\/2026/);assert.match(delivered[0][2],/transmettez son attestation/);assert.match(delivered[0][2],/versement des primes d’engagement est lié au respect de cette obligation de formation/);assert.ok(trainingReminderText(people[1],trainingReminderPeriod(new Date('2026-11-30T12:00:00Z'))).length<500);
+});
