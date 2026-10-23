@@ -26,3 +26,8 @@ These fields are **NOT** excluded by the current pg_dump invocation. PostgreSQL 
 
 ## Gate
 The exclusion audit is **incomplete**. Do not enable real-data backup, merge to main, or deploy to production. Next: inspect application source and schema migrations, build a synthetic regression test that injects order data into both dedicated and shared columns, and confirm restored exports contain none of the excluded content. Complete HDS/GDPR assessment independently.
+
+## Implementation progress — 2026-10-24
+- Backup archive command updated to `--exclude-table` for all five dedicated order tables, excluding their schemas as well as rows.
+- The real-backup fail-closed gate remains active because shared-table columns are not yet sanitized.
+- Important: schema-only inspection cannot establish absence of patient details from free text or document blobs. The staff charter is an organizational mitigation, not a technical guarantee.
