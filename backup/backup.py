@@ -85,6 +85,9 @@ def digest_file(path):
     return h.hexdigest()
 
 def backup():
+    # Explicit release gate: never export a real database by accident.
+    if os.environ.get("BACKUP_REAL_DATA_APPROVED") != "YES":
+        raise RuntimeError("Real-data backup is disabled pending compliance approval")
     source = required("BACKUP_DATABASE_URL")
     bucket = required("S3_BUCKET")
     prefix = os.environ.get("S3_PREFIX", "portailtrevoux/daily").strip("/")
@@ -124,29 +127,9 @@ def backup():
     # Retention is configured as an S3 bucket lifecycle rule, not via this script.
 
 def restore(object_key):
-    if os.environ.get("ALLOW_ISOLATED_RESTORE") != "YES":
-        raise RuntimeError("Set ALLOW_ISOLATED_RESTORE=YES for a disposable isolated database")
-    target = required("RESTORE_DATABASE_URL")
-    if target == os.environ.get("BACKUP_DATABASE_URL"):
-        raise RuntimeError("Restore target must differ from source")
-    if os.environ.get("RESTORE_TARGET_CONFIRMATION") != "DISPOSABLE_TEST_DATABASE":
-        raise RuntimeError("Explicit disposable target confirmation required")
-    bucket = required("S3_BUCKET")
-    client = s3()
-    with tempfile.TemporaryDirectory() as folder:
-        encrypted = pathlib.Path(folder) / "encrypted"
-        dump = pathlib.Path(folder) / "database.dump"
-        client.download_file(bucket, object_key, str(encrypted))
-        expected = client.head_object(Bucket=bucket, Key=object_key).get("Metadata", {}).get("sha256")
-        if not expected or digest_file(encrypted) != expected:
-            raise RuntimeError("Encrypted backup checksum mismatch")
-        decrypt_file(encrypted, dump, key())
-        subprocess.run(["pg_restore", "--list", str(dump)], check=True,
-                       stdout=subprocess.DEVNULL, timeout=60)
-        # The caller MUST provision an empty isolated DB and disable outbound integrations.
-        subprocess.run(["pg_restore", "--exit-on-error", "--no-owner", "--no-acl",
-                        "--dbname", target, str(dump)], check=True, timeout=1800)
-        print(json.dumps({"status": "restored", "object": object_key}))
+    # Restoring to a database through this generic backup image is intentionally
+    # disabled. A dedicated isolated restore workflow must be separately reviewed.
+    raise RuntimeError("Restore disabled: use a separately approved isolated restore workflow")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
