@@ -66,6 +66,18 @@ echo 'PASS: selective backup excludes all order records'
 echo 'PASS: synthetic PostgreSQL dump, AES-GCM, and restore'
 python /opt/backup/test-scaleway-synthetic.py
 echo 'PASS: synthetic encrypted Scaleway round-trip'
+python /opt/backup/check-backup-freshness.py
+python - <<'PY'
+import datetime as dt
+import importlib.util
+spec=importlib.util.spec_from_file_location('monitor','/opt/backup/check-backup-freshness.py')
+module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+now=dt.datetime.now(dt.timezone.utc)
+assert module.evaluate([],now,26)['status']=='missing'
+assert module.evaluate([{'LastModified':now-dt.timedelta(hours=30)}],now,26)['status']=='stale'
+assert module.evaluate([{'LastModified':now-dt.timedelta(hours=1)}],now,26)['status']=='ok'
+print('PASS: missing, stale and fresh backup detection')
+PY
 python - <<'PY'
 from http.server import BaseHTTPRequestHandler,HTTPServer
 import os
