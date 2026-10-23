@@ -1,16 +1,18 @@
-# Backup alert email configuration (test environment)
+# Portail+ synthetic backup alerts
 
 Recipient: pharmaciedetrevoux@gmail.com
 
-The synthetic freshness monitor emits a BACKUP_ALERT JSON line and a nonzero
-exit code for missing, stale (>26 hours), or failed checks. A successful check
-does not emit an alert.
+Proposed sender: a dedicated Gmail account (for example,
+alertes.portailplus@gmail.com, subject to availability and account creation).
+No custom domain purchase is required.
 
-To deliver email notifications, configure an authorized SMTP relay or email
-provider with credentials stored as Render secret environment variables. Do not
-put credentials in GitHub. The sender identity must be verified with the
-provider. Test delivery using only synthetic events.
+Delivery option: Gmail SMTP with an app password if Google permits this for
+the account. Store SMTP_USERNAME and SMTP_APP_PASSWORD only as secret Render
+environment variables; never commit credentials.
 
-Until delivery is tested and a scheduled job exists, log alerts are NOT email
-notifications. The existing synthetic web service does not itself schedule a
-daily check. Production backups remain disabled pending compliance review.
+The synthetic freshness monitor emits BACKUP_ALERT on missing, stale
+(older than 26 hours), or technical failure. It does not send mail yet.
+A scheduled checker and a tested mail transport are still required.
+
+Do not send real database content or credentials in alert messages.
+Do not activate production backup or monitoring until compliance review.
