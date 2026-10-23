@@ -16,6 +16,19 @@ def evaluate(objects, now, max_age_hours):
         return {"status": "stale", "age_hours": round(age_hours, 2)}
     return {"status": "ok", "age_hours": round(age_hours, 2)}
 
+def notify_problem(status):
+    if os.getenv("SYNTHETIC_MONITOR_EMAIL_ALERTS") != "YES":
+        print("DRY RUN: synthetic monitor email disabled")
+        return
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("gmail_alert", "/opt/backup/send-test-alert.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.send_alert(
+        "[PORTAIL+] ALERTE TEST - Sauvegarde fictive " + status,
+        "Controle de sauvegarde FICTIVE : " + status + ".\\nAucune donnee reelle concernee."
+    )
+
 def main():
     prefix = os.environ.get("BACKUP_MONITOR_PREFIX", "tests/synthetic/")
     if not prefix.startswith("tests/synthetic/"):
@@ -44,6 +57,7 @@ def main():
             "action": "Review the Render test service logs and Scaleway synthetic prefix",
         }
         print("BACKUP_ALERT " + json.dumps(alert), file=sys.stderr)
+        notify_problem(state["status"])
     return 0 if state["status"] == "ok" else 2
 
 if __name__ == "__main__":
@@ -55,4 +69,8 @@ if __name__ == "__main__":
             "status": "error", "type": type(exc).__name__,
             "action": "Review test service configuration and logs"
         }), file=sys.stderr)
+        try:
+            notify_problem("error")
+        except Exception as alert_exc:
+            print("ALERT_DELIVERY_FAILED " + type(alert_exc).__name__, file=sys.stderr)
         sys.exit(3)
