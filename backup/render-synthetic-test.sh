@@ -3,6 +3,7 @@ set -euo pipefail
 export PATH="/usr/lib/postgresql/18/bin:$PATH"
 dir="$(mktemp -d)"
 trap 'runuser -u postgres -- pg_ctl -D "$dir/pg" -m immediate stop >/dev/null 2>&1 || true; rm -rf "$dir"' EXIT
+chmod 755 "$dir"
 mkdir "$dir/pg"; chown -R postgres:postgres "$dir/pg"
 runuser -u postgres -- initdb -D "$dir/pg" --auth-local=trust --no-instructions >/dev/null
 runuser -u postgres -- pg_ctl -D "$dir/pg" -o "-c listen_addresses='' -c unix_socket_directories=/tmp" -w start >/dev/null
