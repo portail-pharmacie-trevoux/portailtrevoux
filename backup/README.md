@@ -1,6 +1,6 @@
 # Portail+ — backup design (NOT DEPLOYED)
 
-This branch is preparatory only. Production is unchanged. No S3 account, bucket, secrets, cron job, or restore database has been created.
+This branch is preparatory only. Production is unchanged. A private Scaleway S3 test bucket and a separate synthetic Render test service are configured. No production cron job or real-data backup is enabled.
 
 ## Architecture
 - Dedicated Render **Docker cron job**, region **Frankfurt**, source repository branch `chore/backup-design-2026-10`, Dockerfile `backup/Dockerfile`, schedule `0 1 * * *` **UTC** (fixed 01:00 UTC, not fixed Paris local time).
@@ -33,3 +33,18 @@ Provide as Render cron job secret environment variables, **never in GitHub**:
 - A database backup does not include external Google Drive, Gmail, Calendar, Youtrust, or other provider data.
 - No application writes, production exports, or schema changes are required.
 - Restoration must be into a dedicated empty database; never point `RESTORE_DATABASE_URL` at production.
+
+## Approved functional scope — 2026-10-24
+
+The pharmacy owner confirmed: **include all Portail+ modules except the entire 'Outils d'aide aux commandes' module**. This is functional scope approval, **not** HDS/GDPR clearance or permission to export production data.
+
+**Release blockers (must be verified before production):**
+1. Inventory all database tables, columns, JSON payloads, file/blob stores, and cross-module references belonging to the orders module. The current code only excludes *rows* of five named tables; it does **not** exclude their schemas or prove the absence of order information elsewhere. Treat this as an incomplete exclusion, not a passed scope audit.
+2. Define and test an explicit, reviewed exclusion manifest against the real schema **without copying any production rows**. Abort on unexpected order-related tables/columns or missing expected exclusions. Verify restored backup contains no excluded order information.
+3. Inventory included modules' data categories, especially employee HR files, personal information, and possible health data; verify whether HDS certification is required for the actual processing and validate provider/service certification scope, contractual terms, access controls, encryption key custody, retention, and GDPR documentation.
+4. Configure a dedicated daily scheduler and an **independent** daily freshness check with alerts; the current synthetic web-service startup test is not a reliable recurring schedule.
+5. Confirm S3 lifecycle/object-lock/versioning behavior actually produces the agreed 35-day retention, including noncurrent versions and locked objects.
+6. Validate monthly isolated restoration and key recovery, and document an incident/alert response owner. No restore into production.
+7. Only after sign-off, request separate explicit authorization for production deployment and real-data backup. Keep `BACKUP_REAL_DATA_APPROVED` unset until then.
+
+**Agreed target cadence:** nightly encrypted backup; daily independent freshness monitoring and Gmail anomaly alerts; 35-day retention; monthly isolated restoration. All tests to date used synthetic data only.
