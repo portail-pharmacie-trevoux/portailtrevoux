@@ -1,38 +1,48 @@
 #!/usr/bin/env python3
-"""Send a synthetic Portail+ test alert using Gmail SMTP. No database data."""
+"""Send an explicitly enabled synthetic alert through Gmail API HTTPS."""
+import base64
+import json
 import os
-import smtplib
-import ssl
+import urllib.parse
+import urllib.request
 from email.message import EmailMessage
 
 SENDER = "portailplustrevoux@gmail.com"
 RECIPIENT = "pharmaciedetrevoux@gmail.com"
 
-def build_message():
-    msg = EmailMessage()
-    msg["From"] = SENDER
-    msg["To"] = RECIPIENT
-    msg["Subject"] = "[PORTAIL+] TEST - Alerte sauvegarde fictive"
-    msg.set_content(
-        "Ceci est un TEST du système d'alerte de Portail+.\n"
-        "Aucune sauvegarde réelle n'est concernée.\n"
-        "Ne nécessite aucune action.\n"
-    )
-    return msg
-
 def main():
-    if os.environ.get("SEND_SYNTHETIC_TEST_EMAIL") != "YES":
-        print("DRY RUN: no email sent")
-        print(build_message()["Subject"])
+    if os.getenv("SEND_SYNTHETIC_TEST_EMAIL") != "YES":
+        print("DRY RUN: synthetic Gmail alert disabled")
         return
-    username = os.environ["SMTP_USERNAME"]
-    password = os.environ["SMTP_APP_PASSWORD"]
-    if username != SENDER:
-        raise RuntimeError("Unexpected SMTP sender")
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ssl.create_default_context(), timeout=20) as smtp:
-        smtp.login(username, password)
-        smtp.send_message(build_message())
-    print("PASS: synthetic alert email sent")
+    for name in ("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"):
+        if not os.getenv(name):
+            raise RuntimeError(f"Missing required Gmail setting: {name}")
+    payload = urllib.parse.urlencode({
+        "client_id": os.environ["GMAIL_CLIENT_ID"],
+        "client_secret": os.environ["GMAIL_CLIENT_SECRET"],
+        "refresh_token": os.environ["GMAIL_REFRESH_TOKEN"],
+        "grant_type": "refresh_token",
+    }).encode()
+    request = urllib.request.Request("https://oauth2.googleapis.com/token", data=payload, method="POST")
+    with urllib.request.urlopen(request, timeout=20) as response:
+        access_token = json.load(response)["access_token"]
+    message = EmailMessage()
+    message["From"] = SENDER
+    message["To"] = RECIPIENT
+    message["Subject"] = "[PORTAIL+] TEST - Alerte sauvegarde fictive"
+    message.set_content("Ceci est un TEST du système d'alerte de Portail+.\nAucune sauvegarde réelle n'est concernée.\n")
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
+    request = urllib.request.Request(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        data=json.dumps({"raw": raw}).encode(),
+        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        result = json.load(response)
+    if not result.get("id"):
+        raise RuntimeError("Gmail API did not return a message ID")
+    print("PASS: synthetic Gmail API alert accepted")
 
 if __name__ == "__main__":
     main()
