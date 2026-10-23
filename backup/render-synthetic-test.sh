@@ -22,15 +22,21 @@ CREATE TABLE order_reminder_emails(period text, email text);
 INSERT INTO order_reminder_emails VALUES ('test','TEST_ONLY');
 CREATE TABLE order_weekly_reminders(period text, heading text);
 INSERT INTO order_weekly_reminders VALUES ('test','TEST_ONLY');
+CREATE TABLE sessions(id text PRIMARY KEY, order_mfa_at timestamptz, order_mfa_generation integer);
+INSERT INTO sessions VALUES ('synthetic-session', now(), 99);
+CREATE TABLE team_messages(id integer PRIMARY KEY, text text, order_digest jsonb);
+INSERT INTO team_messages VALUES (1, 'normal synthetic team message', '{"patient":"SYNTHETIC_ORDER_SECRET"}');
 CREATE TABLE fake_documents(id integer PRIMARY KEY, contents bytea NOT NULL);
 INSERT INTO fake_documents VALUES (1, decode('255044462d312e340a66616b652d646f63756d656e74','hex'));
 SQL
 pg_dump -Fc -d source \
-  --exclude-table-data=public.order_planning \
-  --exclude-table-data=public.order_mfa \
-  --exclude-table-data=public.order_mfa_audit \
-  --exclude-table-data=public.order_reminder_emails \
-  --exclude-table-data=public.order_weekly_reminders > "$dir/source.dump"
+  --exclude-table=public.order_planning \
+  --exclude-table=public.order_mfa \
+  --exclude-table=public.order_mfa_audit \
+  --exclude-table=public.order_reminder_emails \
+  --exclude-table=public.order_weekly_reminders \
+  --exclude-table=public.sessions \
+  --exclude-table=public.team_messages > "$dir/source.dump"
 pg_restore --list "$dir/source.dump" >/dev/null
 python - "$dir" <<'PY'
 import pathlib, secrets, sys
@@ -59,10 +65,10 @@ for db in source restored; do
 done
 cmp "$dir/source.staff" "$dir/restored.staff"
 cmp "$dir/source.doc" "$dir/restored.doc"
-for table in order_planning order_mfa order_mfa_audit order_reminder_emails order_weekly_reminders; do
-  test "$(psql -At -d restored -c "SELECT count(*) FROM $table")" = "0"
+for table in order_planning order_mfa order_mfa_audit order_reminder_emails order_weekly_reminders sessions team_messages; do
+  test "$(psql -At -d restored -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='$table'")" = "0"
 done
-echo 'PASS: selective backup excludes all order records'
+echo 'PASS: synthetic dump excludes entire order tables and shared-table order fields (shared tables omitted)'
 echo 'PASS: synthetic PostgreSQL dump, AES-GCM, and restore'
 python /opt/backup/test-scaleway-synthetic.py
 echo 'PASS: synthetic encrypted Scaleway round-trip'
