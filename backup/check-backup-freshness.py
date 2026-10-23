@@ -35,11 +35,24 @@ def main():
         raise RuntimeError("Too many objects to check safely; pagination required")
     state = evaluate(result.get("Contents", []), now, max_age_hours)
     print(json.dumps({"monitor": "synthetic", "prefix": prefix, **state}))
+    if state["status"] != "ok":
+        alert = {
+            "severity": "warning",
+            "service": "Portail+ synthetic backup monitor",
+            "status": state["status"],
+            "message": "Synthetic backup missing or older than freshness threshold",
+            "action": "Review the Render test service logs and Scaleway synthetic prefix",
+        }
+        print("BACKUP_ALERT " + json.dumps(alert), file=sys.stderr)
     return 0 if state["status"] == "ok" else 2
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception as exc:
-        print(json.dumps({"monitor": "synthetic", "status": "error", "type": type(exc).__name__}), file=sys.stderr)
+        print("BACKUP_ALERT " + json.dumps({
+            "severity": "error", "service": "Portail+ synthetic backup monitor",
+            "status": "error", "type": type(exc).__name__,
+            "action": "Review test service configuration and logs"
+        }), file=sys.stderr)
         sys.exit(3)
