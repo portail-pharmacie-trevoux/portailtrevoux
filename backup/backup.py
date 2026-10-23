@@ -22,6 +22,23 @@ EXCLUDED_ORDER_TABLES = (
     "public.order_weekly_reminders",
 )
 
+# Fail closed until shared-table order fields are excluded by a reviewed export.
+# Metadata only: never reads production row contents.
+SHARED_ORDER_COLUMNS = {
+    "public.sessions": ("order_mfa_at", "order_mfa_generation"),
+    "public.team_messages": ("order_digest",),
+}
+
+def verify_order_exclusion_ready(database_url):
+    # pg_dump --exclude-table-data removes table rows, not selected columns.
+    # A standard full dump would still export the shared-table order fields.
+    # Do not silently enable real exports until a sanitizing implementation
+    # and restored synthetic regression test have been approved.
+    raise RuntimeError(
+        "Order-module exclusion incomplete: shared-table fields in sessions "
+        "and team_messages require a verified selective export strategy"
+    )
+
 MAGIC = b"PORTAILBACKUP1"
 CHUNK = 1024 * 1024
 
@@ -89,6 +106,7 @@ def backup():
     if os.environ.get("BACKUP_REAL_DATA_APPROVED") != "YES":
         raise RuntimeError("Real-data backup is disabled pending compliance approval")
     source = required("BACKUP_DATABASE_URL")
+    verify_order_exclusion_ready(source)
     bucket = required("S3_BUCKET")
     prefix = os.environ.get("S3_PREFIX", "portailtrevoux/daily").strip("/")
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
