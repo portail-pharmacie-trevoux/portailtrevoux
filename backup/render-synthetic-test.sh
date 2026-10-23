@@ -67,6 +67,7 @@ echo 'PASS: synthetic PostgreSQL dump, AES-GCM, and restore'
 python /opt/backup/test-scaleway-synthetic.py
 echo 'PASS: synthetic encrypted Scaleway round-trip'
 python /opt/backup/check-backup-freshness.py
+python /opt/backup/send-test-alert.py
 python - <<'PY'
 import datetime as dt
 import importlib.util
