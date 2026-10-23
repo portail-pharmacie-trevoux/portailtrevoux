@@ -7,5 +7,6 @@ COPY backup/backup.py /opt/backup/backup.py
 COPY backup/render-synthetic-test.sh /opt/backup/render-synthetic-test.sh
 COPY backup/test-scaleway-synthetic.py /opt/backup/test-scaleway-synthetic.py
 COPY backup/check-backup-freshness.py /opt/backup/check-backup-freshness.py
+COPY backup/send-test-alert.py /opt/backup/send-test-alert.py
 RUN chmod +x /opt/backup/render-synthetic-test.sh
 CMD ["/opt/backup/render-synthetic-test.sh"]
