@@ -78,7 +78,6 @@ assert module.evaluate([{'LastModified':now-dt.timedelta(hours=30)}],now,26)['st
 assert module.evaluate([{'LastModified':now-dt.timedelta(hours=1)}],now,26)['status']=='ok'
 print('PASS: missing, stale and fresh backup detection')
 PY
-python /opt/backup/send-test-alert.py
 python - <<'PY'
 from http.server import BaseHTTPRequestHandler,HTTPServer
 import os
