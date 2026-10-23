@@ -2,8 +2,7 @@
 
 Recipient: pharmaciedetrevoux@gmail.com
 
-Proposed sender: a dedicated Gmail account (for example,
-alertes.portailplus@gmail.com, subject to availability and account creation).
+Dedicated sender: portailplustrevoux@gmail.com (user-provided address; SMTP access not yet verified).
 No custom domain purchase is required.
 
 Delivery option: Gmail SMTP with an app password if Google permits this for
