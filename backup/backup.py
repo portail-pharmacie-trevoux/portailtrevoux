@@ -14,6 +14,14 @@ import boto3
 from botocore.config import Config
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+EXCLUDED_ORDER_TABLES = (
+    "public.order_planning",
+    "public.order_mfa",
+    "public.order_mfa_audit",
+    "public.order_reminder_emails",
+    "public.order_weekly_reminders",
+)
+
 MAGIC = b"PORTAILBACKUP1"
 CHUNK = 1024 * 1024
 
@@ -87,9 +95,21 @@ def backup():
         encrypted = pathlib.Path(folder) / "database.dump.aesgcm"
         with open(dump, "wb") as out:
             subprocess.run(["pg_dump", "--format=custom", "--no-owner", "--no-acl",
+                            *("--exclude-table-data=" + name for name in EXCLUDED_ORDER_TABLES),
                             "--dbname", source], stdout=out, check=True, timeout=1800)
         subprocess.run(["pg_restore", "--list", str(dump)], check=True,
                        stdout=subprocess.DEVNULL, timeout=60)
+        listing = subprocess.run(
+            ["pg_restore", "--list", str(dump)], capture_output=True, text=True,
+            check=True, timeout=60
+        ).stdout
+        for name in EXCLUDED_ORDER_TABLES:
+            schema, table = name.split(".", 1)
+            if any(
+                (" TABLE DATA " + schema + " " + table + " ") in line
+                for line in listing.splitlines()
+            ):
+                raise RuntimeError("Excluded table data found in dump: " + name)
         encrypt_file(dump, encrypted, key())
         checksum = digest_file(encrypted)
         client = s3()
