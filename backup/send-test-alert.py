@@ -10,10 +10,8 @@ from email.message import EmailMessage
 SENDER = "portailplustrevoux@gmail.com"
 RECIPIENT = "pharmaciedetrevoux@gmail.com"
 
-def main():
-    if os.getenv("SEND_SYNTHETIC_TEST_EMAIL") != "YES":
-        print("DRY RUN: synthetic Gmail alert disabled")
-        return
+def send_alert(subject, body):
+    """Send one synthetic-monitor alert; callers control when it is needed."""
     for name in ("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"):
         if not os.getenv(name):
             raise RuntimeError(f"Missing required Gmail setting: {name}")
@@ -29,8 +27,8 @@ def main():
     message = EmailMessage()
     message["From"] = SENDER
     message["To"] = RECIPIENT
-    message["Subject"] = "[PORTAIL+] TEST - Alerte sauvegarde fictive"
-    message.set_content("Ceci est un TEST du système d'alerte de Portail+.\nAucune sauvegarde réelle n'est concernée.\n")
+    message["Subject"] = subject
+    message.set_content(body)
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
     request = urllib.request.Request(
         "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -43,6 +41,12 @@ def main():
     if not result.get("id"):
         raise RuntimeError("Gmail API did not return a message ID")
     print("PASS: synthetic Gmail API alert accepted")
+
+def main():
+    if os.getenv("SEND_SYNTHETIC_TEST_EMAIL") != "YES":
+        print("DRY RUN: synthetic Gmail alert disabled")
+        return
+    send_alert("[PORTAIL+] TEST - Alerte sauvegarde fictive", "Ceci est un TEST du système d’alerte Portail+. Aucune donnée réelle.")
 
 if __name__ == "__main__":
     main()
