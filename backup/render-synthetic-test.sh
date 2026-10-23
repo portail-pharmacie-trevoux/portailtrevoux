@@ -45,6 +45,8 @@ done
 cmp "$dir/source.staff" "$dir/restored.staff"
 cmp "$dir/source.doc" "$dir/restored.doc"
 echo 'PASS: synthetic PostgreSQL dump, AES-GCM, and restore'
+python /opt/backup/test-scaleway-synthetic.py
+echo 'PASS: synthetic encrypted Scaleway round-trip'
 python - <<'PY'
 from http.server import BaseHTTPRequestHandler,HTTPServer
 import os
