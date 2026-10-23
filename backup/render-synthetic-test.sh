@@ -68,6 +68,15 @@ python /opt/backup/test-scaleway-synthetic.py
 echo 'PASS: synthetic encrypted Scaleway round-trip'
 python /opt/backup/check-backup-freshness.py
 python /opt/backup/send-test-alert.py
+if [ "${RUN_SYNTHETIC_MISSING_ALERT_TEST:-NO}" = "YES" ]; then
+  echo 'TEST: simulating missing synthetic backup for email alert'
+  if BACKUP_MONITOR_PREFIX="tests/synthetic/alert-missing-simulation-never-written/" SYNTHETIC_MONITOR_EMAIL_ALERTS=YES python /opt/backup/check-backup-freshness.py; then
+    echo 'FAIL: missing-backup simulation unexpectedly succeeded' >&2
+    exit 1
+  else
+    echo 'PASS: missing-backup alert simulation executed (check Gmail API logs)'
+  fi
+fi
 python - <<'PY'
 import datetime as dt
 import importlib.util
