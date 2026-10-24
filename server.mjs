@@ -54,7 +54,7 @@ export function createApp(db,config) {
   app.set('trust proxy',1); app.disable('x-powered-by');
   app.use((req,res,next)=>{
     res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
-      'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://images.openfoodfacts.org https://images.openbeautyfacts.org; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       'Permissions-Policy':'camera=(), microphone=(), geolocation=()'});
     if(secure)res.set('Strict-Transport-Security','max-age=31536000');
     next();
