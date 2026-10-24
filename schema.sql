@@ -458,3 +458,7 @@ CREATE TABLE IF NOT EXISTS useful_contact_documents (
 );
 
 CREATE TABLE IF NOT EXISTS portal_quick_links (singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton),links JSONB NOT NULL DEFAULT '[]'::jsonb,revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS corrected_at TIMESTAMPTZ;
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS corrected_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS corrected_name TEXT;
