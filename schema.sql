@@ -456,3 +456,5 @@ CREATE TABLE IF NOT EXISTS useful_contact_documents (
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  UNIQUE(contact_id,sha256)
 );
+
+CREATE TABLE IF NOT EXISTS portal_quick_links (singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton),links JSONB NOT NULL DEFAULT '[]'::jsonb,revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());

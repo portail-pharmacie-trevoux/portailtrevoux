@@ -1,3 +1,4 @@
+import {registerPortalQuickLinks} from './portal-quick-links.mjs';
 import {registerContactDocuments} from './contact-documents.mjs';
 import {migrateProcedureFiles} from './procedure-file-migration.mjs';
 import {createGoogleConnectionHealth} from './google-connection-health.mjs';
@@ -84,6 +85,7 @@ export function createApp(db,config) {
   async function publish(universe,title,key=null) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
+  registerPortalQuickLinks({app,db,auth,ready,admin,csrf,fail});
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser:express.json({limit:'70mb'})});
