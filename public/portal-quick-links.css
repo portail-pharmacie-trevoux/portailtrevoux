@@ -6,3 +6,6 @@
 .quick-link-logo{width:34px;height:34px;display:flex;align-items:center;justify-content:center}.quick-link-logo img{display:block;max-width:32px;max-height:32px;width:32px;height:32px;object-fit:contain}.quick-link-logo img[hidden],.quick-link-logo-fallback[hidden]{display:none}.quick-link-logo-fallback{font:700 14px system-ui;color:#53317b}.quick-link-editor .field-note{font-size:11px;line-height:1.4}
 
 .quick-links-admin.admin-menu>summary::before{content:none}
+
+/* Keep the quick-link rail on the left edge, with the handle facing the page. */
+.portal-quick-links{left:0;right:auto;grid-template-columns:minmax(0,1fr) 42px;transform:translateX(calc(-100% + 42px))}.portal-quick-links.is-open{transform:translateX(0)}.quick-links-toggle{grid-column:2;grid-row:1;border-radius:0 10px 10px 0;box-shadow:3px 3px 10px #25213b25}.quick-links-panel{grid-column:1;grid-row:1;border-left:0;border-right:1px solid #ded4eb;border-radius:0 0 12px 0;box-shadow:8px 8px 25px #25213b20}
