@@ -1,3 +1,4 @@
+import {registerTesterAccess} from './tester-access.mjs';
 import {registerPortalQuickLinks} from './portal-quick-links.mjs';
 import {registerContactDocuments} from './contact-documents.mjs';
 import {migrateProcedureFiles} from './procedure-file-migration.mjs';
@@ -85,6 +86,7 @@ export function createApp(db,config) {
   async function publish(universe,title,key=null) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
+  const testerAccess=registerTesterAccess({app,db,auth,ready,admin,csrf,fail,secure});
   registerPortalQuickLinks({app,db,auth,ready,admin,csrf,fail});
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
@@ -138,6 +140,7 @@ export function createApp(db,config) {
   async function newSession(user,res){
     const raw=token(),session=digest(raw),csrfToken=token();
     await db.query("INSERT INTO sessions(id,user_id,csrf,expires_at) VALUES($1,$2,$3,now()+interval '8 hours')",[session,user.id,csrfToken]);
+    res.clearCookie('portail_demo_session',{...cookieOptions,maxAge:undefined});
     res.cookie('trevoux_session',raw,cookieOptions);
     return {user:cleanUser(user),csrf:csrfToken};
   }
@@ -152,6 +155,7 @@ export function createApp(db,config) {
       if(rows[0].count>20)throw fail(429,'Trop de tentatives. Réessayez dans 15 minutes.');
     }
     const user=(await db.query('SELECT * FROM users WHERE email=$1',[email])).rows[0];
+    if(!user){const demo=await testerAccess.login(email,req.body.password,res);if(demo)return res.json(demo);}
     const valid=await verifyPassword(req.body.password,user?.password_hash||config.dummyHash);
     if(!user||!valid||!user.active)throw fail(401,'Adresse ou mot de passe incorrect.');
     if(req.auth)await db.query('DELETE FROM sessions WHERE id=$1',[req.auth.session_id]);
@@ -382,7 +386,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync,mailer,connectionHealth}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM portal_tester_sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }

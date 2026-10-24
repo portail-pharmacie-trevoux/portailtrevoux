@@ -29,7 +29,7 @@ export function decrypt(value,secret) {
   return JSON.parse(Buffer.concat([cipher.update(data),cipher.final()]).toString('utf8'));
 }
 export function canAccess(user,universe) {
- if(!user)return false;if(user.role==='admin')return true;
+ if(!user||user.role==='tester')return false;if(user.role==='admin')return true;
  if(["Outils d'aide à la démarche qualité",'Actualités','Agenda'].includes(universe))return true;
  if(user.permissions_configured)return !!user.rights?.includes(universe);
  return ['Fun','Outils de calculs rapides','Collaborateurs','Actualités','Ressources humaines','Laboratoires',"Outils d'aide aux commandes","Outils d'aide au merchandising","Outils d'aide à la démarche qualité"].includes(universe)||!!user.rights?.includes(universe);

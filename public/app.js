@@ -101,6 +101,8 @@ async function api(path,method='GET',data){
 function error(e){q('#global-message').textContent=e.message;}
 function showLogin(){q('#portal-quick-links')?.remove();q('#google-connection-alert')?.remove();q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
+  if(session.user.role==='tester'){showTesterHome();return;}
+
   const linksUserId=session.user.id;void import('/portal-quick-links.js').then(module=>{if(session?.user.id===linksUserId&&!session.user.mustChange)void module.setupQuickLinks({api,userId:linksUserId,isAdmin:session.user.role==='admin',isCurrent:()=>session?.user.id===linksUserId&&!session.user.mustChange});}).catch(error);
   const whatsappUserId=session.user.id;void import('/whatsapp.js').then(module=>{if(session?.user.id===whatsappUserId)module.setupWhatsApp({button:q('#whatsapp-button'),status:q('#whatsapp-status'),api,getUser:()=>session?.user});}).catch(error);
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
@@ -116,6 +118,10 @@ async function refreshGoogleConnections(){
  try{const [data,module]=await Promise.all([api('/api/integrations/google-health'),import('/google-connection-alert.js')]);if(session?.user.id!==userId||session.user.role!=='admin')return;let banner=q('#google-connection-alert');if(!banner){banner=node('aside');banner.id='google-connection-alert';q('body>header').after(banner);}module.renderGoogleConnectionAlert({container:banner,data,onOpenAgenda:()=>void openUniverse('Agenda'),onReconnect:async kind=>{const result=await api(kind==='mail'?'/api/mail/connect':'/api/google/connect','POST',{});window.location.assign(result.url);}});
  }catch(e){if(session?.user.id===userId&&session.user.role==='admin'){let banner=q('#google-connection-alert');if(!banner){banner=node('aside');banner.id='google-connection-alert';q('body>header').after(banner);}banner.hidden=false;banner.className='google-connection-alert';banner.setAttribute('role','status');banner.textContent='⚠ Suivi des connexions Google momentanément indisponible. Nouvelle vérification automatique.';}}
  finally{googleConnectionsPending=false;}
+}
+function showTesterHome(){
+ setPeopleAddActions(false);q('#hr-import-action')?.remove();
+ q('#portal-quick-links')?.remove();q('#google-connection-alert')?.remove();q('#home').classList.add('hidden');q('#login').classList.add('hidden');q('#detail').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');q('#session-name').textContent=session.user.name+' · Testeur';setUniverseHeading('Découverte de Portail+');q('#description').textContent='Espace de démonstration';q('#global-message').textContent='';q('#feedback').textContent='';currentUniverse=null;const testerId=session.user.id;void import('/tester-demo.js').then(m=>{if(session?.user.id===testerId)m.renderTesterDemo({container:q('#content'),user:session.user});}).catch(error);
 }
 function afterLogin(){if(session.user.mustChange){q('#login').classList.add('hidden');q('#logout').classList.remove('hidden');openPassword();}else showHome();}
 q('#login-form').onsubmit=async e=>{e.preventDefault();const btn=e.submitter;btn.disabled=true;q('#login-error').textContent='';try{session=await api('/api/login','POST',{email:q('#login-email').value,password:q('#login-password').value});q('#login-password').value='';afterLogin();}catch(e){q('#login-error').textContent=e.message;}finally{btn.disabled=false;}};
@@ -162,7 +168,7 @@ function renderPeople(){
   employeeRecordRequest++;setPeopleAddActions(session.user.role==='admin');
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
   content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
-  if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.prepend(administration);}
+  if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);const testerUserId=session.user.id;void import('/tester-admin.js').then(m=>{if(session?.user.id===testerUserId&&currentUniverse==='Collaborateurs')m.renderTesterAdmin({container:body,api,isCurrent:()=>session?.user.id===testerUserId&&currentUniverse==='Collaborateurs'});}).catch(error);content.prepend(administration);}
   for(const active of [true,false]){
     const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
@@ -575,7 +581,7 @@ async function renderPublications(name){
   }
 }
 setInterval(()=>{
-  if(!session||session.user.mustChange||document.hidden)return;
+  if(!session||session.user.mustChange||session.user.role==='tester'||document.hidden)return;
   void refreshGoogleConnections();if(currentUniverse)void renderPublications(currentUniverse);else void refreshHomeExtras();
 },60000);
 

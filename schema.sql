@@ -471,3 +471,8 @@ WITH automatic_states AS (
 ) UPDATE quality_errors e SET status=a.value,revision=e.revision+1,
  status_history=e.status_history||jsonb_build_array(jsonb_build_object('from',e.status,'to',a.value,'at',now(),'by','Portail+ — état automatique'))
  FROM automatic_states a WHERE e.id=a.id AND e.status<>a.value;
+
+-- External demo accounts are deliberately separate from the pharmacy staff directory.
+CREATE TABLE IF NOT EXISTS portal_testers(id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,must_change BOOLEAN NOT NULL DEFAULT TRUE,active BOOLEAN NOT NULL DEFAULT TRUE,access_expires_at TIMESTAMPTZ NOT NULL,created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS portal_tester_sessions(id TEXT PRIMARY KEY,tester_id UUID NOT NULL REFERENCES portal_testers(id) ON DELETE CASCADE,csrf TEXT NOT NULL,expires_at TIMESTAMPTZ NOT NULL);
+CREATE INDEX IF NOT EXISTS portal_tester_sessions_expiry_idx ON portal_tester_sessions(expires_at);
