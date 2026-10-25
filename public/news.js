@@ -1,3 +1,5 @@
+import {reminderTaskPreset} from './news-reminder-presets.js';
+import {openNewsReminderTask} from './news-reminder-task.js';
 import {messageKind,groupNewsThreads} from './news-threads.js';
 import {orderAlertIcon,legacyOrderAlerts} from './order-alerts.js';
 import {printNewsMessage} from './news-print.js';
@@ -76,7 +78,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
         };label.append(input,node('span',labelText));actions.append(label);
       }
       if(message.merchandising_month)card.append(button('Consulter le planning merchandising',()=>onOpenMerchandising(message.merchandising_month),'btn primary small'));
-      if(message.planning_week)card.append(button('Consulter le planning',()=>onOpenPlanning(message.planning_week?String(message.planning_week).slice(0,10):null),'btn primary small'));if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));return card;
+      if(message.planning_week)card.append(button('Consulter le planning',()=>onOpenPlanning(message.planning_week?String(message.planning_week).slice(0,10):null),'btn primary small'));if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));if(reminderTaskPreset(message)){const reminder=button('📅 Créer un événement personnel avec rappel',()=>openNewsReminderTask({message,api,onChanged,onCreated:()=>{reminder.textContent='✓ Événement ajouté à mon agenda';reminder.disabled=true;}}),'btn primary small');card.append(reminder);}card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));return card;
   }
   function outgoingCard(message){const card=node('article','','news-message news-message-outgoing news-origin-'+messageKind(message));card.append(originBadge(message,true),node('strong','Vous · '+date(message.created_at)),node('p',message.text,'news-message-text'));if(message.attachment_name)card.append(attachmentLink(message));if(message.recipients){const seen=message.recipients.filter(p=>p.seen).length;card.append(node('p',seen+' / '+message.recipients.length+' destinataires ont coché « Vu »','field-note'));const people=node('ul');message.recipients.forEach(p=>people.append(node('li',p.name+' · '+(p.seen?'Vu'+(p.seenAt?' le '+date(p.seenAt):''):'Non vu'))));card.append(people);}card.append(button('Imprimer',()=>printNewsMessage(card,{sent:true,hasAttachment:!!message.attachment_name})));return card;}
   function threadCard(group,outgoing){

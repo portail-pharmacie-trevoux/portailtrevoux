@@ -476,3 +476,7 @@ WITH automatic_states AS (
 CREATE TABLE IF NOT EXISTS portal_testers(id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,must_change BOOLEAN NOT NULL DEFAULT TRUE,active BOOLEAN NOT NULL DEFAULT TRUE,access_expires_at TIMESTAMPTZ NOT NULL,created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS portal_tester_sessions(id TEXT PRIMARY KEY,tester_id UUID NOT NULL REFERENCES portal_testers(id) ON DELETE CASCADE,csrf TEXT NOT NULL,expires_at TIMESTAMPTZ NOT NULL);
 CREATE INDEX IF NOT EXISTS portal_tester_sessions_expiry_idx ON portal_tester_sessions(expires_at);
+
+-- Personal follow-ups survive deletion of the original notification.
+ALTER TABLE calendar_tasks ADD COLUMN IF NOT EXISTS source_message_id INTEGER REFERENCES team_messages(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS calendar_tasks_source_message ON calendar_tasks(user_id,source_message_id) WHERE source_message_id IS NOT NULL;
