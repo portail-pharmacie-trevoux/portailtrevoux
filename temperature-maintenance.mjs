@@ -1,8 +1,11 @@
-export async function temperatureMaintenance(db,now=new Date()){
+export async function temperatureRetention(db){
  await db.query("DELETE FROM temperature_readings WHERE recorded_at<now()-interval '3 years'");
  await db.query("DELETE FROM temperature_comments WHERE happened_at<now()-interval '3 years'");
  await db.query("DELETE FROM temperature_imports WHERE last_reading<now()-interval '3 years'");
  await db.query("DELETE FROM temperature_reminders WHERE sent_at<now()-interval '3 years'");
+}
+export async function temperatureMaintenance(db,now=new Date()){
+ await temperatureRetention(db);
  const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value])),month=p.year+'-'+p.month;
  const previous=new Date(Date.UTC(Number(p.year),Number(p.month)-2,1)).toISOString().slice(0,7),label=new Intl.DateTimeFormat('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(previous+'-01T00:00:00Z'));
  await db.query(`WITH targets AS MATERIALIZED (

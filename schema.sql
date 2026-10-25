@@ -480,3 +480,21 @@ CREATE INDEX IF NOT EXISTS portal_tester_sessions_expiry_idx ON portal_tester_se
 -- Personal follow-ups survive deletion of the original notification.
 ALTER TABLE calendar_tasks ADD COLUMN IF NOT EXISTS source_message_id INTEGER REFERENCES team_messages(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS calendar_tasks_source_message ON calendar_tasks(user_id,source_message_id) WHERE source_message_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS message_automations(
+ id TEXT PRIMARY KEY,kind TEXT NOT NULL,name TEXT NOT NULL,enabled BOOLEAN NOT NULL DEFAULT TRUE,config JSONB NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1,activation_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),deleted_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS message_automation_runs(
+ id BIGSERIAL PRIMARY KEY,automation_id TEXT NOT NULL REFERENCES message_automations(id),occurrence DATE NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('sent','skipped','failed')),recipient_count INTEGER NOT NULL DEFAULT 0,message_count INTEGER NOT NULL DEFAULT 0,
+ error TEXT,completed_at TIMESTAMPTZ NOT NULL DEFAULT now(),UNIQUE(automation_id,occurrence)
+);
+CREATE TABLE IF NOT EXISTS message_automation_changes(
+ id BIGSERIAL PRIMARY KEY,automation_id TEXT NOT NULL REFERENCES message_automations(id),actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ action TEXT NOT NULL,before_value JSONB,after_value JSONB,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS reminder_kind TEXT;
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS automation_text TEXT;

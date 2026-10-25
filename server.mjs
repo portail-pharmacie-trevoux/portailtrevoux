@@ -1,20 +1,20 @@
+import {registerMessageAutomationAdmin} from './message-automation-admin.mjs';
+import {ensureMessageAutomations} from './message-automation-defaults.mjs';
+import {runMessageAutomations} from './message-automation-engine.mjs';
 import {registerTesterAccess} from './tester-access.mjs';
 import {registerPortalQuickLinks} from './portal-quick-links.mjs';
 import {registerContactDocuments} from './contact-documents.mjs';
 import {migrateProcedureFiles} from './procedure-file-migration.mjs';
 import {createGoogleConnectionHealth} from './google-connection-health.mjs';
-import {merchandisingFreeReminders} from './merchandising-free-reminders.mjs';
 import {registerMusicCSV} from './music-csv.mjs';
 import {orderReminderEmails} from './order-reminder-emails.mjs';
 import {registerMerchDocuments} from './merchandising-documents.mjs';
-import {orderWeeklyReminders,sendOrderExample} from './order-reminders.mjs';
+import {sendOrderExample} from './order-reminders.mjs';
 import {registerCalendarTasks} from './calendar-tasks.mjs';
-import {challengeMonthlyReminders} from './challenge-reminders.mjs';
-import {qualityMonthlyReminders} from './quality-reminders.mjs';
 import {registerTiersPayant} from './quality-tiers-payant.mjs';
 import {announceVersion11} from './version-announcement.mjs';
 import {registerTemperatures} from './temperatures.mjs';
-import {temperatureMaintenance} from './temperature-maintenance.mjs';
+import {temperatureRetention} from './temperature-maintenance.mjs';
 import {registerQualityErrors} from './quality-errors.mjs';
 import {registerQualityTraining} from './quality-training.mjs';
 import {registerQualityServices} from './quality-services.mjs';
@@ -102,6 +102,7 @@ export function createApp(db,config) {
   const orderMFA=registerOrderMFA({app,db,auth,ready,csrf,viewUniverse,fail,secret});
   app.use('/api/order-planning',auth,ready,viewUniverse("Outils d'aide aux commandes"),orderMFA.guard);
   registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret});
+  registerMessageAutomationAdmin({app,db,auth,ready,admin,csrf,fail});
   registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'15mb'})});
   const youtrust=config.youtrustClient||createYoutrust({getSetting,setSetting,deleteSetting:key=>db.query('DELETE FROM settings WHERE key=$1',[key]),secret,origin,fail,config,fetchImpl:config.youtrustFetch});
   registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,secret,publish,uploadParser:express.json({limit:'15mb'}),youtrust});
@@ -352,11 +353,10 @@ export function createApp(db,config) {
 
 export async function initialize(db,config){
   await db.query(await readFile(new URL('./schema.sql',import.meta.url),'utf8'));
-  await orderWeeklyReminders(db,config.secret);
+  await ensureMessageAutomations(db);
+  await runMessageAutomations(db,config.secret);
   await sendOrderExample(db,config.secret);
-  await qualityMonthlyReminders(db);
-  await challengeMonthlyReminders(db);
-  await temperatureMaintenance(db);
+  await temperatureRetention(db);
   await purgeNews(db);
   await importProcedureDocuments(db,config.procedureImport);
   const procedureFiles=await migrateProcedureFiles(db,config.procedureFilesImport);if(procedureFiles.failed.length)console.error('Fichiers de procédures à réimporter : '+procedureFiles.failed.join(','));
@@ -386,7 +386,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync,mailer,connectionHealth}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM portal_tester_sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await runMessageAutomations(db,config.secret);await orderReminderEmails(db,mailer,config.origin,new Date(),true);}catch{console.error('Programmations Messagerie à vérifier.');}try{await temperatureRetention(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM portal_tester_sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }

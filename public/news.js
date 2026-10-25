@@ -7,7 +7,7 @@ const node=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textCont
 const button=(text,action,cls='btn small')=>{const e=node('button',text,cls);e.type='button';e.onclick=action;return e;};
 const attachmentLink=message=>{const link=node('a','📎 '+message.attachment_name,'btn small news-attachment');link.href='/api/news/'+message.id+'/attachment';link.download=message.attachment_name;return link;};
 const date=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});
-export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{},onOpenOrders=()=>{},onOpenMerchandising=()=>{}}){
+export async function renderNews({container,api,isAdmin=false,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{},onOpenOrders=()=>{},onOpenMerchandising=()=>{}}){
   const [recipients,initialMessages,initialSent]=await Promise.all([api('/api/news/recipients'),api('/api/news'),api('/api/news/sent')]);
   if(!isCurrent())return;
   const expandedThreads=new Set(),threadCache=new Map();let sentMessages=initialSent,view='inbox',replyTo=null;let messages=initialMessages,filter='all',request=0,sending=false;
@@ -106,5 +106,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
       try{await reload();}catch(e){inboxError.textContent=e.message;}onChanged();
     }catch(e){if(isCurrent())feedback.textContent=e.message;}finally{sending=false;form.inert=false;submit.disabled=!recipients.length;attachment.disabled=false;removeAttachment.disabled=false;}
   };
-  layout.append(compose,inbox);container.replaceChildren(note,layout);redraw();
+  layout.append(compose,inbox);container.replaceChildren(note,layout);
+  if(isAdmin){const toolbar=node('div','','news-automation-toolbar universe-toolbar'),admin=node('details','','admin-menu news-automation-menu'),summary=node('summary','Administration'),body=node('div');admin.append(summary,body);toolbar.append(admin);container.prepend(toolbar);let loaded=false;admin.ontoggle=async()=>{if(!admin.open||loaded)return;loaded=true;body.textContent='Chargement des programmations…';try{if(!document.querySelector('link[href="/news-automations.css"]')){const css=document.createElement('link');css.rel='stylesheet';css.href='/news-automations.css';document.head.append(css);}const module=await import('/news-automations.js');if(isCurrent())await module.renderNewsAutomations({container:body,api,isCurrent});}catch(error){body.textContent=error.message;loaded=false;}};}
+  redraw();
 }
