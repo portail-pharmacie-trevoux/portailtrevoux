@@ -1,0 +1,19 @@
+.schedule .schedule-week-clock{--clock-height:588px;--clock-step:42px;--clock-half:21px;table-layout:fixed;min-width:960px}
+.schedule .schedule-week-clock th:first-child{width:95px;min-width:95px}
+.schedule .schedule-week-clock th:last-child{width:90px}
+.schedule .schedule-week-clock tbody td,.schedule .schedule-week-clock tbody th{vertical-align:top;padding-top:12px;padding-bottom:14px}
+.week-clock-person{display:block;font-size:11px;overflow-wrap:anywhere;margin-bottom:8px}
+.week-clock-ruler{position:relative;height:var(--clock-height);margin-top:0}
+.week-clock-ruler>span{position:absolute;right:8px;transform:translateY(-50%);font-size:11px;font-weight:600;white-space:nowrap}
+.week-clock-ruler>.half-hour{font-size:9px;font-weight:400;color:#71818e}
+.schedule .schedule-week-clock tbody th:first-child{padding-top:12px}
+/* Keep the clock aligned with tracks; the employee name lives above the ruler. */
+.schedule-week-clock .week-clock-person{position:absolute;top:calc(var(--clock-height) + 22px);left:6px;right:6px}
+.schedule .week-clock-day{display:block;position:relative;width:100%;padding:0;min-height:0;border:0;background:transparent;color:inherit;text-align:left}
+.week-clock-track{display:block;position:relative;height:var(--clock-height);background:repeating-linear-gradient(to bottom,#cbd7df 0,#cbd7df 1px,transparent 1px,transparent var(--clock-step)),repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--clock-half) - 1px),#e4eaf0 calc(var(--clock-half) - 1px),#e4eaf0 var(--clock-half),transparent var(--clock-half),transparent var(--clock-step));border-bottom:1px solid #cbd7df}
+.schedule .schedule-week-clock .week-clock-slot{position:absolute;left:2px;right:2px;width:auto;margin:0;padding:2px 4px;border-radius:4px;box-sizing:border-box;font-size:10px;line-height:1.25;overflow:hidden;white-space:normal;border:1px solid #ffffff90;min-height:0;display:block}
+.week-clock-slot:focus-visible{outline:2px solid #462b90;z-index:2}
+.week-clock-notes{display:flex;flex-direction:column;gap:3px;margin-top:10px;min-height:30px}
+.week-clock-notes>.schedule-day-kind{font-size:10px}
+.schedule .schedule-week-clock .schedule-day:disabled{opacity:1;cursor:default}
+@media print{.schedule .schedule-week-clock{--clock-height:420px;--clock-step:30px;--clock-half:15px;min-width:0}.schedule .schedule-week-clock .week-clock-slot{font-size:8px;padding:1px}.week-clock-ruler>span{font-size:8px}.schedule .schedule-week-clock th:first-child{width:64px;min-width:64px}.week-clock-person{position:static!important}}
