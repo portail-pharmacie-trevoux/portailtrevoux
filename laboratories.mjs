@@ -1,5 +1,6 @@
 import {validateProcedureFile} from './procedure-files.mjs';
 import express from 'express';
+import {exportLaboratories} from './laboratories-export.mjs';
 import {emailValid,sameMailAccount} from './invitations.mjs';
 const limits={conditions:4000,franco:1000,commercialName:160,commercialRole:160,commercialEmail:254,commercialPhone:50,commercialMobile:50,labAddress:500,labPhone:50,labEmail:254,labWebsite:500,orderEmail:254,customerNumber:100,notes:4000};
 export function validateLaboratory(body,fail){
@@ -19,6 +20,11 @@ export function registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,p
  const rowSQL='SELECT l.id,l.name,l.order_mode,l.responsible_id,l.details,l.revision,l.logo_version,u.name AS responsible_name FROM laboratories l LEFT JOIN users u ON u.id=l.responsible_id';
  const clean=r=>({id:r.id,name:r.name,orderMode:r.order_mode,responsibleId:r.responsible_id,responsibleName:r.responsible_name,revision:r.revision,logoVersion:r.logo_version||0,...r.details});
  app.get('/api/laboratories',auth,ready,access,async(req,res)=>res.json((await db.query(rowSQL+' ORDER BY lower(l.name),l.id')).rows.map(clean)));
+ app.get('/api/laboratories/export.xlsx',auth,ready,access,async(req,res)=>{
+  if(req.auth.role!=='admin')throw fail(403,'Export réservé aux administrateurs.');
+  const rows=(await db.query("SELECT l.id,l.name,l.order_mode,l.responsible_id,l.details,u.name AS responsible_name,COALESCE((SELECT json_agg(json_build_object('title',d.title,'file_name',d.file_name) ORDER BY d.created_at DESC,d.id DESC) FROM laboratory_documents d WHERE d.laboratory_id=l.id),'[]'::json) AS documents FROM laboratories l LEFT JOIN users u ON u.id=l.responsible_id ORDER BY lower(l.name),l.id")).rows;
+  res.set('Cache-Control','no-store').type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment('PortailPlus-laboratoires-'+new Date().toISOString().slice(0,10)+'.xlsx').send(exportLaboratories(rows));
+ });
  app.get('/api/laboratories/responsibles',auth,ready,access,async(req,res)=>res.json((await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY last_name,first_name,id')).rows));
  app.post('/api/laboratories/:id/email',...guard,async(req,res)=>{
   const b=req.body,id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||typeof b?.subject!=='string'||!b.subject.trim()||b.subject.length>200||/[\r\n\x00]/.test(b.subject)||typeof b.text!=='string'||!b.text.trim()||b.text.length>6000||typeof b.requestId!=='string'||!/^[a-f0-9-]{36}$/i.test(b.requestId))throw fail(400,'Renseignez un objet (200 caractères) et un message (6 000 caractères maximum).');
