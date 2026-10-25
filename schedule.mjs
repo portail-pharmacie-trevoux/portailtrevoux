@@ -117,12 +117,20 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   });
   app.post('/api/schedule/:week/publish',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision);await ensureWeek(week);
-    const {rows}=await db.query(`WITH changed AS (
+    const client=await db.connect();try{
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(78451024)');
+    const {rows}=await client.query(`WITH changed AS (
       UPDATE schedule_weeks SET published=draft,published_revision=revision,published_at=now()
       WHERE week=$1::date AND revision=$2 AND (published_at IS NULL OR published_revision<>revision)
       RETURNING published_at
     ), publication AS (
       INSERT INTO publications(universe,title) SELECT 'Emplois du temps',$3 FROM changed RETURNING id
+    ), obsolete AS (
+      DELETE FROM team_messages
+      WHERE planning_week IS NOT NULL AND sender_id IS NULL AND sender_name='Portail +' AND can_archive=FALSE
+        AND EXISTS(SELECT 1 FROM changed)
+      RETURNING id
     ), notice AS (
       INSERT INTO team_messages(sender_name,text,priority,can_archive,planning_week)
       SELECT 'Portail +',$4,'normal',FALSE,$1::date FROM changed RETURNING id
@@ -130,8 +138,10 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
       INSERT INTO team_message_recipients(message_id,user_id)
       SELECT notice.id,u.id FROM notice CROSS JOIN users u WHERE u.active=TRUE RETURNING message_id
     ) SELECT publication.id,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Un nouvel emploi du temps est disponible pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.']);
+    await client.query('COMMIT');
     if(!rows.length){const row=await weekRow(week);if(row?.revision!==revision)throw conflict();return res.json({ok:true,alreadyPublished:true});}
     res.json({ok:true});
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   });
 }
 
