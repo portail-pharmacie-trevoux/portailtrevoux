@@ -55,6 +55,18 @@ export function copySchedule(source,sourceWeek,targetWeek,allowedIds){
   }
   return result;
 }
+// Compare only information displayed on the collaborator's published schedule.
+export function changedScheduleUsers(previous={},draft={}){
+ const normalize=e=>({kind:e.kind,slots:(e.slots||[]).map(([start,end],i)=>({start,end,kind:slotKind(e,i),post:e.postIds?.[i]??null,comment:e.comments?.[i]||''})),durations:(e.durations||[]).map(d=>({kind:d.kind,minutes:d.minutes,comment:d.comment||''})),mealTicket:!!e.mealTicket,actualMinutes:e.actualMinutes??null,leavePart:e.leavePart??null});
+ const users=new Set();
+ for(const key of new Set([...Object.keys(previous||{}),...Object.keys(draft||{})])){
+  const a=previous?.[key],b=draft?.[key];
+  if(JSON.stringify(a?normalize(a):null)!==JSON.stringify(b?normalize(b):null)){
+   const id=Number((b||a).userId);if(Number.isSafeInteger(id)&&id>0)users.add(id);
+  }
+ }
+ return [...users];
+}
 export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModify,fail}){
   const tools=registerScheduleTools({app,db,auth,ready,admin,csrf,canAccess,fail});
   const access=(req,res,next)=>canAccess(req.auth,'Emplois du temps')?next():next(fail(403,'Accès refusé.'));
@@ -120,6 +132,9 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const client=await db.connect();try{
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(78451024)');
+    const previous=(await client.query('SELECT * FROM schedule_weeks WHERE week=$1::date FOR UPDATE',[week])).rows[0];
+    if(!previous||previous.revision!==revision)throw conflict();
+    const affected=changedScheduleUsers(previous.published||{},previous.draft||{});
     const {rows}=await client.query(`WITH changed AS (
       UPDATE schedule_weeks SET published=draft,published_revision=revision,published_at=now()
       WHERE week=$1::date AND revision=$2 AND (published_at IS NULL OR published_revision<>revision)
@@ -127,17 +142,20 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     ), publication AS (
       INSERT INTO publications(universe,title) SELECT 'Emplois du temps',$3 FROM changed RETURNING id
     ), obsolete AS (
-      DELETE FROM team_messages
-      WHERE planning_week IS NOT NULL AND sender_id IS NULL AND sender_name='Portail +' AND can_archive=FALSE
+      DELETE FROM team_message_recipients r USING team_messages m
+      WHERE r.message_id=m.id AND r.user_id=ANY($5::int[])
+        AND m.planning_week IS NOT NULL AND m.sender_id IS NULL AND m.sender_name='Portail +' AND m.can_archive=FALSE
         AND EXISTS(SELECT 1 FROM changed)
-      RETURNING id
+      RETURNING r.message_id
     ), notice AS (
       INSERT INTO team_messages(sender_name,text,priority,can_archive,planning_week)
-      SELECT 'Portail +',$4,'normal',FALSE,$1::date FROM changed RETURNING id
+      SELECT 'Portail +',$4,'normal',FALSE,$1::date FROM changed
+      WHERE EXISTS(SELECT 1 FROM users WHERE active=TRUE AND id=ANY($5::int[])) RETURNING id
     ), deliveries AS (
       INSERT INTO team_message_recipients(message_id,user_id)
-      SELECT notice.id,u.id FROM notice CROSS JOIN users u WHERE u.active=TRUE RETURNING message_id
-    ) SELECT publication.id,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Un nouvel emploi du temps est disponible pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.']);
+      SELECT notice.id,u.id FROM notice CROSS JOIN users u WHERE u.active=TRUE AND u.id=ANY($5::int[]) RETURNING message_id
+    ) SELECT publication.id,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Votre emploi du temps a été mis à jour pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.',affected]);
+    await client.query("DELETE FROM team_messages m WHERE m.planning_week IS NOT NULL AND m.sender_id IS NULL AND m.sender_name='Portail +' AND m.can_archive=FALSE AND NOT EXISTS(SELECT 1 FROM team_message_recipients r WHERE r.message_id=m.id)");
     await client.query('COMMIT');
     if(!rows.length){const row=await weekRow(week);if(row?.revision!==revision)throw conflict();return res.json({ok:true,alreadyPublished:true});}
     res.json({ok:true});
