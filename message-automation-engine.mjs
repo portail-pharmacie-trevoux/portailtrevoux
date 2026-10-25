@@ -17,7 +17,7 @@ export async function automationPayloads(db,job,date,secret,now=new Date()){
  if(job.kind==='annual')return services.filter(s=>targets.some(p=>p.id===s.collaborator_id)&&(a.mode!=='services'||a.serviceIds.includes(s.id))).map(s=>payload([s.collaborator_id],{service:s.service}));
  if(job.kind==='training'){
   const eligible=targets.filter(p=>isTrainingProfession(p.job));if(!eligible.length)return [];
-  const documents=(await db.query("SELECT owner_id,title FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND title LIKE 'Attestation%'",[eligible.map(p=>p.id)])).rows;
+  const documents=(await db.query("SELECT owner_id,title,training_title,to_char(training_date,'YYYY-MM-DD') AS training_date,training_kind FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND (training_date IS NOT NULL OR title LIKE 'Attestation%')",[eligible.map(p=>p.id)])).rows;
   const overview=trainingOverview(eligible,documents,Number(date.slice(0,4)),parisWall(now).slice(0,10)),quarter=Math.floor((Number(date.slice(5,7))-1)/3);
   const missing=overview.people.filter(p=>p.quarters[quarter].status!=='done').map(p=>p.id);return missing.length?[payload(missing)]:[];
  }

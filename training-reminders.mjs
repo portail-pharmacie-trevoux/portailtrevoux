@@ -13,7 +13,7 @@ export function trainingReminderText(person,period){
 export async function trainingQuarterlyReminders(db,now=new Date()){
  const period=trainingReminderPeriod(now);if(!period)return;
  const people=(await db.query('SELECT id,name,job FROM users WHERE active=TRUE ORDER BY id')).rows.filter(p=>isTrainingProfession(p.job));if(!people.length)return;
- const documents=(await db.query("SELECT owner_id,title FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND title LIKE 'Attestation%'",[people.map(p=>p.id)])).rows;
+ const documents=(await db.query("SELECT owner_id,title,training_title,to_char(training_date,'YYYY-MM-DD') AS training_date,training_kind FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND (training_date IS NOT NULL OR title LIKE 'Attestation%')",[people.map(p=>p.id)])).rows;
  const overview=trainingOverview(people,documents,period.year,period.today);
  for(const person of people){if(overview.people.find(p=>p.id===person.id).quarters[period.quarter-1].status==='done')continue;
   // Atomic delivery and quarterly claim: retries and concurrent ticks cannot duplicate messages.

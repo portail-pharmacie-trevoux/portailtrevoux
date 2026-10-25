@@ -1,3 +1,4 @@
+import {registerTrainingAttestationImport} from './training-attestation-import.mjs';
 import {registerMessageAutomationAdmin} from './message-automation-admin.mjs';
 import {ensureMessageAutomations} from './message-automation-defaults.mjs';
 import {runMessageAutomations} from './message-automation-engine.mjs';
@@ -62,7 +63,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/quality/training/imports/analyze','/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -95,6 +96,7 @@ export function createApp(db,config) {
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
   registerTiersPayant({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'200kb'})});
   registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
+  registerTrainingAttestationImport({app,db,auth,ready,csrf,viewUniverse,fail});
   registerQualityTraining({app,db,auth,ready,viewUniverse,fail});
   registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'3mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
@@ -386,7 +388,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync,mailer,connectionHealth}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
-  const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await runMessageAutomations(db,config.secret);await orderReminderEmails(db,mailer,config.origin,new Date(),true);}catch{console.error('Programmations Messagerie à vérifier.');}try{await temperatureRetention(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM portal_tester_sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
+  const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await runMessageAutomations(db,config.secret);await orderReminderEmails(db,mailer,config.origin,new Date(),true);}catch{console.error('Programmations Messagerie à vérifier.');}try{await temperatureRetention(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM portal_tester_sessions WHERE expires_at<now()');await db.query('DELETE FROM training_attestation_imports WHERE expires_at<now()');await db.query("DELETE FROM training_attestation_reads WHERE requested_at<now()-interval '1 day'");await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
 }

@@ -1,6 +1,10 @@
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 export const isTrainingProfession=job=>/^(?:pharmacien(?:ne)?|preparateur|preparatrice)(?:$| (?:cienne|ne|trice|en pharmacie|en officine|adjoint|titulaire)\b)/.test(normalize(String(job||'')));
 export function parseTrainingAttestation(doc){
+ if(doc.training_title&&doc.training_date&&['Classique','DPC'].includes(doc.training_kind)){
+  const date=String(doc.training_date).slice(0,10);if(!/^20\d{2}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date)return null;
+  return {title:doc.training_title,date,kind:doc.training_kind,ownerId:Number(doc.owner_id),key:normalize(doc.training_title)};
+ }
  const match=/^Attestation (DPC|de formation) — (.+) — (\d{2})\/(\d{2})\/(\d{4})$/.exec(doc.title||'');if(!match)return null;
  const [,kind,title,day,month,year]=match,date=`${year}-${month}-${day}`,parsed=new Date(date+'T12:00:00Z');
  if(!Number.isFinite(+parsed)||parsed.toISOString().slice(0,10)!==date)return null;
@@ -27,8 +31,8 @@ export function registerQualityTraining({app,db,auth,ready,viewUniverse,fail,now
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now()).map(p=>[p.type,p.value])),today=parts.year+'-'+parts.month+'-'+parts.day;
   const year=Number(req.query.year??parts.year);if(!Number.isInteger(year)||year<2025||year>Number(parts.year))throw fail(400,'Choisissez une année entre 2025 et l’année en cours.');
   const isAdmin=req.auth.role==='admin';
-  const people=(await db.query('SELECT id,name,job FROM users WHERE active=TRUE AND ($1::boolean OR id=$2) ORDER BY lower(last_name),lower(first_name),id',[isAdmin,req.auth.id])).rows.filter(person=>isTrainingProfession(person.job));
-  const documents=(await db.query("SELECT owner_id,title FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND title LIKE 'Attestation%'",[people.map(p=>p.id)])).rows;
-  res.set('Cache-Control','no-store').json({...trainingOverview(people,documents,year,today),isAdmin});
+  const owners=(await db.query('SELECT id,name,job FROM users WHERE active=TRUE AND ($1::boolean OR id=$2) ORDER BY lower(last_name),lower(first_name),id',[isAdmin,req.auth.id])).rows,people=owners.filter(person=>isTrainingProfession(person.job));
+  const documents=(await db.query("SELECT owner_id,title,training_title,to_char(training_date,'YYYY-MM-DD') AS training_date,training_kind FROM hr_documents WHERE active=TRUE AND scope='personal' AND owner_id=ANY($1::int[]) AND (training_date IS NOT NULL OR title LIKE 'Attestation%')",[people.map(p=>p.id)])).rows;
+  res.set('Cache-Control','no-store').json({...trainingOverview(people,documents,year,today),isAdmin,importOwners:owners.filter(p=>isAdmin||p.id===req.auth.id).map(p=>({id:p.id,name:p.name})),currentUserId:req.auth.id});
  });
 }

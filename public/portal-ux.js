@@ -8,6 +8,7 @@
  const api={createEditState};global.PortalUX=api;
  if(!global.document)return;
  const doc=global.document,records=new Map();let intent=null,sequence=0,pending=0,message='',kind='',messageTimer;
+ if(!doc.querySelector('script[data-admin-access]')){const script=doc.createElement('script');script.src='/admin-access.js';script.dataset.adminAccess='1';doc.head.append(script);}
  const notice=doc.createElement('div');notice.id='portal-save-feedback';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');notice.hidden=true;doc.body.append(notice);
  const fieldValue=n=>n.type==='checkbox'||n.type==='radio'?String(n.checked):n.type==='file'?[...(n.files||[])].map(f=>[f.name,f.size,f.lastModified].join(':')).join('|'):n.tagName==='SELECT'&&n.multiple?JSON.stringify([...n.selectedOptions].map(o=>o.value)):n.value;
  const live=form=>form.isConnected&&!form.closest('.hidden,[hidden]')&&(!form.closest('dialog')||form.closest('dialog').open);

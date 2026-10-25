@@ -498,3 +498,17 @@ CREATE TABLE IF NOT EXISTS message_automation_changes(
 );
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS reminder_kind TEXT;
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS automation_text TEXT;
+
+ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS training_title TEXT;
+ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS training_date DATE;
+ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS training_kind TEXT CHECK(training_kind IN ('Classique','DPC'));
+ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS training_verified_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE hr_documents ADD COLUMN IF NOT EXISTS training_verified_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS training_attestation_imports(
+ id UUID PRIMARY KEY,owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,added_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ file_name TEXT NOT NULL,file_type TEXT NOT NULL,file_content BYTEA NOT NULL,file_hash TEXT NOT NULL,proposal JSONB NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),expires_at TIMESTAMPTZ NOT NULL DEFAULT now()+interval '1 day'
+);
+CREATE INDEX IF NOT EXISTS training_attestation_imports_expiry ON training_attestation_imports(expires_at);
+CREATE TABLE IF NOT EXISTS training_attestation_reads(user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,requested_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS training_attestation_reads_user_time ON training_attestation_reads(user_id,requested_at);
