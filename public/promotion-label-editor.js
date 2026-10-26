@@ -7,7 +7,7 @@ export function renderPromotionLabel({container,promotion=null,month='',api=null
  if(!document.querySelector('link[data-promo-editor]')){const style=document.createElement('link');style.rel='stylesheet';style.href='/promotion-label-editor.css?v=20261026-prix-central';style.dataset.promoEditor='1';document.head.append(style)}
  const heading=document.createElement('h3');heading.textContent='Étiquette promotionnelle personnalisable';
  const note=document.createElement('p');note.textContent='Format fixe horizontal : 105 × 99,6 mm (estimation issue du modèle). Les repères ne sont pas imprimés. Deux étiquettes par feuille A4.';note.className='field-note';
- const controls=document.createElement('div');controls.className='promo-controls';const fieldInputs={};let photoRevision=0;
+ const controls=document.createElement('div');controls.className='promo-controls';const fieldInputs={};let photoRevision=0,logoRevision=0,logoResetRequested=false,defaultLogo='';
  const preview=document.createElement('div');preview.className='promo-label';
  const fields=[
   ['date','1 · Date de validité','text'],['slogan','2 · Accroche promotionnelle','text'],['old','3 · Prix barré (€)','text'],
@@ -28,14 +28,14 @@ export function renderPromotionLabel({container,promotion=null,month='',api=null
  for(const [id,label,type] of fields){
   const wrap=document.createElement('label');wrap.textContent=label;wrap.className='promo-field';
   const input=document.createElement('input');input.type=type==='file'?'file':'text';
-  if(type==='file'){input.accept='image/png,image/jpeg,image/webp';input.onchange=()=>{const file=input.files?.[0];if(!file)return;if(id==='photo')photoRevision++;if(file.size>1500000){status.textContent='Image trop volumineuse (maximum 1,5 Mo).';return}const revision=photoRevision,reader=new FileReader();reader.onload=()=>{if(id==='photo'&&revision!==photoRevision)return;data[id]=String(reader.result);update();save()};reader.readAsDataURL(file)};}
+  if(type==='file'){input.accept='image/png,image/jpeg,image/webp';input.onchange=()=>{const file=input.files?.[0];if(!file)return;if(id==='photo')photoRevision++;if(id==='logo1'){logoRevision++;logoResetRequested=false;}if(file.size>1500000){status.textContent='Image trop volumineuse (maximum 1,5 Mo).';return}const revision=id==='logo1'?logoRevision:photoRevision,reader=new FileReader();reader.onload=()=>{if(id==='photo'&&revision!==photoRevision||id==='logo1'&&revision!==logoRevision)return;data[id]=String(reader.result);update();save()};reader.readAsDataURL(file)};}
   else{input.value=data[id]||'';input.oninput=()=>{data[id]=input.value;update();save()};}
   fieldInputs[id]=input;wrap.append(input);controls.append(wrap);
  }
  const buttons=document.createElement('div');buttons.className='promo-actions';
  const draft=document.createElement('button');draft.className='btn';draft.textContent='Enregistrer le brouillon';draft.onclick=()=>{save();status.textContent='Brouillon enregistré dans ce navigateur.'};
  const print=document.createElement('button');print.className='btn primary';print.textContent='Imprimer deux étiquettes sur A4';print.onclick=()=>window.print();
- const reset=document.createElement('button');reset.className='btn danger';reset.textContent='Vider les champs';reset.onclick=()=>{if(!confirm('Effacer les données de cette étiquette ?'))return;data={...defaults};localStorage.removeItem(key);controls.querySelectorAll('input').forEach(i=>{i.value=''});update()};
+ const reset=document.createElement('button');reset.className='btn danger';reset.textContent='Vider les champs';reset.onclick=()=>{if(!confirm('Effacer les données de cette étiquette ?'))return;logoRevision++;logoResetRequested=true;data={...defaults,logo1:defaultLogo};localStorage.removeItem(key);controls.querySelectorAll('input').forEach(i=>{i.value=''});update()};
  buttons.append(draft,print,reset);
  const sheet=document.createElement('div');sheet.className='promo-sheet';sheet.append(preview);const second=preview.cloneNode(true);second.setAttribute('aria-hidden','true');second.classList.add('promo-print-copy');sheet.append(second);const refreshCopy=()=>{second.innerHTML=preview.innerHTML};const originalUpdate=update;update=()=>{originalUpdate();refreshCopy()};
  const chooser=document.createElement('div');chooser.className='promo-product-choice';let choiceToken=0;
@@ -55,4 +55,6 @@ export function renderPromotionLabel({container,promotion=null,month='',api=null
   else{data.name=promotion.title||'';fieldInputs.name.value=data.name;hint.textContent='Aucun EAN renseigné : l’intitulé de la promotion est proposé, à vérifier.';}
  }
  root.append(heading,note,chooser,controls,buttons,status,sheet);container.replaceChildren(root);update();
+ const logoAtStart=logoRevision;
+ void (async()=>{try{const response=await fetch('/api/merchandising/documents/1/file',{credentials:'same-origin'});if(!response.ok)throw Error('Logo indisponible');const blob=await response.blob();if(blob.type!=='image/png'||blob.size>1500000)throw Error('Logo invalide');const value=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(blob);});if(!root.isConnected||!isCurrent())return;defaultLogo=value;if((logoRevision===logoAtStart||logoResetRequested)&&!data.logo1){data.logo1=value;logoResetRequested=false;update();}}catch{if(root.isConnected&&isCurrent()&&!data.logo1)status.textContent='Logo de la pharmacie indisponible : vous pouvez le sélectionner dans le champ 5.';}})();
 }
