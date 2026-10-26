@@ -29,8 +29,8 @@ export async function renderMerchandisingPromotions({container,api,isCurrent,mon
   if(data.canAssign){card.draggable=true;card.ondragstart=e=>{choose(p);e.dataTransfer?.setData('application/x-portail-promotion',String(p.id));if(e.dataTransfer)e.dataTransfer.effectAllowed='move';};card.ondragend=()=>{for(const marker of markers.values())marker.classList.remove('promotion-target');};
    actions.append(iconButton(p.zone_id?'Déplacer la promotion':'Positionner la promotion','arrow',()=>{choose(p);mapArea.scrollIntoView?.({behavior:'smooth',block:'nearest'});}));
   }
-  if(p.category==='TG'&&p.zone_id)actions.append(iconButton('Créer une étiquette promotionnelle pour '+zoneName(p.zone_id),'poster',()=>onOpenLabel(month)));
   if(data.canAssign&&p.zone_id)actions.append(iconButton('Remettre en attente d’attribution','unassign',()=>void assign(p,null)));
+  if(p.zone_id)actions.append(iconButton('Créer une étiquette promotionnelle pour '+zoneName(p.zone_id),'poster',()=>onOpenLabel(month)));
   if(data.canAssign||!p.zone_id&&p.created_by===data.userId)actions.append(iconButton('Supprimer la promotion','trash',()=>void remove(p),'danger'));
   card.append(lab,title,state,actions);section.append(card);
  }board.append(section);}
