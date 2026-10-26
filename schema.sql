@@ -590,3 +590,8 @@ WITH run AS (
  (SELECT count(*) FROM cleared) AS cleared_zones,(SELECT count(*) FROM logged) AS audit_events;
 
 ALTER TABLE merchandising_promotions ADD COLUMN IF NOT EXISTS stocks JSONB NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(stocks)='object');
+
+CREATE TABLE IF NOT EXISTS merchandising_product_names(
+ ean TEXT PRIMARY KEY CHECK(ean ~ '^[0-9]{13}$'),data JSONB NOT NULL,
+ checked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

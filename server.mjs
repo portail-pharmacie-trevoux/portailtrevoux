@@ -87,12 +87,13 @@ export function createApp(db,config) {
   async function publish(universe,title,key=null) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
+  const products=createProductSources({origin,serpKey:config.serpKey});
   const testerAccess=registerTesterAccess({app,db,auth,ready,admin,csrf,fail,secure});
   registerPortalQuickLinks({app,db,auth,ready,admin,csrf,fail});
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser:express.json({limit:'70mb'})});
-  registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify});
+  registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify,products});
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
   registerTiersPayant({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'200kb'})});
   registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
@@ -337,7 +338,6 @@ export function createApp(db,config) {
     if(!rowCount)throw fail(404,'Ce morceau ne figure plus dans la sélection.');
     res.json({ok:true});
   });
-  const products=createProductSources({origin,serpKey:config.serpKey});
   app.get('/api/promoflash/product/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>{const result=await products.product(req.params.ean);res.json({...result,image:result.image?'/api/promoflash/image/'+req.params.ean:''});});
   app.get('/api/promoflash/image/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>{const result=await products.image(req.params.ean);res.type(result.type).send(Buffer.from(result.bytes));});
   app.get('/api/promoflash/prices/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>res.json(await products.prices(req.params.ean)));
