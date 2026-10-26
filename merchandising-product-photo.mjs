@@ -15,6 +15,16 @@ export function extractExactProductImage(html,ean,pageURL){
   }
  }return null;
 }
+// Single-product pages sometimes provide their main picture only in Open Graph metadata.
+export function extractSingleProductPageImage(html,ean,pageURL){
+ const product=extractVerifiedProduct(html,ean);
+ if(!product||product.method!=='EAN explicite sur la fiche produit')return null;
+ for(const tag of String(html).match(/<meta\b[^>]*>/gi)||[]){
+  const attrs={};for(const match of tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g))attrs[match[1].toLowerCase()]=match[2]??match[3];
+  if((attrs.property||attrs.name||'').toLowerCase()!=='og:image'||!attrs.content)continue;
+  try{const value=attrs.content.replace(/&amp;/gi,'&');const url=publicProductURL(new URL(value,pageURL).href);if(url)return url.href;}catch{}
+ }return null;
+}
 export async function readPublicProductImage(value,redirects=0){
  const url=publicProductURL(value);if(!url||redirects>3)throw Error('Image non disponible.');const addresses=await dnsLookup(url.hostname,{all:true});if(!addresses.length||addresses.some(a=>!publicAddress(a.address)))throw Error('Adresse non publique.');const address=addresses.find(a=>a.family===4)||addresses[0];
  return await new Promise((resolve,reject)=>{const req=https.get(url,{headers:{'user-agent':'PortailPlus-ProductIdentity/1.2','accept':'image/jpeg,image/png,image/webp','accept-encoding':'identity'},lookup:(host,options,cb)=>options?.all?cb(null,[address]):cb(null,address.address,address.family)},res=>{
@@ -24,7 +34,7 @@ export async function readPublicProductImage(value,redirects=0){
 }
 export async function findProductPhoto({ean,record,readPage=readPublicProductPage,readImage=readPublicProductImage}){
  const sources=record?.sources||[],domains=new Set(sources.map(s=>s.domain).filter(Boolean));if(record?.validationMethod!==webValidationMethod||record.validated!==true||domains.size<2)return null;
- for(const source of sources.slice(0,4)){if(!publicProductURL(source.url)||sourceDomain(source.url)!==source.domain)continue;try{const page=await readPage(source.url);if(sourceDomain(page.url)!==source.domain||!extractVerifiedProduct(page.html,ean))continue;const image=extractExactProductImage(page.html,ean,page.url);if(!image)continue;const result=await readImage(image);return{...result,source:page.url};}catch{}}
+ for(const source of sources.slice(0,4)){if(!publicProductURL(source.url)||sourceDomain(source.url)!==source.domain)continue;try{const page=await readPage(source.url);if(sourceDomain(page.url)!==source.domain||!extractVerifiedProduct(page.html,ean))continue;const image=extractExactProductImage(page.html,ean,page.url)||extractSingleProductPageImage(page.html,ean,page.url);if(!image)continue;const result=await readImage(image);return{...result,source:page.url};}catch{}}
  return null;
 }
 export function registerMerchProductPhoto({app,db,auth,ready,view,fail}){
