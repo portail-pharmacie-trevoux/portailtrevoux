@@ -605,3 +605,5 @@ CREATE TABLE IF NOT EXISTS merchandising_product_name_events(
  id BIGSERIAL PRIMARY KEY,ean TEXT NOT NULL,previous_name TEXT NOT NULL,name TEXT NOT NULL,
  operator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,operator_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE merchandising_promotions ADD COLUMN IF NOT EXISTS prices JSONB NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(prices)='object');
