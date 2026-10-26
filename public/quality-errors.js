@@ -6,7 +6,7 @@ const datetime=v=>new Date(v).toLocaleString('fr-FR',{timeZone:'Europe/Paris',da
 export async function renderQualityErrors({container,api,isCurrent=()=>true,onBack}){
  if(!document.querySelector('link[data-error-progress]')){const css=el('link');css.rel='stylesheet';css.href='/quality-error-progress.css';css.dataset.errorProgress='1';document.head.append(css);}
  const back=el('button','← Démarche qualité','btn');back.type='button';back.onclick=onBack;
- const area=el('div'),error=el('p','','error');error.setAttribute('role','alert');container.replaceChildren(back,el('h3','Recueil des erreurs de délivrance'),area,error);
+ const area=el('div'),error=el('p','','error');error.setAttribute('role','alert');container.replaceChildren(back,el('h3','Suivi des erreurs de délivrance'),area,error);
  const current=()=>isCurrent()&&container.contains(area);let data,query='',sortKey='identified_date',sortDirection='desc',statusFilter='';
  const run=async fn=>{error.textContent='';try{await fn();}catch(e){if(current())error.textContent=e.message;}};
  const load=async()=>{data=await api('/api/quality/errors');if(current())draw();};
