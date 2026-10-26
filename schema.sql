@@ -519,7 +519,7 @@ ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS correction_note TEXT NOT NUL
 
 CREATE TABLE IF NOT EXISTS merchandising_promotions(
  id SERIAL PRIMARY KEY,
- month TEXT NOT NULL CHECK(month ~ '^20[0-9]{2}-(0[1-9]|1[0-2])$' AND month>='2026-12'),
+ month TEXT NOT NULL CHECK(month ~ '^20[0-9]{2}-(0[1-9]|1[0-2])$' AND month>='2026-11'),
  category TEXT NOT NULL CHECK(category IN ('TG','BS','IC','EV','SA','DS')),
  title TEXT NOT NULL,laboratory_id INTEGER REFERENCES laboratories(id) ON DELETE SET NULL,
  laboratory_name TEXT NOT NULL,eans JSONB NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(eans)='array'),
@@ -607,3 +607,41 @@ CREATE TABLE IF NOT EXISTS merchandising_product_name_events(
 );
 
 ALTER TABLE merchandising_promotions ADD COLUMN IF NOT EXISTS prices JSONB NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(prices)='object');
+
+-- November 2026: one-time migration of validated legacy offers. October and all
+-- other months are left unchanged; the original November values are archived.
+ALTER TABLE merchandising_promotions DROP CONSTRAINT IF EXISTS merchandising_promotions_month_check;
+ALTER TABLE merchandising_promotions ADD CONSTRAINT merchandising_promotions_month_check CHECK(month ~ '^20[0-9]{2}-(0[1-9]|1[0-2])$' AND month>='2026-11');
+CREATE TABLE IF NOT EXISTS merchandising_november_2026_backup(
+ zone_id INTEGER PRIMARY KEY,offer TEXT NOT NULL,laboratory TEXT,approval JSONB,
+ captured_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+DO $november$
+BEGIN
+ IF NOT EXISTS (SELECT 1 FROM portal_data_operations WHERE key='merch-promotions-november-2026-v1') THEN
+  LOCK TABLE merchandising_zones IN SHARE ROW EXCLUSIVE MODE;
+  IF EXISTS (SELECT 1 FROM merchandising_promotions WHERE month='2026-11') THEN
+   RAISE EXCEPTION 'Migration novembre interrompue : des fiches novembre existent déjà';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM merchandising_zones WHERE btrim(COALESCE(months->>'2026-11',''))<>'') OR
+     EXISTS (SELECT 1 FROM merchandising_zones WHERE btrim(COALESCE(months->>'2026-11',''))<>'' AND (NOT COALESCE((month_approvals->'2026-11'->>'validated')::boolean,false) OR char_length(btrim(months->>'2026-11'))>200)) THEN
+   RAISE EXCEPTION 'Migration novembre interrompue : vérifiez les validations et les intitulés';
+  END IF;
+  INSERT INTO merchandising_november_2026_backup(zone_id,offer,laboratory,approval)
+   SELECT id,months->>'2026-11',month_labs->>'2026-11',month_approvals->'2026-11'
+   FROM merchandising_zones WHERE btrim(COALESCE(months->>'2026-11',''))<>'';
+  INSERT INTO merchandising_promotions(month,category,title,laboratory_id,laboratory_name,eans,zone_id,creator_name,assigned_name,assigned_at,origin_key)
+   SELECT '2026-11',
+    CASE WHEN z.id<=10 OR z.id=24 THEN 'TG' WHEN z.id<=18 THEN 'IC' WHEN z.id<=22 THEN 'BS' WHEN z.id=23 THEN 'EV' WHEN z.id<=28 THEN 'SA' ELSE 'DS' END,
+    btrim(z.months->>'2026-11'),
+    (SELECT l.id FROM laboratories l WHERE lower(l.name)=lower(COALESCE(z.month_labs->>'2026-11','')) ORDER BY l.id LIMIT 1),
+    COALESCE(z.month_labs->>'2026-11',''),
+    COALESCE((SELECT jsonb_agg(DISTINCT (m.c)[2]) FROM regexp_matches(z.months->>'2026-11','(^|[^0-9])([0-9]{13})(?=$|[^0-9])','g') AS m(c)),'[]'::jsonb),
+    z.id,COALESCE(z.month_approvals->'2026-11'->>'modifiedBy','Planning existant'),
+    z.month_approvals->'2026-11'->>'validatedBy',
+    (z.month_approvals->'2026-11'->>'validatedAt')::timestamptz,
+    z.id::text||':2026-11'
+   FROM merchandising_zones z WHERE btrim(COALESCE(z.months->>'2026-11',''))<>'';
+  INSERT INTO portal_data_operations(key) VALUES('merch-promotions-november-2026-v1');
+ END IF;
+END $november$;

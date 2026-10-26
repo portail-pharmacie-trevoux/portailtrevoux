@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';
 import {promotionMonth,promotionCategory,promotionFields,registerMerchandisingPromotions} from '../merchandising-promotions.mjs';
 const fail=(status,message)=>Object.assign(Error(message),{status});
-test('New promotion workflow starts in December 2026 and validates categories, laboratories and optional EAN lines',()=>{
- assert.equal(promotionMonth('2026-12'),'2026-12');assert.equal(promotionMonth('2027-01'),'2027-01');for(const m of ['2026-11','2026-13','bad'])assert.throws(()=>promotionMonth(m));
+test('New promotion workflow starts in November 2026 and validates categories, laboratories and optional EAN lines',()=>{
+ assert.equal(promotionMonth('2026-11'),'2026-11');assert.equal(promotionMonth('2026-12'),'2026-12');assert.equal(promotionMonth('2027-01'),'2027-01');for(const m of ['2026-10','2026-13','bad'])assert.throws(()=>promotionMonth(m));
  assert.equal(promotionCategory(24),'TG');assert.equal(promotionCategory(19),'BS');assert.equal(promotionCategory(29),'DS');assert.equal(promotionCategory(31),null);
  const b={category:'TG',title:' Offre ',laboratoryId:1,eans:''};assert.deepEqual(promotionFields(b).eans,[]);assert.deepEqual(promotionFields({...b,eans:undefined}).eans,[]);assert.equal(promotionFields(b).title,'Offre');assert.deepEqual(promotionFields({...b,eans:'0123456789012\n1234567890123\n0123456789012'}).eans,['0123456789012','1234567890123']);
  for(const v of [{...b,eans:'123'},{...b,eans:['123456789012a']},{...b,laboratoryId:null,laboratoryOther:''},{...b,category:'XX'},{...b,title:''}])assert.throws(()=>promotionFields(v));assert.equal(promotionFields({...b,laboratoryId:null,laboratoryOther:'Autre labo'}).laboratoryOther,'Autre labo');
@@ -20,3 +20,4 @@ test('Deleting an assigned promotion is reserved to referent/admin and atomicall
  const pass=(q,s,n)=>{q.auth={id:2,name:'Opérateur',role};n();};registerMerchandisingPromotions({app,db,auth:pass,ready:pass,csrf:pass,view:pass,fail});app.use((e,q,s,n)=>s.status(e.status||500).json({error:e.message}));const server=app.listen(0);t.after(()=>server.close());const remove=revision=>fetch('http://127.0.0.1:'+server.address().port+'/api/merchandising/promotions/1',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({revision})});
  assert.equal((await remove(3)).status,403);assert.equal(cleared,false);assert.equal(deleted,false);allowed=true;assert.equal((await remove(2)).status,409);assert.equal(cleared,false);assert.equal((await remove(3)).status,200);assert.ok(cleared&&deleted&&logged);cleared=deleted=logged=false;allowed=false;role='admin';assert.equal((await remove(3)).status,200);assert.ok(cleared&&deleted&&logged);
 });
+
