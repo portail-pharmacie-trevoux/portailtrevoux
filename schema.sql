@@ -563,3 +563,28 @@ WITH pending AS (
  AND COALESCE(z.months->>p.month,'')=p.title AND NOT COALESCE((z.month_approvals->p.month->>'validated')::boolean,FALSE)
  GROUP BY split_part(p.origin_key,':',1)::int
 ) UPDATE merchandising_zones z SET months=z.months-pending.keys,month_labs=z.month_labs-pending.keys,revision=z.revision+1 FROM pending WHERE z.id=pending.id;
+
+-- One-time removal explicitly requested on 26 October 2026. Only the seven
+-- already validated fiches are targeted; future tests and pending proposals stay.
+CREATE TABLE IF NOT EXISTS portal_data_operations(
+ key TEXT PRIMARY KEY,performed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+WITH run AS (
+ INSERT INTO portal_data_operations(key) VALUES('merch-remove-validated-december-20261026')
+ ON CONFLICT(key) DO NOTHING RETURNING key
+), removed AS (
+ DELETE FROM merchandising_promotions
+ WHERE id=ANY(ARRAY[1,2,3,4,5,6,7]) AND month>='2026-12' AND zone_id IS NOT NULL
+ AND EXISTS(SELECT 1 FROM run) RETURNING *
+), slots AS (
+ SELECT zone_id,array_agg(month) AS months FROM removed GROUP BY zone_id
+), cleared AS (
+ UPDATE merchandising_zones z SET months=z.months-slots.months,
+ month_labs=z.month_labs-slots.months,month_approvals=z.month_approvals-slots.months,
+ revision=z.revision+1 FROM slots WHERE z.id=slots.zone_id RETURNING z.id
+), logged AS (
+ INSERT INTO merchandising_promotion_events(promotion_id,action,from_zone,to_zone,operator_name,snapshot)
+ SELECT NULL,'deleted',zone_id,NULL,'Suppression demandée par l’administrateur',to_jsonb(removed) FROM removed
+ RETURNING id
+) SELECT (SELECT count(*) FROM removed) AS removed_promotions,
+ (SELECT count(*) FROM cleared) AS cleared_zones,(SELECT count(*) FROM logged) AS audit_events;
