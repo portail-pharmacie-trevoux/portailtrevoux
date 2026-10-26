@@ -10,7 +10,7 @@ const date=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris
 export async function renderNews({container,api,isAdmin=false,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{},onOpenOrders=()=>{},onOpenMerchandising=()=>{}}){
   const [recipients,initialMessages,initialSent]=await Promise.all([api('/api/news/recipients'),api('/api/news'),api('/api/news/sent')]);
   if(!isCurrent())return;
-  const expandedMessages=new Set(),expandedThreads=new Set(),threadCache=new Map();let sentMessages=initialSent,view='inbox',replyTo=null;let messages=initialMessages,filter='all',request=0,sending=false;
+  const expandedMessages=new Set(),expandedThreads=new Set(),threadCache=new Map();let sentMessages=initialSent,view='inbox',replyTo=null;let messages=initialMessages,filter='unseen',request=0,sending=false;
   const note=node('p','Les messages non archivés disparaissent automatiquement au bout de 15 jours. Cochez « Archiver » pour conserver un message dans votre espace.','news-retention');
   const layout=node('div','','news-layout'),compose=node('section','','news-compose'),inbox=node('section','','news-inbox');
   const form=node('form'),composeTitle=node('h3','Envoyer un message court'),replyContext=node('p','','field-note');replyContext.hidden=true;form.append(composeTitle,replyContext);
@@ -44,7 +44,7 @@ export async function renderNews({container,api,isAdmin=false,isCurrent=()=>true
   const list=node('div','','news-message-list');list.setAttribute('aria-live','polite');
   const filterLabel=node('label','Afficher');filterLabel.htmlFor='news-filter';
   const selector=node('select');selector.id='news-filter';
-  [['all','Tous les messages'],['unseen','Non vus'],['current','Non archivés'],['archived','Archivés']].forEach(([value,label])=>{const option=node('option',label);option.value=value;selector.append(option);});
+  [['all','Tous les messages'],['unseen','Non vus'],['current','Non archivés'],['archived','Archivés']].forEach(([value,label])=>{const option=node('option',label);option.value=value;selector.append(option);});selector.value=filter;
   const inboxError=node('p','','error');inboxError.setAttribute('role','alert');
   const redraw=()=>{
     list.replaceChildren();
