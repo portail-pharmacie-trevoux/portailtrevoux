@@ -4,7 +4,7 @@ export function renderPromotionLabel({container,promotion=null,month='',api=null
  const defaults={date:'',slogan:'',old:'',sale:'',unit:'',name:'',photo:'',logo1:'',logo2:''};
  let data={...defaults};if(!promotion)try{data={...data,...JSON.parse(localStorage.getItem(key)||'{}')}}catch{}
  const root=document.createElement('section');root.className='promo-editor';
- if(!document.querySelector('link[data-promo-editor]')){const style=document.createElement('link');style.rel='stylesheet';style.href='/promotion-label-editor.css?v=20261026-reperes';style.dataset.promoEditor='1';document.head.append(style)}
+ if(!document.querySelector('link[data-promo-editor]')){const style=document.createElement('link');style.rel='stylesheet';style.href='/promotion-label-editor.css?v=20261026-prix-central';style.dataset.promoEditor='1';document.head.append(style)}
  const heading=document.createElement('h3');heading.textContent='Étiquette promotionnelle personnalisable';
  const note=document.createElement('p');note.textContent='Format fixe horizontal : 105 × 99,6 mm (estimation issue du modèle). Les repères ne sont pas imprimés. Deux étiquettes par feuille A4.';note.className='field-note';
  const controls=document.createElement('div');controls.className='promo-controls';const fieldInputs={};
