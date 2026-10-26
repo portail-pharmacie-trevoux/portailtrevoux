@@ -37,6 +37,6 @@ export function renderPromotionLabel({container}){
  const print=document.createElement('button');print.className='btn';print.textContent='Imprimer deux étiquettes sur A4';print.onclick=()=>window.print();
  const reset=document.createElement('button');reset.className='btn';reset.textContent='Vider les champs';reset.onclick=()=>{if(!confirm('Effacer les données de cette étiquette ?'))return;data={...defaults};localStorage.removeItem(key);controls.querySelectorAll('input').forEach(i=>{i.value=''});update()};
  buttons.append(draft,print,reset);
- const sheet=document.createElement('div');sheet.className='promo-sheet';sheet.append(preview);
+ const sheet=document.createElement('div');sheet.className='promo-sheet';sheet.append(preview);const second=preview.cloneNode(true);second.setAttribute('aria-hidden','true');second.classList.add('promo-print-copy');sheet.append(second);const refreshCopy=()=>{second.innerHTML=preview.innerHTML};const originalUpdate=update;update=()=>{originalUpdate();refreshCopy()};
  root.append(heading,note,controls,buttons,status,sheet);container.replaceChildren(root);update();
 }
