@@ -588,3 +588,5 @@ WITH run AS (
  RETURNING id
 ) SELECT (SELECT count(*) FROM removed) AS removed_promotions,
  (SELECT count(*) FROM cleared) AS cleared_zones,(SELECT count(*) FROM logged) AS audit_events;
+
+ALTER TABLE merchandising_promotions ADD COLUMN IF NOT EXISTS stocks JSONB NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(stocks)='object');
