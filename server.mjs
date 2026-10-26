@@ -1,3 +1,4 @@
+import {createWebProductSearch} from './merchandising-web-identity.mjs';
 import {registerTrainingAttestationImport} from './training-attestation-import.mjs';
 import {registerMessageAutomationAdmin} from './message-automation-admin.mjs';
 import {ensureMessageAutomations} from './message-automation-defaults.mjs';
@@ -88,12 +89,13 @@ export function createApp(db,config) {
     await db.query('INSERT INTO publications(universe,title,source_key) VALUES($1,$2,$3) ON CONFLICT(source_key) DO NOTHING',[universe,title,key]);
   }
   const products=createProductSources({origin,serpKey:config.serpKey});
+  const merchandisingSearch=createWebProductSearch({readKey:async()=>{if(config.openaiKey)return config.openaiKey;const row=(await db.query("SELECT value FROM settings WHERE key='employee_import_openai_key'")).rows[0];return row?decrypt(row.value,secret).key:null;},model:config.merchProductSearchModel||'gpt-4.1-mini'});
   const testerAccess=registerTesterAccess({app,db,auth,ready,admin,csrf,fail,secure});
   registerPortalQuickLinks({app,db,auth,ready,admin,csrf,fail});
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser:express.json({limit:'70mb'})});
-  registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify,products});
+  registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify,searchWeb:merchandisingSearch});
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
   registerTiersPayant({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'200kb'})});
   registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
@@ -379,7 +381,7 @@ export async function initialize(db,config){
   await announceVersion11(db);
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
-  const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,procedureFilesImport:env.PROCEDURE_FILES_IMPORT_JSON,laboratoryImport:env.LABORATORIES_IMPORT_JSON,laboratoryLogosImport:env.LABORATORY_LOGOS_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
+  const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,merchProductSearchModel:env.MERCH_PRODUCT_SEARCH_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,procedureFilesImport:env.PROCEDURE_FILES_IMPORT_JSON,laboratoryImport:env.LABORATORIES_IMPORT_JSON,laboratoryLogosImport:env.LABORATORY_LOGOS_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   // Render lance directement node server.mjs : préparer les médias avant de servir le portail.

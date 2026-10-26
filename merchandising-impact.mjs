@@ -1,5 +1,5 @@
 import {previousYearDate,impactFinancials,impactAnalysis} from './public/merchandising-impact-model.js';
-import {registerMerchandisingProductLookup} from './merchandising-product-lookup.mjs';
+import {registerMerchandisingProductLookup,resolveImpactProductNames} from './merchandising-product-lookup.mjs';
 export const promotionStockSnapshot=p=>(p?.eans||[]).map(ean=>({ean,stockBeforePromotion:p.stocks?.[ean]??null}));
 const invalid=message=>Object.assign(Error(message),{status:400});
 export const impactMonth=value=>{if(typeof value!=='string'||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(value))throw invalid('Choisissez un mois valide.');return value;};
@@ -24,17 +24,20 @@ export function validateImpact(body,zoneCount=30){
  if(!['pending','success','improve','failure'].includes(body.conclusion))throw invalid('Conclusion invalide.');if(typeof body.notes!=='string'||body.notes.length>3000)throw invalid('Commentaire limité à 3 000 caractères.');data.conclusion=body.conclusion;data.notes=body.notes.trim();return{month,zoneId,revision,data};
 }
 export function impactMeasures(data){const metric=(a,b)=>{if(data[a]===null||data[a]===undefined||data[b]===null||data[b]===undefined)return null;const before=data[a]/data.referenceDays,after=data[b]/data.promotionDays;return{before,after,change:after-before,percent:before===0?null:(after-before)/before*100};};return{units:metric('referenceUnits','promotionUnits'),revenue:metric('referenceRevenue','promotionRevenue')};}
-export function registerMerchandisingImpact({app,db,auth,ready,csrf,view,edit,fail,canEdit,zoneCount,products}){
- registerMerchandisingProductLookup({app,db,auth,ready,view,fail,products});
- app.get('/api/merchandising/impact',auth,ready,view,async(req,res)=>{const month=impactMonth(req.query.month);const rows=(await db.query('SELECT * FROM merchandising_impact WHERE month=$1 ORDER BY zone_id',[month])).rows;const promotions=month>='2026-12'?(await db.query('SELECT id,zone_id,title,eans,stocks FROM merchandising_promotions WHERE month=$1 AND zone_id IS NOT NULL',[month])).rows:[];res.json({promotions,canEdit:canEdit(req.auth),evaluations:rows.map(r=>({...r,measures:impactMeasures(r.data),analysis:impactAnalysis(r.data)}))});});
+export function registerMerchandisingImpact({app,db,auth,ready,csrf,view,edit,fail,canEdit,zoneCount,searchWeb,canManageProductNames=async user=>user?.role==='admin'}){
+ registerMerchandisingProductLookup({app,db,auth,ready,csrf,view,fail,searchWeb,canManage:canManageProductNames});
+ app.get('/api/merchandising/impact',auth,ready,view,async(req,res)=>{const month=impactMonth(req.query.month);const rows=(await db.query('SELECT * FROM merchandising_impact WHERE month=$1 ORDER BY zone_id',[month])).rows;const promotions=month>='2026-12'?(await db.query('SELECT id,zone_id,title,eans,stocks FROM merchandising_promotions WHERE month=$1 AND zone_id IS NOT NULL',[month])).rows:[];res.json({canManageProductNames:await canManageProductNames(req.auth),promotions,canEdit:canEdit(req.auth),evaluations:rows.map(r=>({...r,measures:impactMeasures(r.data),analysis:impactAnalysis(r.data)}))});});
  app.put('/api/merchandising/impact',auth,ready,edit,csrf,async(req,res)=>{
   const value=validateImpact(req.body,zoneCount),zone=(await db.query('SELECT id,name,months,month_labs FROM merchandising_zones WHERE id=$1',[value.zoneId])).rows[0];let offer=zone?.months?.[value.month],prior=null;if(!offer?.trim()&&value.revision>0)prior=(await db.query('SELECT zone_name,offer,laboratory,data FROM merchandising_impact WHERE zone_id=$1 AND month=$2',[value.zoneId,value.month])).rows[0];if(prior)offer=prior.offer;if(!offer?.trim())throw fail(409,'Renseignez d’abord l’opération de ce mois dans l’organisation de l’espace vente.');
+  let previousImpactData=prior?.data||null;
   if(value.month>='2026-12'){
    const previous=value.revision>0?(prior?.data||(await db.query('SELECT data FROM merchandising_impact WHERE zone_id=$1 AND month=$2 AND revision=$3',[value.zoneId,value.month,value.revision])).rows[0]?.data):null;
+   previousImpactData=previous;
    if(Array.isArray(previous?.productStocks)){value.data.productStocks=previous.productStocks;value.data.promotionId=previous.promotionId??null;}
    else{const promotion=(await db.query('SELECT id,eans,stocks FROM merchandising_promotions WHERE zone_id=$1 AND month=$2',[value.zoneId,value.month])).rows[0];value.data.productStocks=promotionStockSnapshot(promotion);value.data.promotionId=promotion?.id??null;}
   }
   const knownEANs=new Set((value.data.productStocks||[]).map(p=>p.ean));value.data.productNames=Object.fromEntries(Object.entries(value.data.productNames).filter(([ean])=>knownEANs.has(ean)));
+  value.data.productNames=await resolveImpactProductNames({db,user:req.auth,names:value.data.productNames,previousNames:previousImpactData?.productNames||{},canManage:canManageProductNames});value.data.productNames=Object.fromEntries(Object.entries(value.data.productNames).filter(([ean])=>knownEANs.has(ean)));
   const args=[value.zoneId,value.month,prior?.zone_name||zone.name,offer,prior?.laboratory??zone.month_labs?.[value.month]??'',JSON.stringify(value.data),req.auth.id,value.revision];
   const row=(await db.query(value.revision===0?`INSERT INTO merchandising_impact(zone_id,month,zone_name,offer,laboratory,data,updated_by) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7) ON CONFLICT(zone_id,month) DO NOTHING RETURNING *`:`UPDATE merchandising_impact SET data=$6::jsonb,updated_by=$7,updated_at=now(),revision=revision+1 WHERE zone_id=$1 AND month=$2 AND revision=$8 AND $3::text IS NOT NULL AND $4::text IS NOT NULL AND $5::text IS NOT NULL RETURNING *`,value.revision===0?args.slice(0,7):args)).rows[0];
   if(!row)throw fail(409,'Ce bilan a été modifié. Rechargez-le avant de poursuivre.');res.json({...row,measures:impactMeasures(row.data),analysis:impactAnalysis(row.data)});

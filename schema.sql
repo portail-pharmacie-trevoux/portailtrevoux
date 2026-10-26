@@ -595,3 +595,13 @@ CREATE TABLE IF NOT EXISTS merchandising_product_names(
  ean TEXT PRIMARY KEY CHECK(ean ~ '^[0-9]{13}$'),data JSONB NOT NULL,
  checked_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS merchandising_product_overrides(
+ ean TEXT PRIMARY KEY CHECK(ean ~ '^[0-9]{13}$'),name TEXT NOT NULL CHECK(char_length(name)<=300),
+ revision INTEGER NOT NULL DEFAULT 1,updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ updated_name TEXT NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS merchandising_product_name_events(
+ id BIGSERIAL PRIMARY KEY,ean TEXT NOT NULL,previous_name TEXT NOT NULL,name TEXT NOT NULL,
+ operator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,operator_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
