@@ -617,3 +617,8 @@ body>header .account-actions .btn:focus-visible,body>header #portal-home:focus-v
 @media(max-width:1050px){.grid>.tile.primary-space{grid-column:span 4}}
 @media(max-width:800px){.grid>.tile.primary-space{grid-column:span 6}.grid>.tile.compact-space{grid-column:span 4;padding:14px 12px}#home .grid>.tile.compact-space>strong{font-size:14px}}
 @media(max-width:560px){.grid>.tile.primary-space{padding:18px;min-height:190px}.grid>.tile.compact-space,.grid>.tile.calculation-tools.compact-space{grid-column:1 / -1;min-height:96px;padding:14px 16px}#home .grid>.tile.compact-space>strong{font-size:16px}}
+
+/* Retour aux univers : même violet que l’accès Administration. */
+#back.btn{background:#6d429c;border-color:#593185;color:#fff;font-weight:700}
+#back.btn:hover{background:#593185}
+#back.btn:focus-visible{outline:3px solid #34204b;outline-offset:3px}
