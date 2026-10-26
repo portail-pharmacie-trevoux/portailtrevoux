@@ -516,3 +516,50 @@ CREATE INDEX IF NOT EXISTS training_attestation_reads_user_time ON training_atte
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120);
 
 ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS correction_note TEXT NOT NULL DEFAULT '' CHECK(char_length(correction_note)<=100);
+
+CREATE TABLE IF NOT EXISTS merchandising_promotions(
+ id SERIAL PRIMARY KEY,
+ month TEXT NOT NULL CHECK(month ~ '^20[0-9]{2}-(0[1-9]|1[0-2])$' AND month>='2026-12'),
+ category TEXT NOT NULL CHECK(category IN ('TG','BS','IC','EV','SA','DS')),
+ title TEXT NOT NULL,laboratory_id INTEGER REFERENCES laboratories(id) ON DELETE SET NULL,
+ laboratory_name TEXT NOT NULL,eans JSONB NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(eans)='array'),
+ zone_id INTEGER REFERENCES merchandising_zones(id),
+ created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,creator_name TEXT NOT NULL,
+ assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,assigned_name TEXT,assigned_at TIMESTAMPTZ,
+ updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ revision INTEGER NOT NULL DEFAULT 1,origin_key TEXT UNIQUE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS merchandising_promotion_slot ON merchandising_promotions(month,zone_id) WHERE zone_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS merchandising_promotion_month ON merchandising_promotions(month);
+CREATE TABLE IF NOT EXISTS merchandising_promotion_events(
+ id BIGSERIAL PRIMARY KEY,promotion_id INTEGER REFERENCES merchandising_promotions(id) ON DELETE SET NULL,
+ action TEXT NOT NULL,from_zone INTEGER,to_zone INTEGER,
+ operator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,operator_name TEXT NOT NULL,
+ snapshot JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Preserve existing future offers once. Generated monthly projections carry promotionId and are never reimported.
+INSERT INTO merchandising_promotions(month,category,title,laboratory_id,laboratory_name,zone_id,creator_name,assigned_name,assigned_at,origin_key)
+SELECT m.key,CASE WHEN z.id<=10 OR z.id=24 THEN 'TG' WHEN z.id<=18 THEN 'IC' WHEN z.id<=22 THEN 'BS' WHEN z.id=23 THEN 'EV' WHEN z.id<=28 THEN 'SA' ELSE 'DS' END,
+ m.value,(SELECT l.id FROM laboratories l WHERE l.name=COALESCE(z.month_labs->>m.key,'') ORDER BY l.id LIMIT 1),
+ COALESCE(z.month_labs->>m.key,''),CASE WHEN COALESCE((z.month_approvals->m.key->>'validated')::boolean,FALSE) THEN z.id ELSE NULL END,
+ COALESCE(z.month_approvals->m.key->>'modifiedBy','Planning existant'),z.month_approvals->m.key->>'validatedBy',
+ CASE WHEN COALESCE((z.month_approvals->m.key->>'validated')::boolean,FALSE) THEN COALESCE((z.month_approvals->m.key->>'validatedAt')::timestamptz,now()) ELSE NULL END,
+ z.id::text||':'||m.key
+FROM merchandising_zones z CROSS JOIN LATERAL jsonb_each_text(z.months) m
+WHERE m.key>='2026-12' AND btrim(m.value)<>'' AND NOT (COALESCE(z.month_approvals->m.key,'{}'::jsonb)?'promotionId')
+ON CONFLICT(origin_key) DO NOTHING;
+-- Attach the imported ID to its projection without changing existing approval stamps.
+WITH tags AS (
+ SELECT zone_id,jsonb_object_agg(month,COALESCE(z.month_approvals->p.month,'{}'::jsonb)||jsonb_build_object('promotionId',p.id)) AS approvals
+ FROM merchandising_promotions p JOIN merchandising_zones z ON z.id=p.zone_id
+ WHERE p.origin_key IS NOT NULL AND NOT (COALESCE(z.month_approvals->p.month,'{}'::jsonb)?'promotionId') GROUP BY zone_id
+) UPDATE merchandising_zones z SET month_approvals=z.month_approvals||tags.approvals FROM tags WHERE z.id=tags.zone_id;
+-- Former unvalidated future entries become pending proposals. Keep their content in the new fiche.
+WITH pending AS (
+ SELECT split_part(p.origin_key,':',1)::int AS id,array_agg(p.month) AS keys
+ FROM merchandising_promotions p JOIN merchandising_zones z ON z.id=split_part(p.origin_key,':',1)::int
+ WHERE p.origin_key IS NOT NULL AND p.zone_id IS NULL AND NOT (COALESCE(z.month_approvals->p.month,'{}'::jsonb)?'promotionId')
+ AND COALESCE(z.months->>p.month,'')=p.title AND NOT COALESCE((z.month_approvals->p.month->>'validated')::boolean,FALSE)
+ GROUP BY split_part(p.origin_key,':',1)::int
+) UPDATE merchandising_zones z SET months=z.months-pending.keys,month_labs=z.month_labs-pending.keys,revision=z.revision+1 FROM pending WHERE z.id=pending.id;
