@@ -514,3 +514,5 @@ CREATE TABLE IF NOT EXISTS training_attestation_reads(user_id INTEGER NOT NULL R
 CREATE INDEX IF NOT EXISTS training_attestation_reads_user_time ON training_attestation_reads(user_id,requested_at);
 
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120);
+
+ALTER TABLE quality_errors ADD COLUMN IF NOT EXISTS correction_note TEXT NOT NULL DEFAULT '' CHECK(char_length(correction_note)<=100);
