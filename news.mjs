@@ -7,6 +7,11 @@ export function validateNewsExpiry(value,fail,now=new Date()){
 import {validateProcedureFile} from './procedure-files.mjs';
 import {validateEmployeeScan} from './employee-import.mjs';
 export function validateNewsAttachment(value,fail){if(value===undefined||value===null)return null;if(typeof value!=='object'||Array.isArray(value))throw fail(400,'Pièce jointe invalide.');return /\.(pdf|docx)$/i.test(value.fileName||'')?validateProcedureFile(value,fail):validateEmployeeScan(value,fail);}
+export function validateNewsTitle(value,fail){
+ if(value===undefined||value===null)return null;
+ if(typeof value!=='string'||Array.from(value.trim()).length>120||/[\r\n]/.test(value))throw fail(400,'Le titre doit tenir sur une ligne de 120 caractères maximum.');
+ return value.trim()||null;
+}
 export const messageLimit=500;
 export function validateMessage(body,fail){
   const text=typeof body?.text==='string'?body.text.trim():'';
@@ -34,7 +39,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    res.json((await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,COALESCE(m.automation_text,m.text) AS text,m.reminder_kind,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,
+    res.json((await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,COALESCE(m.automation_text,m.text) AS text,m.reminder_kind,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,
       CASE WHEN parent.sender_id=$1 AND ${newsDeadline('parent')}>now() THEN jsonb_build_object('text',parent.text,'createdAt',parent.created_at) ELSE NULL END AS reply_context,
       ${newsDeadline()} AS expires_at,r.seen,r.archived
       FROM team_message_recipients r JOIN team_messages m ON m.id=r.message_id LEFT JOIN team_messages parent ON parent.id=m.reply_to_id
@@ -43,14 +48,14 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.get('/api/news/sent',auth,ready,access,async(req,res)=>{
     await purgeNews(db);
-    const {rows}=await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,COALESCE(m.automation_text,m.text) AS text,m.reminder_kind,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,
+    const {rows}=await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,COALESCE(m.automation_text,m.text) AS text,m.reminder_kind,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,
       COALESCE(jsonb_agg(jsonb_build_object('id',r.user_id,'name',COALESCE(u.name,'Ancien collaborateur'),'seen',r.seen,'seenAt',r.seen_at,'archived',r.archived) ORDER BY u.name) FILTER(WHERE r.user_id IS NOT NULL),'[]'::jsonb) AS recipients
       FROM team_messages m LEFT JOIN team_message_recipients r ON r.message_id=m.id LEFT JOIN users u ON u.id=r.user_id
       WHERE m.sender_id=$1 AND ${newsDeadline()}>now() GROUP BY m.id ORDER BY m.created_at DESC,m.id DESC`,[req.auth.id]);res.json(rows);
   });
   app.get('/api/news/threads/:thread',auth,ready,access,async(req,res)=>{
     const thread=Number(req.params.thread);if(!Number.isSafeInteger(thread)||thread<1)throw fail(400,'Fil de discussion invalide.');
-    const rows=(await db.query(`SELECT m.id,m.sender_id,m.sender_name AS sender,COALESCE(m.automation_text,m.text) AS text,m.reminder_kind,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,r.seen,r.archived
+    const rows=(await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,COALESCE(m.automation_text,m.text) AS text,m.reminder_kind,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,r.seen,r.archived
       FROM team_messages m LEFT JOIN team_message_recipients r ON r.message_id=m.id AND r.user_id=$1
       WHERE COALESCE(m.thread_id,m.id)=$2 AND ((r.user_id=$1 AND (r.archived OR ${newsDeadline()}>now())) OR (m.sender_id=$1 AND ${newsDeadline()}>now()))
       ORDER BY m.created_at DESC,m.id DESC LIMIT 201`,[req.auth.id,thread])).rows;
@@ -59,7 +64,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
   });
   app.post('/api/news',auth,ready,access,csrf,uploadParser||((req,res,next)=>next()),async(req,res)=>{
     const attachment=validateNewsAttachment(req.body?.attachment,fail);
-    const {text,recipients,priority}=validateMessage(req.body,fail);const expiresOn=validateNewsExpiry(req.body.expiresOn,fail);const replyTo=req.body.replyTo??null;if(replyTo!==null&&(!Number.isSafeInteger(replyTo)||replyTo<1))throw fail(400,'Message d’origine invalide.');
+    const {text,recipients,priority}=validateMessage(req.body,fail);const title=validateNewsTitle(req.body.title,fail);const expiresOn=validateNewsExpiry(req.body.expiresOn,fail);const replyTo=req.body.replyTo??null;if(replyTo!==null&&(!Number.isSafeInteger(replyTo)||replyTo<1))throw fail(400,'Message d’origine invalide.');
     // One atomic statement: every selected recipient must still be active.
     const {rows}=await db.query(`WITH targets AS MATERIALIZED (
       SELECT id FROM users WHERE active=TRUE AND id=ANY($1::int[]) FOR SHARE
@@ -67,13 +72,13 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
       SELECT p.id,p.sender_id,COALESCE(p.thread_id,p.id) AS thread_id FROM team_messages p JOIN team_message_recipients pr ON pr.message_id=p.id
       WHERE p.id=$9::int AND pr.user_id=$2 AND (pr.archived OR ${newsDeadline('p')}>now()) AND p.sender_id IS NOT NULL FOR SHARE OF p
     ), message AS (
-      INSERT INTO team_messages(sender_id,sender_name,text,priority,attachment_name,attachment_type,attachment_content,reply_to_id,is_reply,expires_on,thread_id)
-      SELECT $2,$3,$4,$5,$6,$7,$8,$9::int,$9::int IS NOT NULL,$10::date,(SELECT thread_id FROM parent) WHERE (SELECT COUNT(*) FROM targets)=cardinality($1::int[])
+      INSERT INTO team_messages(sender_id,sender_name,text,priority,attachment_name,attachment_type,attachment_content,reply_to_id,is_reply,expires_on,thread_id,title)
+      SELECT $2,$3,$4,$5,$6,$7,$8,$9::int,$9::int IS NOT NULL,$10::date,(SELECT thread_id FROM parent),$11::text WHERE (SELECT COUNT(*) FROM targets)=cardinality($1::int[])
       AND ($9::int IS NULL OR EXISTS(SELECT 1 FROM parent WHERE cardinality($1::int[])=1 AND parent.sender_id=ANY($1::int[]))) RETURNING id
     ), deliveries AS (
       INSERT INTO team_message_recipients(message_id,user_id)
       SELECT message.id,targets.id FROM message CROSS JOIN targets RETURNING message_id
-    ) SELECT message.id,(SELECT COUNT(*)::int FROM deliveries) AS sent FROM message`,[recipients,req.auth.id,req.auth.name,text,priority,attachment?.fileName||null,attachment?.fileType||null,attachment?.bytes||null,replyTo,expiresOn]);
+    ) SELECT message.id,(SELECT COUNT(*)::int FROM deliveries) AS sent FROM message`,[recipients,req.auth.id,req.auth.name,text,priority,attachment?.fileName||null,attachment?.fileType||null,attachment?.bytes||null,replyTo,expiresOn,title]);
     if(!rows[0])throw fail(409,replyTo?'Le message d’origine est indisponible ou son expéditeur n’est plus actif. Actualisez les messages avant de répondre.':'Un destinataire n’est plus actif. Actualisez la liste avant de renvoyer le message.');
     res.status(201).json({ok:true,sent:rows[0].sent});
   });

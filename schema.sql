@@ -512,3 +512,5 @@ CREATE TABLE IF NOT EXISTS training_attestation_imports(
 CREATE INDEX IF NOT EXISTS training_attestation_imports_expiry ON training_attestation_imports(expires_at);
 CREATE TABLE IF NOT EXISTS training_attestation_reads(user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,requested_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS training_attestation_reads_user_time ON training_attestation_reads(user_id,requested_at);
+
+ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120);
