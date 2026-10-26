@@ -4,7 +4,7 @@ export function renderPromotionLabel({container}){
  const defaults={date:'',slogan:'',old:'',sale:'',unit:'',name:'',photo:'',logo1:'',logo2:''};
  let data={...defaults};try{data={...data,...JSON.parse(localStorage.getItem(key)||'{}')}}catch{}
  const root=document.createElement('section');root.className='promo-editor';
- if(!document.querySelector('link[data-promo-editor]')){const style=document.createElement('link');style.rel='stylesheet';style.href='/promotion-label-editor.css';style.dataset.promoEditor='1';document.head.append(style)}
+ if(!document.querySelector('link[data-promo-editor]')){const style=document.createElement('link');style.rel='stylesheet';style.href='/promotion-label-editor.css?v=20261026-reperes';style.dataset.promoEditor='1';document.head.append(style)}
  const heading=document.createElement('h3');heading.textContent='Étiquette promotionnelle personnalisable';
  const note=document.createElement('p');note.textContent='Format fixe horizontal : 105 × 99,6 mm (estimation issue du modèle). Les repères ne sont pas imprimés. Deux étiquettes par feuille A4.';note.className='field-note';
  const controls=document.createElement('div');controls.className='promo-controls';
@@ -15,7 +15,7 @@ export function renderPromotionLabel({container}){
   ['sale','7 · Prix promotionnel (€)','text'],['unit','8 · Prix au litre (€ / L)','text'],['name','9 · Intitulé produit','text']];
  const save=()=>{try{localStorage.setItem(key,JSON.stringify(data))}catch{status.textContent='Stockage local saturé : images trop volumineuses.'}};
  const cells={};for(const id of ['date','slogan','old','photo','logo1','logo2','sale','unit','name']){
-  const cell=document.createElement('div');cell.className='promo-zone promo-'+id;cell.dataset.zone=id;preview.append(cell);cells[id]=cell;
+  const cell=document.createElement('div');cell.className='promo-zone promo-'+id;cell.dataset.zone=id;cell.dataset.number=String(fields.findIndex(field=>field[0]===id)+1);preview.append(cell);cells[id]=cell;
  }
  const money=v=>{const s=String(v||'').trim();return s&&!s.includes('€')?s+' €':s};
  function update(){
