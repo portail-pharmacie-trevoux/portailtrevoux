@@ -1,3 +1,4 @@
+import {registerPromotionDocuments} from './merchandising-promotion-documents.mjs';
 import {canValidateMerchandising} from './merchandising-validation.mjs';
 export const promotionStart='2026-11';
 export const promotionCategory=id=>id>=1&&id<=10||id===24?'TG':id>=11&&id<=18?'IC':id>=19&&id<=22?'BS':id===23?'EV':id>=25&&id<=28?'SA':id>=29&&id<=30?'DS':null;
@@ -16,7 +17,8 @@ export function promotionFields(b){
 }
 const number=v=>{const n=Number(v);if(!Number.isSafeInteger(n)||n<1)throw bad('Fiche invalide.');return n;};
 const revision=b=>{if(!Number.isSafeInteger(b?.revision)||b.revision<1)throw bad('Version invalide.');return b.revision;};
-export function registerMerchandisingPromotions({app,db,auth,ready,csrf,view,fail}){
+export function registerMerchandisingPromotions({app,db,auth,ready,csrf,view,fail,uploadParser}){
+ registerPromotionDocuments({app,db,auth,ready,csrf,view,fail,uploadParser});
  const read=[auth,ready,view],write=[...read,csrf];
  const transaction=async fn=>{const c=await db.connect();try{await c.query('BEGIN');const result=await fn(c);await c.query('COMMIT');return result;}catch(e){await c.query('ROLLBACK');if(e.code==='23505')throw fail(409,'Cette zone est déjà occupée. Rechargez le plan.');throw e;}finally{c.release();}};
  const fetchLocked=async(c,req)=>{const id=number(req.params.id);const initial=(await c.query('SELECT month FROM merchandising_promotions WHERE id=$1',[id])).rows[0];if(!initial)throw fail(404,'Fiche introuvable.');await c.query('SELECT pg_advisory_xact_lock(78451027,hashtext($1))',[initial.month]);const p=(await c.query('SELECT * FROM merchandising_promotions WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!p||p.revision!==revision(req.body))throw fail(409,'Cette fiche a changé. Rechargez le mois.');return p;};

@@ -645,3 +645,10 @@ BEGIN
   INSERT INTO portal_data_operations(key) VALUES('merch-promotions-november-2026-v1');
  END IF;
 END $november$;
+
+CREATE TABLE IF NOT EXISTS merchandising_promotion_documents(
+ id BIGSERIAL PRIMARY KEY,promotion_id INTEGER NOT NULL REFERENCES merchandising_promotions(id) ON DELETE CASCADE,
+ file_name TEXT NOT NULL,file_type TEXT NOT NULL,file_content BYTEA NOT NULL,
+ created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS merchandising_promotion_documents_promotion ON merchandising_promotion_documents(promotion_id);
