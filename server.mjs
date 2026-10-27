@@ -373,6 +373,16 @@ export async function initialize(db,config){
   await announceVersion11(db);
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
+  // Scalingo staging safety gate: no database access, imports, mail, OAuth or scheduled jobs.
+  // Set SCALINGO_PREVIEW_SAFE_MODE=true explicitly until isolated staging is approved.
+  if(process.env.SCALINGO_PREVIEW_SAFE_MODE==='true'){
+    const preview=express();
+    preview.disable('x-powered-by');
+    preview.get('/',(_req,res)=>res.status(200).type('text/plain').send('Portail+ : environnement de préparation, application non activée.'));
+    preview.get('/health',(_req,res)=>res.status(200).json({status:'staging-only'}));
+    const server=preview.listen(Number(process.env.PORT)||3000,'0.0.0.0');
+    process.on('SIGTERM',()=>server.close());
+  }else{
   const env=process.env,config={youtrustKey:env.YOUTRUST_API_KEY,youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailEmail:env.MAIL_SENDER_EMAIL||'pharmacie.trevoux@gmail.com',openaiKey:env.OPENAI_API_KEY,employeeScanModel:env.EMPLOYEE_SCAN_MODEL,procedureImport:env.PROCEDURES_IMPORT_JSON,procedureFilesImport:env.PROCEDURE_FILES_IMPORT_JSON,laboratoryImport:env.LABORATORIES_IMPORT_JSON,laboratoryLogosImport:env.LABORATORY_LOGOS_IMPORT_JSON,serpKey:env.SERPAPI_KEY,origin:env.APP_URL||env.RENDER_EXTERNAL_URL,secret:env.APP_SECRET,adminEmail:env.ADMIN_EMAIL||'pharmacie.trevoux@gmail.com',adminPassword:env.ADMIN_PASSWORD,googleId:env.GOOGLE_CLIENT_ID,googleSecret:env.GOOGLE_CLIENT_SECRET,googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'pharmacie.trevoux@gmail.com'};
   if(!env.DATABASE_URL||!config.origin||!config.secret||config.secret.length<32)throw new Error('Renseignez DATABASE_URL, APP_URL (ou RENDER_EXTERNAL_URL) et APP_SECRET (32 caractères minimum).');
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
@@ -385,5 +395,6 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
   const timer=setInterval(tick,15*60000);void tick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
+  }
 }
 
