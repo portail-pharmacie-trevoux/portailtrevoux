@@ -422,6 +422,8 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   // session holds the advisory lock for the entire run; never use pool.query
   // for a session-level lock, since that could release the connection early.
   const scheduledTick=async()=>{
+    // No business reminders, mail, maintenance or sync on Scalingo without explicit approval.
+    if(env.SCALINGO_REQUIRE_DB_TLS==='true'&&env.SCALINGO_ENABLE_SCHEDULED_JOBS!=='true')return;
     if(env.SCALINGO_REQUIRE_DB_TLS!=='true')return tick(); // Preserve Render behavior.
     let client,locked=false;
     try{
