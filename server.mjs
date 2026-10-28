@@ -346,8 +346,9 @@ export function createApp(db,config) {
   return {app,sync,mailer,connectionHealth};
 }
 
-export async function initialize(db,config){
+export async function initialize(db,config,{technicalOnly=false}={}){
   await db.query(await readFile(new URL('./schema.sql',import.meta.url),'utf8'));
+  if(technicalOnly)return;
   await orderWeeklyReminders(db,config.secret);
   await sendOrderExample(db,config.secret);
   await qualityMonthlyReminders(db);
@@ -405,7 +406,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
     try{
       await startupLock.query('SELECT pg_advisory_lock(20261028, 2)');
       startupLocked=true;
-      await initialize(db,config);
+      await initialize(db,config,{technicalOnly:env.SCALINGO_ENABLE_BUSINESS_STARTUP!=='true'});
     }finally{
       if(startupLocked){
         try{await startupLock.query('SELECT pg_advisory_unlock(20261028, 2)');startupLock.release();}
