@@ -400,7 +400,30 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   const {app,sync,mailer,connectionHealth}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
   const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
-  const timer=setInterval(tick,15*60000);void tick();
+  // One scheduler across all Scalingo web containers. A dedicated PostgreSQL
+  // session holds the advisory lock for the entire run; never use pool.query
+  // for a session-level lock, since that could release the connection early.
+  const scheduledTick=async()=>{
+    if(env.SCALINGO_REQUIRE_DB_TLS!=='true')return tick(); // Preserve Render behavior.
+    let client,locked=false;
+    try{
+      client=await db.connect();
+      const result=await client.query('SELECT pg_try_advisory_lock(20261028, 1) AS acquired');
+      locked=result.rows[0]?.acquired===true;
+      if(locked)await tick();
+    }catch(err){
+      console.error('Exécution planifiée Scalingo impossible :',err.message);
+    }finally{
+      if(client){
+        if(locked){
+          try{await client.query('SELECT pg_advisory_unlock(20261028, 1)');}
+          catch(err){console.error('Libération du verrou planifié impossible :',err.message);client.release(true);client=null;}
+        }
+        if(client)client.release();
+      }
+    }
+  };
+  const timer=setInterval(()=>{void scheduledTick();},15*60000);void scheduledTick();
   process.on('SIGTERM',()=>{clearInterval(timer);server.close(()=>db.end());});
   }
 }
