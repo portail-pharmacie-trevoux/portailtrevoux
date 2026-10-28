@@ -396,7 +396,24 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
     for(const key of ['sslmode','sslcert','sslkey','sslrootcert'])databaseUrl.searchParams.delete(key);
   }
   const db=new pg.Pool({connectionString:databaseUrl?databaseUrl.toString():env.DATABASE_URL,max:10,...(scalingoTls?{ssl:{rejectUnauthorized:true}}:{})});
-  await initialize(db,config);config.dummyHash=await hashPassword(token());
+  if(scalingoTls){
+    // Serialize startup migrations/imports across Scalingo web replicas.
+    // A dedicated connection retains the session advisory lock while initialize()
+    // uses the pool; releasing it in finally also covers initialization failures.
+    const startupLock=await db.connect();
+    let startupLocked=false;
+    try{
+      await startupLock.query('SELECT pg_advisory_lock(20261028, 2)');
+      startupLocked=true;
+      await initialize(db,config);
+    }finally{
+      if(startupLocked){
+        try{await startupLock.query('SELECT pg_advisory_unlock(20261028, 2)');startupLock.release();}
+        catch(err){console.error('Libération du verrou de démarrage impossible :',err.message);startupLock.release(true);}
+      }else startupLock.release(true);
+    }
+  }else await initialize(db,config);
+  config.dummyHash=await hashPassword(token());
   const {app,sync,mailer,connectionHealth}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
   const tick=async()=>{try{await connectionHealth.checkMail();}catch{console.error('Connexion Gmail à vérifier.');}try{await orderWeeklyReminders(db,config.secret);await orderReminderEmails(db,mailer,config.origin);}catch{console.error('Rappels des commandes à vérifier.');}try{await challengeMonthlyReminders(db);}catch{console.error('Rappels des challenges à vérifier.');}try{await qualityMonthlyReminders(db);}catch{console.error('Rappels qualité à vérifier.');}try{await merchandisingFreeReminders(db);}catch{console.error('Rappel des emplacements merchandising à vérifier.');}try{await temperatureMaintenance(db);}catch{console.error('Suivi des températures à vérifier.');}try{await purgeNews(db);}catch{console.error('Messages à actualiser.');}try{await sync();await db.query('DELETE FROM sessions WHERE expires_at<now()');await db.query('DELETE FROM login_attempts WHERE until_at<now()');}catch{console.error('Synchronisation à vérifier dans le portail.');}};
