@@ -388,7 +388,14 @@ if(process.argv[1]===fileURLToPath(import.meta.url)){
   if(env.NODE_ENV==='production'&&!config.origin.startsWith('https://'))throw new Error('HTTPS requis en production.');
   // Render lance directement node server.mjs : préparer les médias avant de servir le portail.
   await import('./cache-portal-media.mjs');
-  const db=new pg.Pool({connectionString:env.DATABASE_URL,max:10});
+  // Scalingo-only opt-in. Render and other environments keep their existing connection behavior.
+  const scalingoTls=env.SCALINGO_REQUIRE_DB_TLS==='true';
+  const databaseUrl=scalingoTls?new URL(env.DATABASE_URL):null;
+  if(databaseUrl){
+    // node-postgres connection-string SSL parameters override the explicit ssl object.
+    for(const key of ['sslmode','sslcert','sslkey','sslrootcert'])databaseUrl.searchParams.delete(key);
+  }
+  const db=new pg.Pool({connectionString:databaseUrl?databaseUrl.toString():env.DATABASE_URL,max:10,...(scalingoTls?{ssl:{rejectUnauthorized:true}}:{})});
   await initialize(db,config);config.dummyHash=await hashPassword(token());
   const {app,sync,mailer,connectionHealth}=createApp(db,config);
   const server=app.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Portail démarré.'));
