@@ -7,6 +7,7 @@ export function registerMerchandisingValidation({app,db,auth,ready,csrf,view,fai
  app.put('/api/merchandising/:id/months/:month/validation',auth,ready,view,csrf,async(req,res)=>{
   if(!await canValidateMerchandising(db,req.auth))throw fail(403,'Validation réservée au référent Merchandising et aux administrateurs.');
   const id=Number(req.params.id),month=req.params.month,b=req.body;if(!Number.isInteger(id)||id<1||id>zoneCount||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)||typeof b?.validated!=='boolean'||!Number.isInteger(b.revision)||b.revision<1)throw fail(400,'Zone, mois, validation ou version invalide.');
+  if(month>='2026-12')throw fail(409,'À partir de décembre 2026, la validation est automatique lors de l’affectation d’une fiche promotion.');
   const row=(await db.query(`WITH changed AS (
    UPDATE merchandising_zones SET month_approvals=jsonb_set(month_approvals,ARRAY[$2::text],COALESCE(month_approvals->$2,'{}'::jsonb)||jsonb_build_object('validated',$3::boolean)||CASE WHEN $3::boolean THEN jsonb_build_object('validatedAt',now(),'validatedBy',$5::text) ELSE jsonb_build_object('invalidatedAt',now(),'invalidatedBy',$5::text) END),revision=revision+1
    WHERE id=$1 AND revision=$4 AND COALESCE((month_approvals->$2->>'validated')::boolean,FALSE) IS DISTINCT FROM $3::boolean AND (NOT $3::boolean OR btrim(COALESCE(months->>$2,''))<>'')
