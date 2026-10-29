@@ -27,7 +27,7 @@ try{
  gate.disable('x-powered-by');
  gate.use((req,res,next)=>{
    const api=req.path.startsWith('/api/')||req.path==='/api';
-   const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/users','/api/schedule'].includes(req.path));
+   const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates'].includes(req.path));
    if(api&&!permittedApi)return res.status(403).json({error:'Fonction désactivée dans la prévisualisation.'});
    if(!api&&!['GET','HEAD'].includes(req.method))return res.status(403).type('text/plain').send('Action non disponible.');
    next();
