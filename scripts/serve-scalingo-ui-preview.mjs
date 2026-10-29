@@ -30,6 +30,6 @@ try{
    next();
  });
  gate.use(app);
- const server=gate.listen(Number(env.PORT)||3000,'0.0.0.0',()=>console.log('Prévisualisation Portail+ restreinte active.'));
+ const server=gate.listen(Number(env.PORT)||3000,env.SCALINGO_PREVIEW_BIND_HOST==='127.0.0.1'?'127.0.0.1':'0.0.0.0',()=>console.log('Prévisualisation Portail+ restreinte active.'));
  process.on('SIGTERM',()=>server.close(()=>db.end()));
 }catch(err){await db.end();throw err;}
