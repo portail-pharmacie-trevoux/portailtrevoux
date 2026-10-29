@@ -28,6 +28,8 @@ try{
  gate.use((req,res,next)=>{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
+   // Phase 2 pilot: only local personal demo tasks; existing app auth and CSRF still apply.
+   if(['POST','PUT','DELETE'].includes(req.method)&&(/^\/api\/calendar\/tasks$/.test(req.path)&&req.method==='POST'||/^\/api\/calendar\/tasks\/\d+$/.test(req.path)&&['PUT','DELETE'].includes(req.method)))return next();
    if(req.method==='GET'&&/^\/api\/merchandising\/promotions\/\d+\/documents$/.test(req.path))return next();
    if(api&&!permittedApi)return res.status(403).json({error:'Fonction désactivée dans la prévisualisation.'});
    if(!api&&!['GET','HEAD'].includes(req.method))return res.status(403).type('text/plain').send('Action non disponible.');
