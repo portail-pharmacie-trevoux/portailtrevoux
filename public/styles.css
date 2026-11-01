@@ -622,3 +622,6 @@ body>header .account-actions .btn:focus-visible,body>header #portal-home:focus-v
 #back.btn{background:#6d429c;border-color:#593185;color:#fff;font-weight:700}
 #back.btn:hover{background:#593185}
 #back.btn:focus-visible{outline:3px solid #34204b;outline-offset:3px}
+
+
+.temperature-day{position:relative}.temperature-day-assessment{display:inline-flex;align-items:center;justify-content:center;margin-left:3px;width:17px;height:17px;border-radius:50%;background:white;font-size:14px;line-height:1;font-weight:800}.temperature-day-assessment.ok{color:#087b45}.temperature-day-assessment.problem{color:#b50017}.temperature-assessment{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:0;padding:0;margin:0 0 14px}.temperature-assessment legend{font-weight:600;margin-bottom:6px}.temperature-event label.temperature-assessment-option{display:inline-flex;gap:6px;align-items:center;padding:7px 12px;border:1px solid currentColor;border-radius:8px;cursor:pointer}.temperature-assessment-option.ok{color:#087b45}.temperature-assessment-option.problem{color:#b50017}

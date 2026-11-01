@@ -3,6 +3,11 @@ import {parseTemperatureWorkbook} from './temperature-xlsx.mjs';
 import {excursions,monthlySummary,parisStamp,stampMs} from './temperature-analysis.mjs';
 const universe="Outils d'aide à la démarche qualité";
 const today=()=>parisStamp(new Date().toISOString().slice(0,19).replace('T',' ')).slice(0,10);
+export function dayAssessment(events,marks,date){
+ const relevant=events.filter(e=>parisStamp(e.start).slice(0,10)<=date&&parisStamp(e.last).slice(0,10)>=date);
+ const statuses=relevant.map(e=>marks.filter(c=>c.happened_at>=e.start&&c.happened_at<=e.last&&['ok','problem'].includes(c.assessment)).at(-1)?.assessment || null);
+ return statuses.includes('problem')?'problem':statuses.length&&statuses.every(x=>x==='ok')?'ok':null;
+}
 export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser}){
  const read=[auth,ready,viewUniverse(universe)],write=[...read,csrf];
  const validMonth=m=>{if(typeof m!=='string'||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(m))throw fail(400,'Mois invalide.');return m;};
@@ -11,6 +16,20 @@ export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,
   const month=validMonth(req.query.month),sensors=(await db.query('SELECT * FROM temperature_sensors ORDER BY name,id')).rows;
   const readings=(await db.query(`SELECT sensor_id,${asStamp} AS time,value FROM temperature_readings WHERE recorded_at>=now()-interval '3 years' AND recorded_at>=($1||'-01')::date::timestamp AT TIME ZONE 'Europe/Paris' AND recorded_at<((($1||'-01')::date+interval '1 month')::timestamp AT TIME ZONE 'Europe/Paris') ORDER BY sensor_id,recorded_at`,[month])).rows;
   const summaries=sensors.map(s=>{const list=readings.filter(r=>r.sensor_id===s.id).map(r=>[r.time,r.value]);return {...s,...monthlySummary(list,month,s.low_threshold,s.high_threshold,today()),excursionCount:excursions(list,s.low_threshold,s.high_threshold).length};});
+  // Evaluate whole episodes, including those crossing midnight or the month boundary.
+  const alertSensors=summaries.filter(s=>s.days.some(d=>d.state==='alert'));
+  if(alertSensors.length){
+   const ids=alertSensors.map(s=>s.id);
+   const history=(await db.query(`SELECT sensor_id,${asStamp} AS time,value FROM temperature_readings WHERE sensor_id=ANY($1::text[]) AND recorded_at>=now()-interval '3 years' ORDER BY sensor_id,recorded_at`,[ids])).rows;
+   const annotations=(await db.query("SELECT sensor_id,to_char(happened_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') AS happened_at,assessment FROM temperature_comments WHERE sensor_id=ANY($1::text[]) AND happened_at>=now()-interval '3 years' AND assessment IN ('ok','problem') ORDER BY created_at,id",[ids])).rows;
+   for(const sensor of alertSensors){
+    const events=excursions(history.filter(r=>r.sensor_id===sensor.id).map(r=>[r.time,r.value]),sensor.low_threshold,sensor.high_threshold);
+    const marks=annotations.filter(c=>c.sensor_id===sensor.id);
+    for(const day of sensor.days.filter(d=>d.state==='alert')){
+     day.assessment=dayAssessment(events,marks,day.date);
+    }
+   }
+  }
   const imports=(await db.query('SELECT id,file_name,imported_at,operator_name,added,ignored,first_reading,last_reading FROM temperature_imports ORDER BY imported_at DESC LIMIT 8')).rows;
   const references=(await db.query("SELECT s.collaborator_name,u.name,u.active FROM quality_services s LEFT JOIN users u ON u.id=s.collaborator_id WHERE regexp_replace(lower(translate(s.service,'âàäéèêëîïôöùûüç','aaaeeeeiioouuuc')),'[^a-z]','','g')='chainedufroid'")).rows;
   const daily=(await db.query(`WITH samples AS (
@@ -27,7 +46,7 @@ export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,
   const month=validMonth(req.query.month),sensor=(await db.query('SELECT * FROM temperature_sensors WHERE id=$1',[req.params.sensor])).rows[0];if(!sensor)throw fail(404,'Sonde introuvable.');
   const all=(await db.query(`SELECT ${asStamp} AS time,value FROM temperature_readings WHERE sensor_id=$1 AND recorded_at>=now()-interval '3 years' ORDER BY recorded_at`,[sensor.id])).rows.map(r=>[r.time,r.value]);
   const events=excursions(all,sensor.low_threshold,sensor.high_threshold).filter(e=>parisStamp(e.start).slice(0,7)<=month&&parisStamp(e.last).slice(0,7)>=month);
-  const comments=(await db.query("SELECT id,to_char(happened_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') AS happened_at,text,created_at,operator_name FROM temperature_comments WHERE sensor_id=$1 AND happened_at>=now()-interval '3 years' ORDER BY created_at,id",[sensor.id])).rows;
+  const comments=(await db.query("SELECT id,to_char(happened_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') AS happened_at,text,created_at,operator_name,assessment FROM temperature_comments WHERE sensor_id=$1 AND happened_at>=now()-interval '3 years' ORDER BY created_at,id",[sensor.id])).rows;
   events.forEach(e=>e.comments=comments.filter(c=>c.happened_at>=e.start&&c.happened_at<=e.last));
   const readings=all.filter(r=>parisStamp(r[0]).slice(0,7)===month);const gaps=[];for(let i=1;i<all.length;i++){const seconds=(stampMs(all[i][0])-stampMs(all[i-1][0]))/1000;if(seconds>900&&parisStamp(all[i][0]).slice(0,7)>=month&&parisStamp(all[i-1][0]).slice(0,7)<=month)gaps.push({start:all[i-1][0],end:all[i][0],seconds});}
   res.json({sensor,month,readings,events,gaps});
@@ -45,5 +64,6 @@ export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
  });
  app.put('/api/quality/temperatures/:sensor',...read,admin,csrf,async(req,res)=>{const b=req.body;if(typeof b.name!=='string'||!b.name.trim()||b.name.length>100||typeof b.low!=='number'||typeof b.high!=='number'||!Number.isFinite(b.low)||!Number.isFinite(b.high)||b.low<-100||b.high>100||b.low>=b.high||!Number.isSafeInteger(b.revision))throw fail(400,'Nom et seuils invalides.');const result=await db.query('UPDATE temperature_sensors SET name=$2,low_threshold=$3,high_threshold=$4,revision=revision+1 WHERE id=$1 AND revision=$5 RETURNING *',[req.params.sensor,b.name.trim(),b.low,b.high,b.revision]);if(!result.rows.length)throw fail(409,'Cette sonde a changé. Rechargez la page.');res.json(result.rows[0]);});
- app.post('/api/quality/temperatures/:sensor/comments',...write,async(req,res)=>{const b=req.body;if(typeof b.time!=='string'||!/^20\d{2}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(b.time)||typeof b.text!=='string'||!b.text.trim()||b.text.length>3000)throw fail(400,'Commentaire de 1 à 3 000 caractères attendu.');const row=(await db.query(`INSERT INTO temperature_comments(sensor_id,happened_at,text,operator_name,created_by) SELECT r.sensor_id,r.recorded_at,$3,$4,$5 FROM temperature_readings r JOIN temperature_sensors s ON s.id=r.sensor_id WHERE r.sensor_id=$1 AND r.recorded_at=($2::timestamp AT TIME ZONE 'UTC') AND r.recorded_at>=now()-interval '3 years' AND (r.value<s.low_threshold OR r.value>s.high_threshold) RETURNING id`,[req.params.sensor,b.time,b.text.trim(),req.auth.name,req.auth.id])).rows[0];if(!row)throw fail(409,'Ce relevé hors seuil n’est plus disponible.');res.json({ok:true});});
+ app.post('/api/quality/temperatures/:sensor/comments',...write,async(req,res)=>{const b=req.body;if(typeof b.time!=='string'||!/^20\d{2}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(b.time)||typeof b.text!=='string'||!b.text.trim()||b.text.length>3000||(b.assessment!=null&&!['ok','problem'].includes(b.assessment)))throw fail(400,'Commentaire ou évaluation invalide.');const row=(await db.query(`INSERT INTO temperature_comments(sensor_id,happened_at,text,operator_name,created_by,assessment) SELECT r.sensor_id,r.recorded_at,$3,$4,$5,$6 FROM temperature_readings r JOIN temperature_sensors s ON s.id=r.sensor_id WHERE r.sensor_id=$1 AND r.recorded_at=($2::timestamp AT TIME ZONE 'UTC') AND r.recorded_at>=now()-interval '3 years' AND (r.value<s.low_threshold OR r.value>s.high_threshold) RETURNING id`,[req.params.sensor,b.time,b.text.trim(),req.auth.name,req.auth.id,b.assessment||null])).rows[0];if(!row)throw fail(409,'Ce relevé hors seuil n’est plus disponible.');res.json({ok:true});});
 }
+

@@ -652,3 +652,6 @@ CREATE TABLE IF NOT EXISTS merchandising_promotion_documents(
  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_name TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS merchandising_promotion_documents_promotion ON merchandising_promotion_documents(promotion_id);
+
+
+ALTER TABLE temperature_comments ADD COLUMN IF NOT EXISTS assessment TEXT;
