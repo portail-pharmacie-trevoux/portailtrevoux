@@ -32,6 +32,12 @@ try{
    if(req.method==='PUT'&&/^\/api\/laboratories\/\d+$/.test(req.path))return next();
    // Demo laboratory creation; emails and document operations remain blocked.
    if(req.method==='POST'&&req.path==='/api/laboratories')return next();
+   // Phase 2 Communication: plain-text demo messages and recipient read/archive only.
+   if(req.method==='POST'&&req.path==='/api/news'){
+     if(req.body?.attachment||req.body?.replyTo!=null)return res.status(403).json({error:'Pièces jointes et réponses désactivées dans la prévisualisation.'});
+     return next();
+   }
+   if(req.method==='PATCH'&&/^\/api\/news\/\d+$/.test(req.path))return next();
    // Phase 2 challenges: permit only creation and editing of demo challenge records.
    // PDF uploads, report confirmation, emailing and all other writes remain blocked.
    if((req.method==='POST'&&req.path==='/api/challenges')||(req.method==='PUT'&&/^\/api\/challenges\/\d+$/.test(req.path)))return next();
