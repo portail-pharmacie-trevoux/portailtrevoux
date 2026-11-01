@@ -18,55 +18,13 @@ const db=new pg.Pool({connectionString:url.toString(),ssl:{rejectUnauthorized:tr
 try{
  const result=await db.query("SELECT current_database() AS name,(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()) AS tls");
  if(result.rows[0]?.name!=='portailplus_7495'||result.rows[0]?.tls!==true)throw Error('Unexpected database or insecure connection');
- const users=await db.query('SELECT email,role,active FROM users');
+ // Staging accounts may now be imported from Render; never recreate demo identities.
  const demoEmails=['adjoint.demo@portailplus.invalid','preparateur.demo@portailplus.invalid','preparatrice.demo@portailplus.invalid','apprenti.demo@portailplus.invalid','rayonniste.demo@portailplus.invalid'];
+ const users=await db.query('SELECT email,role,active FROM users');
  const admin=users.rows.filter(u=>u.email==='admin-test@portailplus.invalid'&&u.role==='admin'&&u.active===true);
- const others=users.rows.filter(u=>u.email!=='admin-test@portailplus.invalid');
- if(admin.length!==1||users.rows.length!==admin.length+others.length||others.length>demoEmails.length||others.some(u=>!demoEmails.includes(u.email)||u.role==='admin'||u.active!==true)||new Set(others.map(u=>u.email)).size!==others.length)throw Error('Unexpected staging accounts');
- // One-time, staging-only assignment of fictional staff roles for schedule counter tests.
- // Match both displayed identity and allowlisted demo email; never change administrator or real users.
- const demoRoles=[
-   {first:'Claire',last:'DEMO',job:'Pharmacien'},
-   {first:'Lucas',last:'ESSAI',job:'Pharmacien'},
-   {first:'Noah',last:'EXEMPLE',job:'Préparateur'},
-   {first:'Emma',last:'FICTIVE',job:'Préparatrice'},
-   {first:'Léa',last:'SIMULATION',job:'Rayonniste'}
- ];
- const demoRoster=await db.query('SELECT id,email,first_name,last_name,role FROM users WHERE role<>$1',['admin']);
- if(demoRoster.rows.length!==demoRoles.length||demoRoster.rows.some(row=>!demoEmails.includes(row.email)||!demoRoles.some(p=>p.first===row.first_name&&p.last===row.last_name)))throw Error('Unexpected demo roster; no profession assignment performed');
- await db.query('CREATE TABLE IF NOT EXISTS staging_preview_setup (key TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())');
- const setup=await db.connect();
- try{
-   await setup.query('BEGIN');
-   const marker=await setup.query('INSERT INTO staging_preview_setup(key) VALUES ($1) ON CONFLICT DO NOTHING RETURNING key',['demo-professions-2026-11-01']);
-   if(marker.rowCount){
-     for(const p of demoRoles)await setup.query('UPDATE users SET job=$1 WHERE first_name=$2 AND last_name=$3 AND email=ANY($4::text[]) AND role<>$5',[p.job,p.first,p.last,demoEmails,'admin']);
-   }
-   await setup.query('COMMIT');
- }catch(error){await setup.query('ROLLBACK');throw error;}finally{setup.release();}
- // Seed one isolated demonstration template and one pending leave request, once.
- const demoSeed=await db.connect();
- try{
-   await demoSeed.query('BEGIN');
-   const marker=await demoSeed.query("INSERT INTO staging_preview_setup(key) VALUES ('demo-week-and-leave-2026-11-02') ON CONFLICT DO NOTHING RETURNING key");
-   if(marker.rowCount){
-     const roster=(await demoSeed.query('SELECT id,first_name,last_name,email FROM users WHERE role<>$1',['admin'])).rows;
-     if(roster.length!==5||roster.some(p=>!demoEmails.includes(p.email)))throw Error('Unexpected demo roster');
-     const content={};
-     for(const p of roster){
-       const weekdayPlan=p.first_name==='Claire'?[[0,'09:00','12:00'],[1,'09:00','12:00'],[2,'09:00','12:00'],[3,'09:00','12:00'],[4,'09:00','12:00']]:p.first_name==='Lucas'?[[0,'10:00','13:00'],[1,'10:00','13:00'],[2,'10:00','13:00'],[3,'10:00','13:00'],[4,'10:00','13:00']]:[[0,'09:00','12:00'],[1,'09:00','12:00'],[2,'09:00','12:00'],[3,'09:00','12:00'],[4,'09:00','12:00']];
-       for(const [weekday,start,end] of weekdayPlan){
-         const entry=validateTemplateDay({userId:p.id,weekday,kind:'travail',slots:[[start,end]],comments:['Semaine test fictive']});
-         content[p.id+':'+weekday]=entry;
-       }
-     }
-     await demoSeed.query('INSERT INTO schedule_templates(name,content) VALUES($1,$2::jsonb)',['semaine test',JSON.stringify(content)]);
-     const requester=roster.find(p=>p.first_name==='Emma'&&p.last_name==='FICTIVE');
-     if(!requester)throw Error('Missing fictional leave requester');
-     await demoSeed.query("INSERT INTO leave_requests(user_id,leave_type,start_date,end_date,start_part,end_part,comment) VALUES($1,'Congés payés','2026-11-05','2026-11-05','full','full',$2)",[requester.id,'DEMANDE FICTIVE — semaine test du 2 au 8 novembre 2026. À valider par administrateur.']);
-   }
-   await demoSeed.query('COMMIT');
- }catch(error){await demoSeed.query('ROLLBACK');throw error;}finally{demoSeed.release();}
+ if(admin.length!==1)throw Error('Expected staging administrator missing');
+ // The former demo-only roster and template seed have been permanently disabled.
+ // Real collaborators remain unable to authenticate until separately configured.
  // Preview entrypoint bypasses server.mjs initialize(): apply only the audited, additive Communication title migration.
  await db.query('ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120)');
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
