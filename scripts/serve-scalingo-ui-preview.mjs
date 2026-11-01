@@ -4,6 +4,7 @@ import express from 'express';
 import pg from 'pg';
 import {createApp} from '../server.mjs';
 import {hashPassword,token} from '../security.mjs';
+import {validateTemplateDay} from '../schedule-templates.mjs';
 const env=process.env;
 const origin='https://portailplus-hds.osc-fr1.scalingo.io';
 if(env.SCALINGO_PREVIEW_SAFE_MODE!=='true'||env.SCALINGO_PREVIEW_UI_ENABLED!=='true')throw Error('Explicit safe UI preview opt-in required');
@@ -43,6 +44,29 @@ try{
    }
    await setup.query('COMMIT');
  }catch(error){await setup.query('ROLLBACK');throw error;}finally{setup.release();}
+ // Seed one isolated demonstration template and one pending leave request, once.
+ const demoSeed=await db.connect();
+ try{
+   await demoSeed.query('BEGIN');
+   const marker=await demoSeed.query("INSERT INTO staging_preview_setup(key) VALUES ('demo-week-and-leave-2026-11-02') ON CONFLICT DO NOTHING RETURNING key");
+   if(marker.rowCount){
+     const roster=(await demoSeed.query('SELECT id,first_name,last_name,email FROM users WHERE role<>$1',['admin'])).rows;
+     if(roster.length!==5||roster.some(p=>!demoEmails.includes(p.email)))throw Error('Unexpected demo roster');
+     const content={};
+     for(const p of roster){
+       const weekdayPlan=p.first_name==='Claire'?[[0,'09:00','12:00'],[1,'09:00','12:00'],[2,'09:00','12:00'],[3,'09:00','12:00'],[4,'09:00','12:00']]:p.first_name==='Lucas'?[[0,'10:00','13:00'],[1,'10:00','13:00'],[2,'10:00','13:00'],[3,'10:00','13:00'],[4,'10:00','13:00']]:[[0,'09:00','12:00'],[1,'09:00','12:00'],[2,'09:00','12:00'],[3,'09:00','12:00'],[4,'09:00','12:00']];
+       for(const [weekday,start,end] of weekdayPlan){
+         const entry=validateTemplateDay({userId:p.id,weekday,kind:'travail',slots:[[start,end]],comments:['Semaine test fictive']});
+         content[p.id+':'+weekday]=entry;
+       }
+     }
+     await demoSeed.query('INSERT INTO schedule_templates(name,content) VALUES($1,$2::jsonb)',['semaine test',JSON.stringify(content)]);
+     const requester=roster.find(p=>p.first_name==='Emma'&&p.last_name==='FICTIVE');
+     if(!requester)throw Error('Missing fictional leave requester');
+     await demoSeed.query("INSERT INTO leave_requests(user_id,leave_type,start_date,end_date,start_part,end_part,comment) VALUES($1,'Congés payés','2026-11-05','2026-11-05','full','full',$2)",[requester.id,'DEMANDE FICTIVE — semaine test du 2 au 8 novembre 2026. À valider par administrateur.']);
+   }
+   await demoSeed.query('COMMIT');
+ }catch(error){await demoSeed.query('ROLLBACK');throw error;}finally{demoSeed.release();}
  // Preview entrypoint bypasses server.mjs initialize(): apply only the audited, additive Communication title migration.
  await db.query('ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120)');
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
@@ -51,11 +75,19 @@ try{
  gate.use(express.json({limit:'64kb'}));
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
-   const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
+   const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/leave-requests','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
    if(req.method==='GET'&&/^\/api\/users\/\d+\/details$/.test(req.path)){
      const id=Number(req.path.split('/')[3]);
      const person=(await db.query('SELECT email,role FROM users WHERE id=$1',[id])).rows[0];
      if(!person||!demoEmails.includes(person.email)||person.role==='admin')return res.status(403).json({error:'Fiche non disponible dans la prévisualisation.'});
+     return next();
+   }
+   if(req.method==='GET'&&/^\\/api\\/schedule-templates\\/\\d+$/.test(req.path))return next();
+   if(req.method==='GET'&&/^\\/api\\/leave-requests\\/\\d+\\/preview$/.test(req.path))return next();
+   if(req.method==='POST'&&/^\\/api\\/leave-requests\\/\\d+\\/review$/.test(req.path)){
+     const id=Number(req.path.split('/')[3]);
+     const row=(await db.query("SELECT l.id,u.email,l.start_date::text AS start_date,l.end_date::text AS end_date,l.comment FROM leave_requests l JOIN users u ON u.id=l.user_id WHERE l.id=$1",[id])).rows[0];
+     if(!row||!demoEmails.includes(row.email)||row.start_date!=='2026-11-05'||row.end_date!=='2026-11-05'||!row.comment.includes('DEMANDE FICTIVE'))return res.status(403).json({error:'Validation réservée à la demande de congé fictive.'});
      return next();
    }
    // Staging-only demo profession editing: never permit arbitrary user/profile writes.
