@@ -65,7 +65,7 @@ try{
    // Phase 2 pilot: only local personal demo tasks; existing app auth and CSRF still apply.
    if(['POST','PUT','DELETE'].includes(req.method)&&(/^\/api\/calendar\/tasks$/.test(req.path)&&req.method==='POST'||/^\/api\/calendar\/tasks\/\d+$/.test(req.path)&&['PUT','DELETE'].includes(req.method)))return next();
    if(req.method==='GET'&&/^\/api\/merchandising\/promotions\/\d+\/documents$/.test(req.path))return next();
-   if(api&&!permittedApi)return res.status(403).json({error:'Fonction désactivée dans la prévisualisation.'});
+   if(api&&!permittedApi)return res.status(403).json({error:`Fonction désactivée dans la prévisualisation (${req.method} ${req.path}).`});
    if(!api&&!['GET','HEAD'].includes(req.method))return res.status(403).type('text/plain').send('Action non disponible.');
    next();
  }catch(error){next(error);}});
