@@ -38,7 +38,7 @@ export function canModify(user,universe) {
  if(!user||!canAccess(user,universe))return false;if(user.role==='admin')return true;
  if(universe==='Emplois du temps')return false;
  if(universe==='Actualités')return true;
- if(['Laboratoires',"Outils d'aide aux commandes","Outils d'aide au merchandising","Outils d'aide à la démarche qualité"].includes(universe))return true;
+ if(!user.permissions_configured&&['Laboratoires',"Outils d'aide aux commandes","Outils d'aide au merchandising","Outils d'aide à la démarche qualité"].includes(universe))return true;
  if(['Collaborateurs','Ressources humaines'].includes(universe))return false;
  return user.permissions_configured?!!user.edit_rights?.includes(universe):universe==='Fun';
 }

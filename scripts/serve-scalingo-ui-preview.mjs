@@ -3,12 +3,12 @@
 import express from 'express';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {digest} from '../security.mjs';
 const execFileAsync=promisify(execFile);
 import pg from 'pg';
 import {createApp} from '../server.mjs';
 import {hashPassword,token} from '../security.mjs';
 import {validateTemplateDay} from '../schedule-templates.mjs';
+import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth} from './scalingo-universal-rights.mjs';
 const env=process.env;
 const origin='https://portailplus-hds.osc-fr1.scalingo.io';
 if(env.SCALINGO_PREVIEW_SAFE_MODE!=='true'||env.SCALINGO_PREVIEW_UI_ENABLED!=='true')throw Error('Explicit safe UI preview opt-in required');
@@ -37,15 +37,7 @@ try{
  gate.use(express.json({limit:'64kb'}));
  // One-time cleanup control: restricted to the exact staging admin and origin.
  // The purge subprocess independently checks the database, account roster and TLS.
- const cleanupAuth=async(req,res,next)=>{
-   try{
-     const raw=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('trevoux_session='))?.slice(16);
-     if(!raw||!/^[\w-]{43}$/.test(raw))return res.status(401).send('Connexion administrateur requise.');
-     const row=(await db.query('SELECT u.id,u.email,u.role,u.active,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now()',[digest(raw)])).rows[0];
-     if(!row||row.email!=='admin-test@portailplus.invalid'||row.role!=='admin'||!row.active)return res.status(403).send('Administrateur TEST uniquement.');
-     req.cleanupAdmin=row;next();
-   }catch(e){next(e);}
- };
+ const cleanupAuth=scalingoTestAdminAuth(db);
  gate.get('/staging-demo-cleanup',cleanupAuth,(req,res)=>{
    res.set('Cache-Control','no-store').type('html').send(`<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Nettoyage Scalingo</title><body style="font:16px system-ui;max-width:680px;margin:4rem auto;padding:1rem"><h1>Nettoyage des cinq comptes fictifs</h1><p>Environnement : Scalingo uniquement. Administrateur TEST conservé. Sauvegarde préalable obligatoire.</p><p>Effectuez d'abord la simulation, puis la purge après vérification.</p><form method="post" action="/api/staging-demo-cleanup"><input type="hidden" name="csrf" value="${req.cleanupAdmin.csrf}"><button name="mode" value="check" formnovalidate>1. Vérifier sans supprimer</button><hr><label><input type="checkbox" name="backup" value="confirmed" required> Je confirme que la sauvegarde manuelle Scalingo est réussie.</label><p><label>Saisir SUPPRIMER LES CINQ COMPTES : <input name="confirmation" autocomplete="off"></label></p><button name="mode" value="execute">2. Supprimer définitivement</button></form></body></html>`);
  });
@@ -60,6 +52,8 @@ try{
      res.set('Cache-Control','no-store').type('text/plain').send(result.stdout+'\\n'+result.stderr);
    }catch(e){res.status(409).type('text/plain').send('Opération refusée ou annulée : '+(e.stdout||'')+' '+(e.stderr||e.message));}
  });
+ registerScalingoRights({gate,db,adminAuth:cleanupAuth,origin,env});
+ gate.use(scalingoUniverseBoundary(db));
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/leave-requests','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
@@ -93,16 +87,10 @@ try{
      if(!row||row.status!=='approved'||!demoEmails.includes(row.email)||row.start_date!=='2026-11-05'||row.end_date!=='2026-11-05'||!row.comment.includes('DEMANDE FICTIVE'))return res.status(403).json({error:'Annulation réservée au congé fictif validé.'});
      return next();
    }
-   // Staging-only demo profession editing: never permit arbitrary user/profile writes.
-   if(req.method==='PUT'&&/^\/api\/users\/\d+$/.test(req.path)){
-     const id=Number(req.path.split('/').pop());
-     const person=(await db.query('SELECT * FROM users WHERE id=$1',[id])).rows[0];
-     if(!person||!demoEmails.includes(person.email)||person.role==='admin')return res.status(403).json({error:'Modification réservée aux collaborateurs fictifs.'});
-     const body=req.body||{};
-     const same=(key,current)=>body[key]===undefined||body[key]===current;
-     if(!same('firstName',person.first_name)||!same('lastName',person.last_name)||!same('phone',person.phone||'')||!same('birthday',person.birthday instanceof Date?person.birthday.toISOString().slice(0,10):person.birthday||'')||!same('active',person.active)||!same('email',person.email)||body.details!==undefined||(body.password!==undefined&&body.password!=='')||body.administratorRights!==undefined||(body.rights!==undefined&&(!Array.isArray(body.rights)||JSON.stringify([...body.rights].sort())!==JSON.stringify([...(person.rights||[])].sort())))||body.editRights!==undefined||typeof body.job!=='string'||!['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste'].includes(body.job))return res.status(403).json({error:'Seule la fonction professionnelle fictive peut être modifiée sur cet environnement.'});
-     return next();
-   }
+   // Permission-only user PUTs are handled above; profile writes stay disabled.
+   if(req.method==='GET'&&['/api/music','/api/contacts','/api/training/documents'].includes(req.path))return next();
+   if(req.method==='GET'&&/^\/api\/(?:hr\/documents|training\/documents)\/\d+\/(?:file|print)$/.test(req.path))return next();
+   if(req.method==='POST'&&req.path==='/api/music')return next();
    // Allow administrators to create fictional work posts (e.g. Comptoir) in isolated staging.
    if(req.method==='POST'&&req.path==='/api/schedule-posts')return next();
    // Allow applying only the seeded demonstration template to the isolated 2026-11-02 draft.
@@ -140,6 +128,7 @@ try{
  }catch(error){next(error);}});
 
  gate.use(app);
+ gate.use((error,req,res,next)=>res.status(error.status||500).json({error:error.status?error.message:'Opération Scalingo impossible.'}));
  const server=gate.listen(Number(env.PORT)||3000,env.SCALINGO_PREVIEW_BIND_HOST==='127.0.0.1'?'127.0.0.1':'0.0.0.0',()=>console.log('Prévisualisation Portail+ restreinte active.'));
  process.on('SIGTERM',()=>server.close(()=>db.end()));
 }catch(err){await db.end();throw err;}
