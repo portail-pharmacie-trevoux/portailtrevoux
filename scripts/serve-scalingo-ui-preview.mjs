@@ -35,6 +35,31 @@ try{
  const gate=express();
  gate.disable('x-powered-by');
  gate.use(express.json({limit:'64kb'}));
+ // One-time cleanup control: restricted to the exact staging admin and origin.
+ // The purge subprocess independently checks the database, account roster and TLS.
+ const cleanupAuth=async(req,res,next)=>{
+   try{
+     const raw=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('trevoux_session='))?.slice(16);
+     if(!raw||!/^[\w-]{43}$/.test(raw))return res.status(401).send('Connexion administrateur requise.');
+     const row=(await db.query('SELECT u.id,u.email,u.role,u.active,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now()',[digest(raw)])).rows[0];
+     if(!row||row.email!=='admin-test@portailplus.invalid'||row.role!=='admin'||!row.active)return res.status(403).send('Administrateur TEST uniquement.');
+     req.cleanupAdmin=row;next();
+   }catch(e){next(e);}
+ };
+ gate.get('/staging-demo-cleanup',cleanupAuth,(req,res)=>{
+   res.set('Cache-Control','no-store').type('html').send(`<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Nettoyage Scalingo</title><body style="font:16px system-ui;max-width:680px;margin:4rem auto;padding:1rem"><h1>Nettoyage des cinq comptes fictifs</h1><p>Environnement : Scalingo uniquement. Administrateur TEST conservé. Sauvegarde préalable obligatoire.</p><p>Effectuez d'abord la simulation, puis la purge après vérification.</p><form method="post" action="/api/staging-demo-cleanup"><input type="hidden" name="csrf" value="${req.cleanupAdmin.csrf}"><button name="mode" value="check" formnovalidate>1. Vérifier sans supprimer</button><hr><label><input type="checkbox" name="backup" value="confirmed" required> Je confirme que la sauvegarde manuelle Scalingo est réussie.</label><p><label>Saisir SUPPRIMER LES CINQ COMPTES : <input name="confirmation" autocomplete="off"></label></p><button name="mode" value="execute">2. Supprimer définitivement</button></form></body></html>`);
+ });
+ gate.post('/api/staging-demo-cleanup',express.urlencoded({extended:false,limit:'2kb'}),cleanupAuth,async(req,res)=>{
+   if(req.get('origin')!==origin||req.body.csrf!==req.cleanupAdmin.csrf)return res.status(403).send('Origine ou session invalide.');
+   const execute=req.body.mode==='execute';
+   if(!execute&&req.body.mode!=='check')return res.status(400).send('Mode inconnu.');
+   if(execute&&(req.body.backup!=='confirmed'||req.body.confirmation!=='SUPPRIMER LES CINQ COMPTES'))return res.status(400).send('Confirmation incomplète.');
+   try{
+     const args=['scripts/purge-scalingo-demo-users.mjs',...(execute?['--execute']:[])];
+     const result=await execFileAsync(process.execPath,args,{cwd:process.cwd(),env:process.env,timeout:30000,maxBuffer:100000});
+     res.set('Cache-Control','no-store').type('text/plain').send(result.stdout+'\\n'+result.stderr);
+   }catch(e){res.status(409).type('text/plain').send('Opération refusée ou annulée : '+(e.stdout||'')+' '+(e.stderr||e.message));}
+ });
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/leave-requests','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
@@ -105,31 +130,6 @@ try{
    next();
  }catch(error){next(error);}});
 
- // One-time cleanup control: restricted to the exact staging admin and origin.
- // The purge subprocess independently checks the database, account roster and TLS.
- const cleanupAuth=async(req,res,next)=>{
-   try{
-     const raw=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('trevoux_session='))?.slice(16);
-     if(!raw||!/^[\w-]{43}$/.test(raw))return res.status(401).send('Connexion administrateur requise.');
-     const row=(await db.query('SELECT u.id,u.email,u.role,u.active,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now()',[digest(raw)])).rows[0];
-     if(!row||row.email!=='admin-test@portailplus.invalid'||row.role!=='admin'||!row.active)return res.status(403).send('Administrateur TEST uniquement.');
-     req.cleanupAdmin=row;next();
-   }catch(e){next(e);}
- };
- gate.get('/staging-demo-cleanup',cleanupAuth,(req,res)=>{
-   res.set('Cache-Control','no-store').type('html').send(`<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Nettoyage Scalingo</title><body style="font:16px system-ui;max-width:680px;margin:4rem auto;padding:1rem"><h1>Nettoyage des cinq comptes fictifs</h1><p>Environnement : Scalingo uniquement. Administrateur TEST conservé. Sauvegarde préalable obligatoire.</p><p>Effectuez d'abord la simulation, puis la purge après vérification.</p><form method="post" action="/api/staging-demo-cleanup"><input type="hidden" name="csrf" value="${req.cleanupAdmin.csrf}"><button name="mode" value="check" formnovalidate>1. Vérifier sans supprimer</button><hr><label><input type="checkbox" name="backup" value="confirmed" required> Je confirme que la sauvegarde manuelle Scalingo est réussie.</label><p><label>Saisir SUPPRIMER LES CINQ COMPTES : <input name="confirmation" autocomplete="off"></label></p><button name="mode" value="execute">2. Supprimer définitivement</button></form></body></html>`);
- });
- gate.post('/api/staging-demo-cleanup',express.urlencoded({extended:false,limit:'2kb'}),cleanupAuth,async(req,res)=>{
-   if(req.get('origin')!==origin||req.body.csrf!==req.cleanupAdmin.csrf)return res.status(403).send('Origine ou session invalide.');
-   const execute=req.body.mode==='execute';
-   if(!execute&&req.body.mode!=='check')return res.status(400).send('Mode inconnu.');
-   if(execute&&(req.body.backup!=='confirmed'||req.body.confirmation!=='SUPPRIMER LES CINQ COMPTES'))return res.status(400).send('Confirmation incomplète.');
-   try{
-     const args=['scripts/purge-scalingo-demo-users.mjs',...(execute?['--execute']:[])];
-     const result=await execFileAsync(process.execPath,args,{cwd:process.cwd(),env:process.env,timeout:30000,maxBuffer:100000});
-     res.set('Cache-Control','no-store').type('text/plain').send(result.stdout+'\\n'+result.stderr);
-   }catch(e){res.status(409).type('text/plain').send('Opération refusée ou annulée : '+(e.stdout||'')+' '+(e.stderr||e.message));}
- });
  gate.use(app);
  const server=gate.listen(Number(env.PORT)||3000,env.SCALINGO_PREVIEW_BIND_HOST==='127.0.0.1'?'127.0.0.1':'0.0.0.0',()=>console.log('Prévisualisation Portail+ restreinte active.'));
  process.on('SIGTERM',()=>server.close(()=>db.end()));
