@@ -12,6 +12,7 @@ import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth} f
 import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTemperatureRoute} from './scalingo-temperature-preview.mjs';
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
 import {registerScalingoTiersPayantImport} from './scalingo-tiers-payant-preview.mjs';
+import {ensureScalingoTemperatureSchema} from './ensure-scalingo-temperature-schema.mjs';
 const env=process.env;
 const origin='https://portailplus-hds.osc-fr1.scalingo.io';
 if(env.SCALINGO_PREVIEW_SAFE_MODE!=='true'||env.SCALINGO_PREVIEW_UI_ENABLED!=='true')throw Error('Explicit safe UI preview opt-in required');
@@ -32,8 +33,11 @@ try{
  if(admin.length!==1)throw Error('Expected staging administrator missing');
  // The former demo-only roster and template seed have been permanently disabled.
  // Real collaborators remain unable to authenticate until separately configured.
- // Preview entrypoint bypasses server.mjs initialize(): apply only the audited, additive Communication title migration.
+ // Preview bypasses initialize(): prepare the additive schema used by its routes
+ // before accepting HTTP requests. Never seed, purge or recreate business data.
  await db.query('ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120)');
+ const temperatureSchema=await ensureScalingoTemperatureSchema(db);
+ console.log('Scalingo temperature schema ready; columns added: '+temperatureSchema.added.join(','));
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');

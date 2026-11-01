@@ -41,7 +41,10 @@ La migration ajoute seulement `validation` (nullable, limitée à V/X), `revisio
 `updated_at` et `history` à `temperature_comments`. Elle est idempotente et ne
 supprime ni ne recrée les commentaires ou relevés. Le schéma normal `schema.sql`
 comporte les mêmes ajouts, mais le preview Scalingo contourne son initialisation :
-il faut donc appliquer la migration dédiée **avant de démarrer la nouvelle version**.
+le preview prépare désormais ces quatre colonnes, si elles manquent, avant de
+servir les routes. Cette préparation est transactionnelle, bornée par un délai
+de verrouillage et refuse de recréer une table absente. Une sauvegarde réussie
+doit être vérifiée avant tout déploiement susceptible de déclencher ces ALTER.
 
 1. Résoudre les échecs de tests bloquants et vérifier une sauvegarde Scalingo
    récente **réussie**, de la bonne base. Aucun état de sauvegarde distant n’a
@@ -54,7 +57,8 @@ il faut donc appliquer la migration dédiée **avant de démarrer la nouvelle ve
    exécuter `node scripts/migrate-scalingo-temperature-validation.mjs`.
    Le script exige safe mode, URL exacte, TLS vérifié, attestation récente et
    `current_database() = 'portailplus_7495'`. Les ALTER sont transactionnels.
-   Il n’est pas lancé automatiquement au démarrage de l’application.
+   Ce script reste une possibilité de migration explicite ; le preview applique
+   désormais les mêmes ajouts au démarrage lorsqu’ils sont nécessaires.
 4. Redéployer uniquement `portailplus-hds` avec le point d’entrée existant.
    Vérifier santé, connexion TEST, lecture des anciens commentaires et affichage
    du calendrier avant toute modification de données métier.

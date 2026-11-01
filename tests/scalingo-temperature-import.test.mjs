@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import express from 'express';
 import pg from 'pg';
 import {zip} from '../order-export.mjs';
 import {token,digest} from '../security.mjs';
 import {createApp} from '../server.mjs';
+import {ensureScalingoTemperatureSchema} from '../scripts/ensure-scalingo-temperature-schema.mjs';
 import {scalingoUniverseBoundary} from '../scripts/scalingo-universal-rights.mjs';
 import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTemperatureRoute} from '../scripts/scalingo-temperature-preview.mjs';
 const origin='https://portailplus-hds.osc-fr1.scalingo.io',path='/api/quality/temperatures/import';
@@ -66,13 +66,21 @@ test('PostgreSQL local : vrai XLSX >64 Ko, doublons, conservation, rollback apr�
   INSERT INTO temperature_readings VALUES('AUTRE','2026-09-01T00:00:00Z',6);
   INSERT INTO temperature_comments(sensor_id,happened_at,text) VALUES('AUTRE','2026-09-01T00:00:00Z','Commentaire conservé');
  `);
- const migration=await readFile(new URL('../scripts/scalingo-temperature-validation-schema.sql',import.meta.url),'utf8');await db.query(migration);await db.query(migration);
  await db.query('CREATE TABLE IF NOT EXISTS quality_services(service text,collaborator_id integer,collaborator_name text)');
- assert.equal((await db.query('SELECT validation FROM temperature_comments')).rows[0].validation,null);
  const raw=token();await db.query("INSERT INTO sessions VALUES($1,1,'csrf',now()+interval '1 hour')",[digest(raw)]);
  const gate=preview(db),server=gate.listen(0);t.after(()=>server.close());const base='http://127.0.0.1:'+server.address().port;
  const headers={cookie:'trevoux_session='+raw,origin,'x-csrf-token':'csrf','content-type':'application/json'};
  const send=body=>fetch(base+path,{method:'POST',headers,body:JSON.stringify(body)});
+ const oldReadings=(await db.query('SELECT * FROM temperature_readings ORDER BY sensor_id,recorded_at')).rows;
+ const oldComments=(await db.query('SELECT id,sensor_id,happened_at,text,operator_name,created_by,created_at FROM temperature_comments ORDER BY id')).rows;
+ const broken=await fetch(base+'/api/quality/temperatures?month=2026-10',{headers});assert.equal(broken.status,500,'Reproduce the missing V/X-column regression');
+ assert.deepEqual(await ensureScalingoTemperatureSchema(db),{added:['validation','revision','updated_at','history']});
+ assert.deepEqual(await ensureScalingoTemperatureSchema(db),{added:[]});
+ const restored=await fetch(base+'/api/quality/temperatures?month=2026-10',{headers});assert.equal(restored.status,200,await restored.clone().text());
+ assert.deepEqual((await db.query('SELECT * FROM temperature_readings ORDER BY sensor_id,recorded_at')).rows,oldReadings);
+ assert.deepEqual((await db.query('SELECT id,sensor_id,happened_at,text,operator_name,created_by,created_at FROM temperature_comments ORDER BY id')).rows,oldComments);
+ assert.equal((await db.query('SELECT validation FROM temperature_comments')).rows[0].validation,null);
+
  const readings=start=>Array.from({length:6001},(_,i)=>[new Date(Date.parse(start)+i*60000).toISOString().slice(0,19).replace('T',' '),'5.0 °C']);
  const body={fileName:'releves.xlsx',fileData:workbook(readings('2026-09-10T00:00:00Z')).toString('base64')};assert.ok(JSON.stringify(body).length>64*1024);
  let response=await send(body);assert.equal(response.status,200,await response.clone().text());assert.equal((await response.json()).added,6001);
