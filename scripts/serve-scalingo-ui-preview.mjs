@@ -63,6 +63,15 @@ try{
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/leave-requests','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
+   // Real roster import: staging-only, exact 16-person Render roster, once, no invitations.
+   if(req.method==='POST'&&req.path==='/api/collaborateurs/import'){
+     const expected=['Céline|Abeillon','Manel|Abid','Véronique|Baule','Aysenur|BILIR','Meghan|Breton','Maria|Clemente','Alexandra|Clergeat','Bénédicte|Durand Fontanel','Alice|Gosselin','Noémy|Huchard','Julie|Mehu','Sandrine|Montabert','Lucile|Preteux','Elena|Rodriguez','Rémy|Steinbach','Jean Michel|WATTEAU'];
+     const people=req.body?.people;
+     if(!Array.isArray(people)||people.length!==16||!people.every(p=>p&&typeof p.firstName==='string'&&typeof p.lastName==='string'&&p.active===true)||JSON.stringify(people.map(p=>p.firstName.trim()+'|'+p.lastName.trim()).sort())!==JSON.stringify(expected.sort()))return res.status(403).json({error:'Import réservé aux 16 collaborateurs réels prévus.'});
+     const existing=(await db.query("SELECT COUNT(*)::int AS n FROM users WHERE role<>'admin'")).rows[0].n;
+     if(existing!==0)return res.status(409).json({error:'Import initial interdit : collaborateurs déjà présents dans Scalingo.'});
+     return next();
+   }
    if(req.method==='GET'&&/^\/api\/users\/\d+\/details$/.test(req.path)){
      const id=Number(req.path.split('/')[3]);
      const person=(await db.query('SELECT email,role FROM users WHERE id=$1',[id])).rows[0];
