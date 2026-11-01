@@ -110,7 +110,7 @@ try{
  const cleanupAuth=async(req,res,next)=>{
    try{
      const raw=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('trevoux_session='))?.slice(16);
-     if(!raw||!/^\\w[\\w-]{42}$/.test(raw))return res.status(401).send('Connexion administrateur requise.');
+     if(!raw||!/^[\w-]{43}$/.test(raw))return res.status(401).send('Connexion administrateur requise.');
      const row=(await db.query('SELECT u.id,u.email,u.role,u.active,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now()',[digest(raw)])).rows[0];
      if(!row||row.email!=='admin-test@portailplus.invalid'||row.role!=='admin'||!row.active)return res.status(403).send('Administrateur TEST uniquement.');
      req.cleanupAdmin=row;next();
