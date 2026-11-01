@@ -28,6 +28,9 @@ try{
  gate.use((req,res,next)=>{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
+   // Phase 2 challenges: permit only creation and editing of demo challenge records.
+   // PDF uploads, report confirmation, emailing and all other writes remain blocked.
+   if((req.method==='POST'&&req.path==='/api/challenges')||(req.method==='PUT'&&/^\/api\/challenges\/\d+$/.test(req.path)))return next();
    // Phase 2: promotion records only. App role checks, CSRF, revisions and DB guards remain active.
    if((req.method==='POST'&&req.path==='/api/merchandising/promotions')||(['PUT','DELETE'].includes(req.method)&&/^\/api\/merchandising\/promotions\/\d+$/.test(req.path))||(req.method==='PUT'&&/^\/api\/merchandising\/promotions\/\d+\/assignment$/.test(req.path)))return next();
    // Phase 2 pilot: only local personal demo tasks; existing app auth and CSRF still apply.
