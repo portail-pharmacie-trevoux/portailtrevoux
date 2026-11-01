@@ -82,9 +82,9 @@ try{
      if(!person||!demoEmails.includes(person.email)||person.role==='admin')return res.status(403).json({error:'Fiche non disponible dans la prévisualisation.'});
      return next();
    }
-   if(req.method==='GET'&&/^\\/api\\/schedule-templates\\/\\d+$/.test(req.path))return next();
-   if(req.method==='GET'&&/^\\/api\\/leave-requests\\/\\d+\\/preview$/.test(req.path))return next();
-   if(req.method==='POST'&&/^\\/api\\/leave-requests\\/\\d+\\/review$/.test(req.path)){
+   if(req.method==='GET'&&/^\/api\/schedule-templates\/\d+$/.test(req.path))return next();
+   if(req.method==='GET'&&/^\/api\/leave-requests\/\d+\/preview$/.test(req.path))return next();
+   if(req.method==='POST'&&/^\/api\/leave-requests\/\d+\/review$/.test(req.path)){
      const id=Number(req.path.split('/')[3]);
      const row=(await db.query("SELECT l.id,u.email,l.start_date::text AS start_date,l.end_date::text AS end_date,l.comment FROM leave_requests l JOIN users u ON u.id=l.user_id WHERE l.id=$1",[id])).rows[0];
      if(!row||!demoEmails.includes(row.email)||row.start_date!=='2026-11-05'||row.end_date!=='2026-11-05'||!row.comment.includes('DEMANDE FICTIVE'))return res.status(403).json({error:'Validation réservée à la demande de congé fictive.'});
