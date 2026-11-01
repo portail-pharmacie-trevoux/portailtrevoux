@@ -31,6 +31,12 @@ try{
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
+   if(req.method==='GET'&&/^\/api\/users\/\d+\/details$/.test(req.path)){
+     const id=Number(req.path.split('/')[3]);
+     const person=(await db.query('SELECT email,role FROM users WHERE id=$1',[id])).rows[0];
+     if(!person||!demoEmails.includes(person.email)||person.role==='admin')return res.status(403).json({error:'Fiche non disponible dans la prévisualisation.'});
+     return next();
+   }
    // Staging-only demo profession editing: never permit arbitrary user/profile writes.
    if(req.method==='PUT'&&/^\/api\/users\/\d+$/.test(req.path)){
      const id=Number(req.path.split('/').pop());
