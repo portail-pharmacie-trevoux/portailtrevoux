@@ -22,6 +22,27 @@ try{
  const admin=users.rows.filter(u=>u.email==='admin-test@portailplus.invalid'&&u.role==='admin'&&u.active===true);
  const others=users.rows.filter(u=>u.email!=='admin-test@portailplus.invalid');
  if(admin.length!==1||users.rows.length!==admin.length+others.length||others.length>demoEmails.length||others.some(u=>!demoEmails.includes(u.email)||u.role==='admin'||u.active!==true)||new Set(others.map(u=>u.email)).size!==others.length)throw Error('Unexpected staging accounts');
+ // One-time, staging-only assignment of fictional staff roles for schedule counter tests.
+ // Match both displayed identity and allowlisted demo email; never change administrator or real users.
+ const demoRoles=[
+   {first:'Claire',last:'DEMO',job:'Pharmacien'},
+   {first:'Lucas',last:'ESSAI',job:'Pharmacien'},
+   {first:'Noah',last:'EXEMPLE',job:'Préparateur'},
+   {first:'Emma',last:'FICTIVE',job:'Préparatrice'},
+   {first:'Léa',last:'SIMULATION',job:'Rayonniste'}
+ ];
+ const demoRoster=await db.query('SELECT id,email,first_name,last_name,role FROM users WHERE role<>$1',['admin']);
+ if(demoRoster.rows.length!==demoRoles.length||demoRoster.rows.some(row=>!demoEmails.includes(row.email)||!demoRoles.some(p=>p.first===row.first_name&&p.last===row.last_name)))throw Error('Unexpected demo roster; no profession assignment performed');
+ await db.query('CREATE TABLE IF NOT EXISTS staging_preview_setup (key TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())');
+ const setup=await db.connect();
+ try{
+   await setup.query('BEGIN');
+   const marker=await setup.query('INSERT INTO staging_preview_setup(key) VALUES ($1) ON CONFLICT DO NOTHING RETURNING key',['demo-professions-2026-11-01']);
+   if(marker.rowCount){
+     for(const p of demoRoles)await setup.query('UPDATE users SET job=$1 WHERE first_name=$2 AND last_name=$3 AND email=ANY($4::text[]) AND role<>$5',[p.job,p.first,p.last,demoEmails,'admin']);
+   }
+   await setup.query('COMMIT');
+ }catch(error){await setup.query('ROLLBACK');throw error;}finally{setup.release();}
  // Preview entrypoint bypasses server.mjs initialize(): apply only the audited, additive Communication title migration.
  await db.query('ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120)');
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
