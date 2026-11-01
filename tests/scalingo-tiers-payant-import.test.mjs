@@ -6,7 +6,7 @@ import {createApp} from '../server.mjs';
 import {token,digest} from '../security.mjs';
 import {parseRejectionSheets,rejectionRate} from '../public/tiers-payant-model.js';
 import {scalingoUniverseBoundary} from '../scripts/scalingo-universal-rights.mjs';
-import {isScalingoTiersPayantImport} from '../scripts/scalingo-tiers-payant-preview.mjs';
+import {isScalingoTiersPayantImport,registerScalingoTiersPayantImport} from '../scripts/scalingo-tiers-payant-preview.mjs';
 const universe="Outils d'aide à la démarche qualité",origin='https://portailplus-hds.osc-fr1.scalingo.io',path='/api/quality/tiers-payant/import';
 // Aggregated synthetic test values only. Never load the user's workbook.
 const records=Array.from({length:69},(_,i)=>({month:new Date(Date.UTC(2021,i,1)).toISOString().slice(0,7),invoices:[1000,1000,0,3][i%4],rejections:[20,21,0,1][i%4],amount:i%4===2?0:12.34+i}));
@@ -26,6 +26,37 @@ test('Source de 69 mois janvier 2021–septembre 2026 : pourcentages source igno
  assert.equal(parsed.warnings.length,52);
 });
 const database=process.env.PORTAIL_TP_TEST_DATABASE_URL;
+test('HTTP sans PostgreSQL : enregistrement effectif avant le filtre, autres routes bloquées et sécurité applicative conservée',async t=>{
+ let actor={id:1,name:'Compte de test local',role:'admin',active:true,must_change:false,csrf:'csrf',rights:[universe],edit_rights:[universe],permissions_configured:true};
+ const db={query:async(sql)=>{
+  if(sql.includes('JOIN users u ON u.id=s.user_id'))return {rows:actor?[actor]:[]};
+  if(sql.startsWith('SELECT DISTINCT u.id'))return {rows:[]};
+  throw Error('Unexpected access in routing test');
+ },connect:async()=>({query:async(sql,args=[])=>{
+  if(['BEGIN','COMMIT','ROLLBACK','SELECT pg_advisory_xact_lock(783411)'].includes(sql))return {rows:[]};
+  if(sql.startsWith('SELECT invoices')){const old=records.find(r=>r.month===args[0]);return {rows:old?[{invoices:old.invoices,rejections:old.rejections,amount_cents:String(Math.round(old.amount*100))}]:[]};}
+  throw Error('Routing test must not write monthly data');
+ },release(){}})};
+ const {app}=createApp(db,{origin,secret:'local-only-secret-'.repeat(3),dummyHash:'unused',googleId:'',googleSecret:'',googleEmail:'',mailEmail:''});
+ const gate=express();gate.use(express.json({limit:'64kb'}));gate.use(scalingoUniverseBoundary(db));
+ registerScalingoTiersPayantImport(gate,app);
+ gate.use((req,res)=>res.status(403).json({error:`Fonction désactivée dans la prévisualisation (${req.method} ${req.path}).`}));
+ gate.use((error,req,res,next)=>res.status(error.status||500).json({error:error.message}));
+ const server=gate.listen(0);t.after(()=>server.close());const base='http://127.0.0.1:'+server.address().port;
+ const headers={cookie:'trevoux_session='+token(),origin,'x-csrf-token':'csrf','content-type':'application/json'};
+ const send=(url,body={records},method='POST',extra={})=>fetch(base+url,{method,headers:{...headers,...extra},body:JSON.stringify(body)});
+ let response=await send(path);assert.equal(response.status,200,await response.clone().text());assert.deepEqual(await response.json(),{added:0,ignored:69});
+ response=await send(path,{records:[]});assert.equal(response.status,400);assert.doesNotMatch((await response.json()).error,/Fonction désactivée/);
+ assert.equal((await send(path,{records},'POST',{'x-csrf-token':'bad'})).status,403);
+ assert.equal((await send(path,{records},'POST',{origin:'https://other.invalid'})).status,403);
+ assert.equal((await send(path,{records},'POST',{cookie:''})).status,401);
+ actor={...actor,role:'employee',edit_rights:[]};assert.equal((await send(path)).status,403);
+ actor={...actor,role:'admin',edit_rights:[universe]};
+ for(const url of [path+'/extra','/api/quality/tiers-payant/other','/api/quality/other/import']){
+  response=await send(url);assert.equal(response.status,403);assert.match((await response.json()).error,/Fonction désactivée/);
+ }
+ response=await send(path,{records},'PUT');assert.equal(response.status,403);assert.match((await response.json()).error,/Fonction désactivée/);
+});
 test('PostgreSQL local + filtre Scalingo : 69 mois, autorisations, doublons, conflits atomiques et données conservées',{skip:!database},async t=>{
  const url=new URL(database);assert.equal(url.hostname,'127.0.0.1');assert.equal(url.pathname,'/portailplus_tp_test');assert.equal(url.search,'');
  const db=new pg.Pool({connectionString:database,max:3});t.after(()=>db.end());
@@ -45,7 +76,8 @@ test('PostgreSQL local + filtre Scalingo : 69 mois, autorisations, doublons, con
  const originals=(await db.query('SELECT * FROM quality_tp_months ORDER BY month')).rows;
  const {app}=createApp(db,{origin,secret:'local-only-secret-'.repeat(3),dummyHash:'unused',googleId:'',googleSecret:'',googleEmail:'',mailEmail:''});
  const gate=express();gate.use(express.json({limit:'64kb'}));gate.use(scalingoUniverseBoundary(db));
- gate.use((req,res,next)=>(isScalingoTiersPayantImport(req)||(req.method==='GET'&&req.path==='/api/quality/tiers-payant'))?next():res.status(403).json({error:'Route désactivée'}));gate.use(app);gate.use((e,req,res,next)=>res.status(e.status||500).json({error:e.message}));
+ registerScalingoTiersPayantImport(gate,app);
+ gate.use((req,res,next)=>(req.method==='GET'&&req.path==='/api/quality/tiers-payant')?next():res.status(403).json({error:'Route désactivée'}));gate.use(app);gate.use((e,req,res,next)=>res.status(e.status||500).json({error:e.message}));
  const server=gate.listen(0);t.after(()=>server.close());const base='http://127.0.0.1:'+server.address().port;
  const send=(body,id=1,extra={})=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json',origin,cookie:cookies[id],'x-csrf-token':'csrf-'+id,...extra},body:JSON.stringify(body)});
  const count=async()=>(await db.query('SELECT count(*)::int AS n FROM quality_tp_months')).rows[0].n;
