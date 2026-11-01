@@ -8,7 +8,7 @@ test('Demandes privées, identité serveur, décision administrateur, révisions
   if(sql.startsWith('SELECT *,start_date::text,end_date::text FROM leave_requests WHERE user_id='))return{rows:items.filter(r=>r.user_id===a[0]&&r.id!==a[1]&&r.status==='approved')};
   if(sql.startsWith('SELECT id FROM users'))return{rows:[{id:a[0]}]};
   if(sql.startsWith('INSERT INTO schedule_weeks')||sql.startsWith('INSERT INTO leave_schedule_changes')||sql.startsWith('UPDATE schedule_weeks')||sql.startsWith('INSERT INTO team_message_recipients'))return{rows:[]};
-  if(sql.startsWith('SELECT *,week::text FROM schedule_weeks'))return{rows:a[0].map(week=>({week,revision:0,draft:{},published:null,locked_days:{}}))};
+  if(sql.startsWith('SELECT schedule_weeks.*,schedule_weeks.week::text AS week_key FROM schedule_weeks'))return{rows:a[0].map(week=>({week,week_key:week,revision:0,draft:{},published:null,locked_days:{}}))};
   if(sql.startsWith('INSERT INTO team_messages'))return{rows:[{id:999}]};
   if(sql.startsWith('SELECT l.id'))return {rows:items.filter(r=>!sql.includes('WHERE l.user_id=$1')||r.user_id===a[0])};
   if(sql.startsWith('INSERT INTO leave_requests')){if(items.some(r=>r.user_id===a[0]&&r.status==='pending'&&r.start_date===a[2]))throw Object.assign(Error(),{code:'23505'});const r={id:++counter,user_id:a[0],leave_type:a[1],start_date:a[2],end_date:a[3],start_part:a[4],end_part:a[5],comment:a[6],status:'pending',revision:1};items.push(r);return {rows:[r]};}

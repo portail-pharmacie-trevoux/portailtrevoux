@@ -10,9 +10,9 @@ function fixture(){let state={request:structuredClone(request),weeks:{[week]:{we
  if(sql.startsWith('SELECT *,start_date::text,end_date::text FROM leave_requests WHERE user_id='))return{rows:structuredClone(state.others)};
  if(sql.startsWith('SELECT id FROM users'))return{rows:[{id:a[0]}]};
  if(sql.startsWith('INSERT INTO schedule_weeks')){state.weeks[a[0]]??={week:a[0],revision:0,draft:{},published:null,locked_days:{}};return{rows:[]};}
- if(sql.startsWith('SELECT *,week::text FROM schedule_weeks'))return{rows:a[0].filter(w=>state.weeks[w]).map(w=>structuredClone(state.weeks[w]))};
+ if(sql.startsWith('SELECT schedule_weeks.*,schedule_weeks.week::text AS week_key FROM schedule_weeks'))return{rows:a[0].filter(w=>state.weeks[w]).map(w=>({...structuredClone(state.weeks[w]),week_key:w}))};
  if(sql.startsWith('INSERT INTO leave_schedule_changes')){const [request_id,day,week,...json]=a;state.changes.push({request_id,day,week,...Object.fromEntries(['draft_before','draft_after','published_before','published_after'].map((k,i)=>[k,JSON.parse(json[i])]))});return{rows:[]};}
- if(sql.startsWith('SELECT *,day::text,week::text FROM leave_schedule_changes'))return{rows:structuredClone(state.changes)};
+ if(sql.startsWith('SELECT leave_schedule_changes.*,leave_schedule_changes.day::text AS day_key,leave_schedule_changes.week::text AS week_key FROM leave_schedule_changes'))return{rows:structuredClone(state.changes).map(row=>({...row,day_key:row.day,week_key:row.week}))};
  if(sql.startsWith('UPDATE schedule_weeks')){const row=state.weeks[a[0]];row.draft=JSON.parse(a[1]);row.published=JSON.parse(a[2]);if(row.published_revision===row.revision)row.published_revision++;row.revision++;return{rows:[]};}
  if(sql.startsWith('UPDATE leave_requests SET status=$2')){Object.assign(state.request,{status:a[1],revision:state.request.revision+1,planning_applied:a[5]});return{rows:[structuredClone(state.request)]};}
  if(sql.startsWith("UPDATE leave_requests SET status='cancelled'")){state.request.status='cancelled';state.request.revision++;return{rows:[structuredClone(state.request)]};}
