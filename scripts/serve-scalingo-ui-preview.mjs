@@ -28,7 +28,9 @@ try{
  gate.use((req,res,next)=>{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
-   // Demo laboratory prerequisite for challenge tests; email, documents and edits remain blocked.
+   // Phase 2 laboratory edit: exact record endpoint only; app auth, CSRF and revision checks apply.
+   if(req.method==='PUT'&&/^\/api\/laboratories\/\d+$/.test(req.path))return next();
+   // Demo laboratory creation; emails and document operations remain blocked.
    if(req.method==='POST'&&req.path==='/api/laboratories')return next();
    // Phase 2 challenges: permit only creation and editing of demo challenge records.
    // PDF uploads, report confirmation, emailing and all other writes remain blocked.
