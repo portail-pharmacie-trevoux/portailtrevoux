@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import express from 'express';
 import pg from 'pg';
@@ -20,12 +21,12 @@ function preview(db){
  const gate=express();registerScalingoTemperaturePreview(gate,{db,origin});
  const small=express.json({limit:'64kb'});gate.use((req,res,next)=>isTemperatureImport(req)?next():small(req,res,next));
  gate.use(scalingoUniverseBoundary(db));
- gate.use((req,res,next)=>isScalingoTemperatureRoute(req)?next():res.status(403).json({error:'Route désactivée dans la prévisualisation.'}));
+ gate.use((req,res,next)=>(isScalingoTemperatureRoute(req)||(req.method==='GET'&&req.path==='/api/quality/temperatures'))?next():res.status(403).json({error:'Route désactivée dans la prévisualisation.'}));
  gate.use(app);gate.use((e,req,res,next)=>res.status(e.status||500).json({error:e.message}));return gate;
 }
 test('Filtre température : seules les routes exactes import et consultation de sonde sont ouvertes',()=>{
- for(const [method,url] of [['POST',path],['GET','/api/quality/temperatures/FRIGO_TEST']])assert.equal(isScalingoTemperatureRoute({method,path:url}),true);
- for(const [method,url] of [['DELETE',path],['POST',path+'/other'],['PUT','/api/quality/temperatures/FRIGO_TEST'],['POST','/api/quality/temperatures/FRIGO_TEST/comments']])assert.equal(isScalingoTemperatureRoute({method,path:url}),false);
+ for(const [method,url] of [['POST',path],['GET','/api/quality/temperatures/FRIGO_TEST'],['POST','/api/quality/temperatures/FRIGO_TEST/comments'],['PUT','/api/quality/temperatures/FRIGO_TEST/comments/1']])assert.equal(isScalingoTemperatureRoute({method,path:url}),true);
+ for(const [method,url] of [['DELETE',path],['POST',path+'/other'],['PUT','/api/quality/temperatures/FRIGO_TEST']])assert.equal(isScalingoTemperatureRoute({method,path:url}),false);
 });
 test('Import Scalingo : administrateur, session, origine et CSRF vérifiés avant le parseur volumineux ; erreurs JSON explicites',async t=>{
  let actor={id:1,email:'admin-test@portailplus.invalid',role:'admin',active:true,must_change:false,csrf:'csrf'};
@@ -65,6 +66,9 @@ test('PostgreSQL local : vrai XLSX >64 Ko, doublons, conservation, rollback apr�
   INSERT INTO temperature_readings VALUES('AUTRE','2026-09-01T00:00:00Z',6);
   INSERT INTO temperature_comments(sensor_id,happened_at,text) VALUES('AUTRE','2026-09-01T00:00:00Z','Commentaire conservé');
  `);
+ const migration=await readFile(new URL('../scripts/scalingo-temperature-validation-schema.sql',import.meta.url),'utf8');await db.query(migration);await db.query(migration);
+ await db.query('CREATE TABLE IF NOT EXISTS quality_services(service text,collaborator_id integer,collaborator_name text)');
+ assert.equal((await db.query('SELECT validation FROM temperature_comments')).rows[0].validation,null);
  const raw=token();await db.query("INSERT INTO sessions VALUES($1,1,'csrf',now()+interval '1 hour')",[digest(raw)]);
  const gate=preview(db),server=gate.listen(0);t.after(()=>server.close());const base='http://127.0.0.1:'+server.address().port;
  const headers={cookie:'trevoux_session='+raw,origin,'x-csrf-token':'csrf','content-type':'application/json'};
@@ -94,4 +98,31 @@ test('PostgreSQL local : vrai XLSX >64 Ko, doublons, conservation, rollback apr�
  assert.equal((await db.query('SELECT count(*)::int AS n FROM temperature_readings')).rows[0].n,12003);
  assert.equal((await db.query("SELECT count(*)::int AS n FROM temperature_readings WHERE sensor_id='AUTRE' AND value=6")).rows[0].n,1);
  const detail=await fetch(base+'/api/quality/temperatures/FRIGO_TEST?month=2026-09',{headers});assert.equal(detail.status,200,await detail.clone().text());assert.equal((await detail.json()).readings.length,12002);
+ // Validation flows use the real app and preview security boundary against PostgreSQL.
+ await db.query("INSERT INTO temperature_sensors(id,name) VALUES('VALIDATION_TEST','Validation'); INSERT INTO temperature_readings VALUES ('VALIDATION_TEST','2026-09-30T21:50:00Z',9),('VALIDATION_TEST','2026-09-30T22:00:00Z',9),('VALIDATION_TEST','2026-09-30T22:10:00Z',5),('VALIDATION_TEST','2026-09-30T22:20:00Z',10),('VALIDATION_TEST','2026-09-30T22:30:00Z',5)");
+ await db.query("INSERT INTO temperature_comments(sensor_id,happened_at,text,operator_name,created_by) VALUES('VALIDATION_TEST','2026-09-30T21:50:00Z','Commentaire historique','TEST',1)");
+ const commentsPath='/api/quality/temperatures/VALIDATION_TEST/comments';
+ const writeComment=(method,suffix,body,extra={})=>fetch(base+commentsPath+suffix,{method,headers:{...headers,...extra},body:JSON.stringify(body)});
+ const calendar=async month=>{const r=await fetch(base+'/api/quality/temperatures?month='+month,{headers});assert.equal(r.status,200,await r.clone().text());return (await r.json()).sensors.find(s=>s.id==='VALIDATION_TEST');};
+ let september=await calendar('2026-09'),october=await calendar('2026-10');
+ assert.equal(september.days[29].state,'alert');assert.equal(september.days[29].validation,null);assert.equal(october.days[0].validation,null);
+ const legacy=(await db.query("SELECT id,revision FROM temperature_comments WHERE sensor_id='VALIDATION_TEST'")).rows[0];
+ assert.equal((await writeComment('PUT','/'+legacy.id,{text:'Maîtrisé',validation:'V',revision:legacy.revision},{'x-csrf-token':'bad'})).status,403);
+ response=await writeComment('PUT','/'+legacy.id,{text:'Maîtrisé',validation:'V',revision:legacy.revision});assert.equal(response.status,200,await response.clone().text());
+ assert.equal((await writeComment('PUT','/'+legacy.id,{text:'Conflit',validation:'X',revision:legacy.revision})).status,409);
+ assert.equal((await writeComment('POST','',{time:'2026-09-30 22:20:00',text:'',validation:'V'})).status,400);
+ assert.equal((await writeComment('POST','',{time:'2026-09-30 22:20:00',text:'Texte',validation:'invalid'})).status,400);
+ september=await calendar('2026-09');october=await calendar('2026-10');
+ assert.equal(september.days[29].validation,'V');assert.equal(september.days[29].state,'alert');assert.equal(october.days[0].validation,null,'Second episode remains unvalidated');
+ response=await writeComment('POST','',{time:'2026-09-30 22:20:00',text:'Problème identifié',validation:'X'});assert.equal(response.status,200,await response.text());
+ october=await calendar('2026-10');assert.equal(october.days[0].validation,'X');assert.equal(october.days[0].state,'alert');
+ const second=(await db.query("SELECT id,revision FROM temperature_comments WHERE sensor_id='VALIDATION_TEST' ORDER BY id DESC LIMIT 1")).rows[0];
+ response=await writeComment('PUT','/'+second.id,{text:'Résolu',validation:'V',revision:second.revision});assert.equal(response.status,200);
+ october=await calendar('2026-10');assert.equal(october.days[0].validation,'V');assert.equal(october.days[0].state,'alert');
+ const stored=(await db.query('SELECT history FROM temperature_comments WHERE id=$1',[legacy.id])).rows[0];assert.equal(stored.history[0].text,'Commentaire historique');assert.equal(stored.history[0].validation,null);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM temperature_readings')).rows[0].n,12008,'Validation never changes imported readings');
+ await db.query("UPDATE users SET role='employee' WHERE id=1");
+ assert.equal((await writeComment('PUT','/'+second.id,{text:'Interdit',validation:'X',revision:2})).status,403);
+ await db.query("UPDATE users SET role='admin' WHERE id=1");
+
 });

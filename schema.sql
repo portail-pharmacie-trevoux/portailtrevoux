@@ -307,6 +307,10 @@ CREATE INDEX IF NOT EXISTS quality_errors_date_idx ON quality_errors(identified_
 CREATE TABLE IF NOT EXISTS temperature_sensors(id TEXT PRIMARY KEY,name TEXT NOT NULL,low_threshold DOUBLE PRECISION NOT NULL DEFAULT 2,high_threshold DOUBLE PRECISION NOT NULL DEFAULT 8,revision INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS temperature_readings(sensor_id TEXT NOT NULL REFERENCES temperature_sensors(id),recorded_at TIMESTAMPTZ NOT NULL,value DOUBLE PRECISION NOT NULL,PRIMARY KEY(sensor_id,recorded_at));
 CREATE TABLE IF NOT EXISTS temperature_comments(id BIGSERIAL PRIMARY KEY,sensor_id TEXT NOT NULL REFERENCES temperature_sensors(id),happened_at TIMESTAMPTZ NOT NULL,text TEXT NOT NULL,operator_name TEXT NOT NULL,created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+ALTER TABLE temperature_comments ADD COLUMN IF NOT EXISTS validation TEXT CHECK (validation IN ('V','X'));
+ALTER TABLE temperature_comments ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE temperature_comments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE temperature_comments ADD COLUMN IF NOT EXISTS history JSONB NOT NULL DEFAULT '[]';
 CREATE INDEX IF NOT EXISTS temperature_comments_sensor_idx ON temperature_comments(sensor_id,happened_at);
 CREATE TABLE IF NOT EXISTS temperature_imports(id BIGSERIAL PRIMARY KEY,file_name TEXT NOT NULL,operator_name TEXT NOT NULL,imported_by INTEGER REFERENCES users(id) ON DELETE SET NULL,added INTEGER NOT NULL,ignored INTEGER NOT NULL,first_reading TIMESTAMPTZ NOT NULL,last_reading TIMESTAMPTZ NOT NULL,imported_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS temperature_reminders(month TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(month,user_id));
