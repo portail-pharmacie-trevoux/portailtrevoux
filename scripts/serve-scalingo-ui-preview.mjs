@@ -22,6 +22,8 @@ try{
  const admin=users.rows.filter(u=>u.email==='admin-test@portailplus.invalid'&&u.role==='admin'&&u.active===true);
  const others=users.rows.filter(u=>u.email!=='admin-test@portailplus.invalid');
  if(admin.length!==1||users.rows.length!==admin.length+others.length||others.length>demoEmails.length||others.some(u=>!demoEmails.includes(u.email)||u.role==='admin'||u.active!==true)||new Set(others.map(u=>u.email)).size!==others.length)throw Error('Unexpected staging accounts');
+ // Preview entrypoint bypasses server.mjs initialize(): apply only the audited, additive Communication title migration.
+ await db.query('ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120)');
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
