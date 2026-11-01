@@ -30,10 +30,10 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   section('Fiche du collaborateur',[
     {key:'firstName',label:'Prénom',required:true},{key:'lastName',label:'Nom de famille',required:true},
     {key:'birthday',label:'Date de naissance',type:'date'},{key:'phone',label:'Téléphone affiché dans l’annuaire',type:'tel'},
-    {key:'job',label:'Fonction prévue à la pharmacie',type:'select',options:['Pharmacien (cienne)','Préparateur(trice)','Autres précisez']}
+    {key:'job',label:'Fonction prévue à la pharmacie',type:'select',options:['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste','Autres précisez']}
   ],p,basicInputs,true);
   const job=basicInputs.get('job').input,otherJob=el('input'),otherLabel=el('label','Précisez la fonction');otherJob.id='employee-job-other';otherJob.maxLength=100;otherLabel.htmlFor=otherJob.id;job.after(otherLabel,otherJob);
-  const savedJob=p.job||'';if(savedJob&&!['Pharmacien (cienne)','Préparateur(trice)'].includes(savedJob)){job.value='Autres précisez';otherJob.value=savedJob==='Autres précisez'?'':savedJob;}
+  const savedJob=p.job||'';if(savedJob&&!['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste'].includes(savedJob)){job.value='Autres précisez';otherJob.value=savedJob==='Autres précisez'?'':savedJob;}
   const toggleJob=()=>{const other=job.value==='Autres précisez';otherJob.hidden=otherLabel.hidden=!other;otherJob.required=other;};job.onchange=toggleJob;toggleJob();
   employeeSections.forEach((s,index)=>section(s.title,s.fields,details,inputs,index===1));
   const account=section('Connexion personnelle au portail',[
@@ -79,6 +79,10 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     if(data.job==='Autres précisez')data.job=otherJob.value.trim();
     data.administratorRights=adminRights.checked;data.active=p.active!==false;data.details=Object.fromEntries([...inputs].map(([key,item])=>[key,value(item)]));data.detailsRevision=loaded.detailsRevision;
     if(!isAdministrator){data.rights=[...rights].filter(([,check])=>check.checked).map(([key])=>key);data.editRights=[...editRights].filter(([,check])=>check.checked).map(([key])=>key);}
+    // The isolated Scalingo preview permits profession changes only for existing demo staff.
+    if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'&&p.id){
+      for(const key of Object.keys(data))if(!['firstName','lastName','phone','birthday','job','active','email'].includes(key))delete data[key];
+    }
     try{const result=await api('/api/users'+(p.id?'/'+p.id:''),p.id?'PUT':'POST',data);await onSaved(result,'Fiche enregistrée. Les droits sont appliqués immédiatement.');}
     catch(error){status.textContent=error.message;status.scrollIntoView?.({block:'center'});save.disabled=false;}
   };
