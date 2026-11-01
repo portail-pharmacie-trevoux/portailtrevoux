@@ -102,6 +102,13 @@ try{
    }
    // Allow administrators to create fictional work posts (e.g. Comptoir) in isolated staging.
    if(req.method==='POST'&&req.path==='/api/schedule-posts')return next();
+   // Allow applying only the seeded demonstration template to the isolated 2026-11-02 draft.
+   if(req.method==='POST'&&req.path==='/api/schedule/2026-11-02/apply-template'){
+     const templateId=req.body?.templateId;
+     const template=Number.isSafeInteger(templateId)?(await db.query('SELECT id,name FROM schedule_templates WHERE id=$1',[templateId])).rows[0]:null;
+     if(!template||template.name!=='semaine test')return res.status(403).json({error:'Seule la semaine type fictive est autorisée.'});
+     return next();
+   }
    // Phase 2 schedule: allow editing and clearing a single fictional employee day only.
    // Publishing, copying, locking, templates and real employee management remain blocked.
    if(req.method==='PUT'&&/^\/api\/schedule\/\d{4}-\d{2}-\d{2}\/day$/.test(req.path))return next();
