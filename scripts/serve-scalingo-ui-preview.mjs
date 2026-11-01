@@ -30,6 +30,10 @@ try{
  gate.use((req,res,next)=>{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
+   // Phase 2 schedule: allow editing and clearing a single fictional employee day only.
+   // Publishing, copying, locking, templates and real employee management remain blocked.
+   if(req.method==='PUT'&&/^\/api\/schedule\/\d{4}-\d{2}-\d{2}\/day$/.test(req.path))return next();
+   if(req.method==='POST'&&/^\/api\/schedule\/\d{4}-\d{2}-\d{2}\/clear-day$/.test(req.path))return next();
    // Phase 2 laboratory edit: exact record endpoint only; app auth, CSRF and revision checks apply.
    if(req.method==='PUT'&&/^\/api\/laboratories\/\d+$/.test(req.path))return next();
    // Demo laboratory creation; emails and document operations remain blocked.
