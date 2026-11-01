@@ -27,9 +27,20 @@ try{
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
- gate.use((req,res,next)=>{
+ gate.use(express.json({limit:'64kb'}));
+ gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    const permittedApi=(req.method==='POST'&&['/api/login','/api/logout'].includes(req.path))||(req.method==='GET'&&['/api/me','/api/calendar','/api/google/status','/api/users','/api/schedule','/api/schedule-posts','/api/schedule-templates','/api/news/recipients','/api/news','/api/news/sent','/api/procedures','/api/hr/documents','/api/hr/signatures','/api/laboratories','/api/laboratories/responsibles','/api/quality/services','/api/merchandising','/api/merchandising/plan','/api/merchandising/impact','/api/merchandising/promotions','/api/merchandising/documents','/api/challenges','/api/challenges/options','/api/quality/errors','/api/quality/temperatures','/api/quality/tiers-payant'].includes(req.path));
+   // Staging-only demo profession editing: never permit arbitrary user/profile writes.
+   if(req.method==='PUT'&&/^\/api\/users\/\d+$/.test(req.path)){
+     const id=Number(req.path.split('/').pop());
+     const person=(await db.query('SELECT * FROM users WHERE id=$1',[id])).rows[0];
+     if(!person||!demoEmails.includes(person.email)||person.role==='admin')return res.status(403).json({error:'Modification réservée aux collaborateurs fictifs.'});
+     const body=req.body||{};
+     const same=(key,current)=>body[key]===undefined||body[key]===current;
+     if(!same('firstName',person.first_name)||!same('lastName',person.last_name)||!same('phone',person.phone||'')||!same('birthday',person.birthday instanceof Date?person.birthday.toISOString().slice(0,10):person.birthday||'')||!same('active',person.active)||!same('email',person.email)||body.details!==undefined||body.password!==undefined||body.administratorRights!==undefined||body.rights!==undefined||body.editRights!==undefined||typeof body.job!=='string'||!['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste'].includes(body.job))return res.status(403).json({error:'Seule la fonction professionnelle fictive peut être modifiée sur cet environnement.'});
+     return next();
+   }
    // Allow administrators to create fictional work posts (e.g. Comptoir) in isolated staging.
    if(req.method==='POST'&&req.path==='/api/schedule-posts')return next();
    // Phase 2 schedule: allow editing and clearing a single fictional employee day only.
@@ -57,7 +68,7 @@ try{
    if(api&&!permittedApi)return res.status(403).json({error:'Fonction désactivée dans la prévisualisation.'});
    if(!api&&!['GET','HEAD'].includes(req.method))return res.status(403).type('text/plain').send('Action non disponible.');
    next();
- });
+ }catch(error){next(error);}});
  gate.use(app);
  const server=gate.listen(Number(env.PORT)||3000,env.SCALINGO_PREVIEW_BIND_HOST==='127.0.0.1'?'127.0.0.1':'0.0.0.0',()=>console.log('Prévisualisation Portail+ restreinte active.'));
  process.on('SIGTERM',()=>server.close(()=>db.end()));
