@@ -1,0 +1,55 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import pg from 'pg';
+import {once} from 'node:events';
+import {createApp} from '../server.mjs';
+import {token,digest} from '../security.mjs';
+import {scalingoUniverseBoundary} from '../scripts/scalingo-universal-rights.mjs';
+import {registerScalingoSchedulePublication} from '../scripts/scalingo-schedule-publication-preview.mjs';
+const origin='https://portailplus-hds.osc-fr1.scalingo.io',database=process.env.PORTAIL_PUBLICATION_TEST_DATABASE_URL,week='2026-11-02',path='/api/schedule/'+week+'/publish';
+const deny=(q,s)=>s.status(403).json({error:'Fonction désactivée dans la prévisualisation'});
+test('Scalingo : publication uniquement, sans ouverture générale des écritures planning',async t=>{
+ const gate=express();registerScalingoSchedulePublication(gate,(q,s)=>s.json({delegated:true}));gate.use(deny);const server=gate.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>server.close());
+ for(const [method,p,status]of [['POST',path,200],['POST','/api/schedule/2026-11-09/publish',200],['PUT',path,403],['DELETE',path,403],['GET',path,403],['POST',path+'/all',403],['POST','/api/schedule/invalid/publish',403],['POST','/api/schedule/2026-11-02/email',403],['POST','/api/news',403]])assert.equal((await fetch('http://127.0.0.1:'+server.address().port+p,{method})).status,status,method+p);
+});
+test('Scalingo/PostgreSQL : publication atomique, message interne, Vu, idempotence et concurrence',{skip:!database},async t=>{
+ const url=new URL(database);assert.equal(url.hostname,'127.0.0.1');assert.equal(url.pathname,'/portailplus_publication_test');assert.equal(url.search,'');
+ const db=new pg.Pool({connectionString:database,max:5});t.after(()=>db.end());
+ await db.query(`DROP TABLE IF EXISTS team_message_recipients,team_messages,publications,schedule_weeks,sessions,users CASCADE;
+ CREATE TABLE users(id integer PRIMARY KEY,name text,job text,schedule_position integer,role text,active boolean,must_change boolean,rights jsonb DEFAULT '[]',edit_rights jsonb DEFAULT '[]',permissions_configured boolean DEFAULT true);
+ CREATE TABLE sessions(id text PRIMARY KEY,user_id integer REFERENCES users(id),csrf text,expires_at timestamptz);
+ CREATE TABLE schedule_weeks(week date PRIMARY KEY,draft jsonb NOT NULL DEFAULT '{}',published jsonb,revision integer NOT NULL DEFAULT 0,published_revision integer,published_at timestamptz,locked_days jsonb NOT NULL DEFAULT '{}');
+ CREATE TABLE publications(id bigserial PRIMARY KEY,universe text,title text,source_key text UNIQUE,created_at timestamptz DEFAULT now());
+ CREATE TABLE team_messages(id serial PRIMARY KEY,title text,sender_id integer REFERENCES users(id),sender_name text NOT NULL,text text NOT NULL,priority text DEFAULT 'normal',created_at timestamptz DEFAULT now(),attachment_name text,can_archive boolean DEFAULT true,planning_week date,is_reply boolean DEFAULT false,reply_to_id integer,thread_id integer,challenge_digest jsonb,order_digest jsonb,merchandising_month text,expires_on date);
+ CREATE TABLE team_message_recipients(message_id integer REFERENCES team_messages(id) ON DELETE CASCADE,user_id integer REFERENCES users(id),seen boolean DEFAULT false,seen_at timestamptz,archived boolean DEFAULT false,PRIMARY KEY(message_id,user_id));`);
+ const cookies={};for(const [id,role,active,mustChange]of [[1,'admin',true,false],[2,'employee',true,false],[3,'employee',true,false],[4,'employee',false,false],[5,'admin',true,true]]){await db.query('INSERT INTO users(id,name,job,role,active,must_change,rights,edit_rights) VALUES($1,$2,\'Local\',$3,$4,$5,$6,$6)',[id,'Compte TEST local '+id,role,active,mustChange,JSON.stringify(['Emplois du temps'])]);const raw=token();cookies[id]='trevoux_session='+raw;await db.query("INSERT INTO sessions VALUES($1,$2,$3,now()+interval '1 hour')",[digest(raw),id,'csrf-'+id]);}
+ const entry={userId:2,day:week,kind:'travail',slots:[['08:00','12:00']]},draft={['2:'+week]:entry};
+ await db.query("INSERT INTO schedule_weeks(week,draft,published,revision,published_revision,published_at) VALUES($1,$2,'{}',3,2,'2026-10-01T10:00:00Z'),('2026-10-26','{}','{}',7,7,'2026-10-01T10:00:00Z')",[week,JSON.stringify(draft)]);
+ await db.query("INSERT INTO team_messages(id,sender_id,sender_name,text) VALUES(100,1,'Compte TEST local 1','Message protégé')");await db.query('INSERT INTO team_message_recipients VALUES(100,2,true,now(),false)');
+ const protectedWeek=async()=>(await db.query("SELECT * FROM schedule_weeks WHERE week='2026-10-26'")).rows[0],before=await protectedWeek();
+ const protectedMessage=async()=>(await db.query('SELECT m.*,r.seen,r.seen_at,r.archived FROM team_messages m JOIN team_message_recipients r ON r.message_id=m.id WHERE m.id=100')).rows[0],messageBefore=await protectedMessage();
+ let external=0;const blocked=async()=>{external++;throw Error('External notification forbidden in tests');};
+ function start(){const {app}=createApp(db,{origin,secret:'local-publication-only-'.repeat(3),mailFetch:blocked,employeeScanFetch:blocked}),gate=express();gate.use(express.json({limit:'64kb'}));gate.use(scalingoUniverseBoundary(db));registerScalingoSchedulePublication(gate,app);gate.get('/api/schedule',(q,s,n)=>app(q,s,n));gate.get('/api/news',(q,s,n)=>app(q,s,n));gate.patch('/api/news/:id',(q,s,n)=>app(q,s,n));gate.use(deny);gate.use((e,q,s,n)=>s.status(e.status||500).json({error:e.message}));const server=gate.listen(0,'127.0.0.1');t.after(()=>{server.closeAllConnections();server.close();});return server;}
+ let server=start();await once(server,'listening');const request=(p,method='GET',body,user=1,extra={})=>fetch('http://127.0.0.1:'+server.address().port+p,{method,headers:{origin,cookie:cookies[user]||'','x-csrf-token':'csrf-'+user,'content-type':'application/json',...extra},body:body===undefined?undefined:JSON.stringify(body)}),publish=(revision=3,user=1,extra={})=>request(path,'POST',{revision},user,extra);
+ for(const user of [0,4])assert.equal((await publish(3,user)).status,401);for(const user of [2,3,5])assert.equal((await publish(3,user)).status,403);assert.equal((await publish(3,1,{'x-csrf-token':'bad'})).status,403);assert.equal((await publish(3,1,{origin:'https://wrong.invalid'})).status,403);
+ for(const revision of [null,-1,'3',3.5])assert.equal((await publish(revision)).status,400);for(const date of ['2026-11-03','2026-02-30'])assert.equal((await request('/api/schedule/'+date+'/publish','POST',{revision:3})).status,400);
+ const readSchedule=(user=1)=>request('/api/schedule?week='+week+'&scope=mine','GET',undefined,user);
+ assert.equal((await(await readSchedule()).json()).unpublishedChanges,true);assert.deepEqual((await(await readSchedule(2)).json()).entries,[]);
+ // Two simultaneous successful retries must produce exactly one publication.
+ const attempts=await Promise.all([publish(),publish()]);assert(attempts.every(r=>r.status===200));const replies=await Promise.all(attempts.map(r=>r.json()));assert.equal(replies.filter(r=>r.alreadyPublished).length,1);
+ const published=(await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0];assert.deepEqual(published.published,draft);assert.equal(published.published_revision,3);assert.equal(published.revision,3);assert(published.published_at>new Date('2026-10-01T10:00:00Z'));
+ const loaded=await(await readSchedule()).json();assert.equal(loaded.unpublishedChanges,false);assert.equal(loaded.publishedAt,published.published_at.toISOString());assert.deepEqual((await(await readSchedule(2)).json()).entries,[entry]);
+ const notices=async()=>(await db.query('SELECT * FROM team_messages WHERE planning_week=$1 ORDER BY id',[week])).rows;assert.equal((await notices()).length,1);const notice=(await notices())[0];assert.equal(notice.sender_name,'Portail +');assert.match(notice.text,/02\/11\/2026 au 08\/11\/2026/);assert.match(notice.text,/Merci de consulter.*Emplois du temps/);assert.equal(notice.priority,'normal');assert.equal(notice.can_archive,false);
+ const deliveries=(await db.query('SELECT * FROM team_message_recipients WHERE message_id=$1 ORDER BY user_id',[notice.id])).rows;assert.deepEqual(deliveries.map(r=>r.user_id),[1,2,3,5]);assert(deliveries.every(r=>!r.seen&&!r.archived));
+ for(const user of [2,3]){const inbox=await(await request('/api/news','GET',undefined,user)).json();assert(inbox.some(m=>m.id===notice.id&&m.text===notice.text));}
+ assert.equal((await request('/api/news/'+notice.id,'PATCH',{seen:true},2,{'x-csrf-token':'bad'})).status,403);assert.equal((await request('/api/news/'+notice.id,'PATCH',{seen:true},2)).status,200);const seen=(await db.query('SELECT user_id,seen,seen_at FROM team_message_recipients WHERE message_id=$1 ORDER BY user_id',[notice.id])).rows;assert(seen.find(r=>r.user_id===2).seen_at);assert.equal(seen.find(r=>r.user_id===3).seen,false);
+ assert.equal((await request('/api/news/'+notice.id,'PATCH',{archived:true},2)).status,404);
+ assert.equal((await(await publish()).json()).alreadyPublished,true);assert.equal((await notices()).length,1);assert.equal((await db.query('SELECT count(*)::int AS n FROM publications')).rows[0].n,1);
+ // A new draft revision may publish once; a stale revision cannot overwrite it.
+ const newer={...draft,['3:'+week]:{userId:3,day:week,kind:'repos',slots:[]}};await db.query('UPDATE schedule_weeks SET draft=$2,revision=4 WHERE week=$1',[week,JSON.stringify(newer)]);assert.equal((await publish(3)).status,409);assert.equal((await publish(4)).status,200);assert.equal((await notices()).length,2);assert.deepEqual((await db.query('SELECT published FROM schedule_weeks WHERE week=$1',[week])).rows[0].published,newer);
+ // Simulated delivery failure must roll back the publication and its notice.
+ await db.query("UPDATE schedule_weeks SET revision=5 WHERE week=$1",[week]);const beforeFailure=(await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0];await db.query("CREATE FUNCTION reject_local_delivery() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'local fixture failure'; END $$; CREATE TRIGGER reject_delivery BEFORE INSERT ON team_message_recipients FOR EACH ROW EXECUTE FUNCTION reject_local_delivery()");assert.equal((await publish(5)).status,500);assert.deepEqual((await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0],beforeFailure);assert.equal((await notices()).length,2);assert.equal((await db.query('SELECT count(*)::int AS n FROM publications')).rows[0].n,2);await db.query('DROP TRIGGER reject_delivery ON team_message_recipients; DROP FUNCTION reject_local_delivery()');
+ server.closeAllConnections();await new Promise(r=>server.close(r));server=start();await once(server,'listening');const afterReload=await(await readSchedule()).json();assert.equal(afterReload.unpublishedChanges,true);assert.equal(afterReload.publishedAt,beforeFailure.published_at.toISOString());assert((await(await request('/api/news','GET',undefined,2)).json()).some(m=>m.id===notice.id&&m.seen));
+ assert.equal(external,0);assert.deepEqual(await protectedWeek(),before);assert.deepEqual(await protectedMessage(),messageBefore);
+});
