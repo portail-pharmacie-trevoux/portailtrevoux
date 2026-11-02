@@ -40,7 +40,7 @@ test('Navigateur annuaire : ajout manuel Sans accès, persistance, confirmation 
    row().querySelector('button[aria-label^="Retirer"]').click();check(document.querySelector('#removeDialog').open,'Confirmation missing');document.querySelector('#keep').click();
    check((await (await fetch('/fixture-state')).json()).calls.every(c=>c.method!=='DELETE'),'Cancelled withdrawal sent');
    row().querySelector('button[aria-label^="Retirer"]').click();document.querySelector('#confirmRemove').click();await until(()=>row()?.closest('.inactive-people'));
-   check(![...row().querySelectorAll('button')].some(b=>b.textContent==='Supprimer définitivement'),'Permanent deletion exposed');
+   check([...row().querySelectorAll('button')].some(b=>b.textContent==='Supprimer définitivement'),'Permanent deletion missing for inactive employee');
    [...row().querySelectorAll('button')].find(b=>b.textContent==='Réactiver').click();await until(()=>row()&&!row().closest('.inactive-people'));
    check(row().querySelector('.access-state').textContent==='Sans accès','Restoration enabled login');
    location.replace('/?persist=1');

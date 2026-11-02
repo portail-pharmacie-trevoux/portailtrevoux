@@ -31,8 +31,9 @@ Les colonnes de connexion (`email`, `password_hash`, `must_change`), le rôle, l
 statut actif et les traces d’invitation ne sont jamais modifiés par ce PUT.
 Une tentative de changement est refusée. Les données de contact confidentielles
 peuvent être renseignées dans la fiche chiffrée, sans créer un accès personnel.
-Les routes d’invitation, d’activation de l’accès personnel et de suppression
-définitive restent bloquées. La création manuelle et le retrait/rétablissement
+Les routes d’invitation et d’activation de l’accès personnel restent bloquées.
+La suppression définitive des seuls inactifs, avec contrôle des dépendances et
+audit minimal, est décrite dans `scalingo-employee-deletion.md`. La création manuelle et le retrait/rétablissement
 des nouvelles fiches sont décrits ci-dessous. Aucun service de messagerie n’est appelé.
 
 Le formulaire utilise les restrictions reçues avec la fiche, et conserve le
@@ -92,8 +93,8 @@ que son appartenance à l’annuaire actif, sans activer un accès au portail.
 La session Scalingo expose `features.employeeAccountsReadOnly` sur `/api/me` et
 après connexion. Le formulaire désactive les identifiants facultatifs et ne les
 envoie pas. L’annuaire affiche « Sans accès », masque les actions de retrait pour
-les comptes importés, désactive les invitations et n’expose pas la suppression
-définitive. Le formulaire et les réponses hors prévisualisation restent inchangés.
+les comptes importés, désactive les invitations et expose la suppression définitive uniquement dans
+les inactifs, avec double confirmation et les contrôles décrits ci-dessus. Le formulaire et les réponses hors prévisualisation restent inchangés.
 
 L’aperçu des droits universels continue de cibler les 16 fiches importées : les
 fiches manuelles de test, actives ou retirées, ne faussent pas ce contrôle

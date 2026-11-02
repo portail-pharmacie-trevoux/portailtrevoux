@@ -1,5 +1,6 @@
 // Scalingo-only profile editing. Never dispatch writes to the general account
 // management endpoint: credentials, activation, role and invitations stay locked.
+import {deleteScalingoEmployee} from './scalingo-employee-deletion.mjs';
 import {randomUUID} from 'node:crypto';
 import {publicPerson,validatePerson} from '../collaborateurs.mjs';
 import {readEmployeeDetails,saveEmployeeDetails,validateEmployeeDetails} from '../employee-details.mjs';
@@ -35,6 +36,11 @@ export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret
   await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);
   await client.query('COMMIT');res.json(active?publicPerson(person,true,req.cleanupAdmin.id):{ok:true});
  }catch(e){if(client)await client.query('ROLLBACK').catch(()=>{});next(e);}finally{client?.release();}};
+ gate.delete('/api/users/:id/permanent',privacy,adminAuth,write,async(req,res,next)=>{try{
+  const id=idOf(req),body=req.body;
+  if(!body||Object.keys(body).some(k=>!['confirmation','confirmationText'].includes(k))||body.confirmation!==id||body.confirmationText!=='SUPPRIMER')throw fail(400,'Confirmez le collaborateur et saisissez exactement SUPPRIMER.');
+  res.json(await deleteScalingoEmployee({db,id,actorId:req.cleanupAdmin.id}));
+ }catch(e){next(e);}});
  gate.delete('/api/users/:id',privacy,adminAuth,write,lifecycle(false));
  gate.post('/api/users/:id/restore',privacy,adminAuth,write,lifecycle(true));
  gate.get('/api/users/:id/details',privacy,adminAuth,async(req,res,next)=>{try{

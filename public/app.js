@@ -197,12 +197,21 @@ function renderPeople(){
           if(p.invitationSentAt)invitation.append(node('small','Dernière invitation : '+new Date(p.invitationSentAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'}),'field-note'));
           actions.append(invitation);
         }
-        if(p.role!=='admin'&&(!session.features?.employeeAccountsReadOnly||p.previewManualRecord)){
-          if(active){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
-          else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);if(!session.features?.employeeAccountsReadOnly){const permanent=button('Supprimer définitivement',async()=>{
-            if(!confirm('Supprimer définitivement '+personName(p)+' ? Sa fiche confidentielle, ses accès et ses entrées de planning seront effacés du portail. Cette action est irréversible.'))return;
-            permanent.disabled=true;restore.disabled=true;try{await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id});await reloadPeople('Collaborateur supprimé définitivement.');}catch(e){error(e);permanent.disabled=false;restore.disabled=false;}
-          },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));actions.append(permanent);}}
+        if(p.role!=='admin'){
+          const canRetire=!session.features?.employeeAccountsReadOnly||p.previewManualRecord;
+          if(active&&canRetire){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
+          else if(!active){
+            let restore=null;if(canRetire){restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);}
+            const permanent=button('Supprimer définitivement',async()=>{
+              permanent.disabled=true;if(restore)restore.disabled=true;
+              try{
+                const body={confirmation:p.id};
+                if(session.features?.employeeAccountsReadOnly){const module=await import('/employee-delete-dialog.js');const word=await module.confirmEmployeeDeletion(personName(p));if(word===null)return;body.confirmationText=word;}
+                else if(!confirm('Supprimer définitivement '+personName(p)+' ? Sa fiche confidentielle, ses accès et ses entrées de planning seront effacés du portail. Cette action est irréversible.'))return;
+                await api('/api/users/'+p.id+'/permanent','DELETE',body);await reloadPeople('Collaborateur supprimé définitivement.');
+              }catch(e){if(session?.features?.employeeAccountsReadOnly)q('#feedback').textContent=e.message;else error(e);}finally{permanent.disabled=false;if(restore)restore.disabled=false;}
+            },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));actions.append(permanent);
+          }
         }
         tr.append(actions);
       }

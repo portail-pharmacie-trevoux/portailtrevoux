@@ -56,6 +56,6 @@ test('Scalingo/PostgreSQL : création Sans accès, retrait et réactivation cibl
  list=await (await request('/api/users')).json();assert.equal(list.find(p=>p.id===created.id).passwordConfigured,false);assert.equal(list.filter(p=>p.active).length,18);
  await db.query('UPDATE users SET email=$2 WHERE id=$1',[created.id,'must-not-enable@example.invalid']);
  assert.equal((await request('/api/users/'+created.id+'/restore','POST')).status,409);await db.query('UPDATE users SET email=NULL WHERE id=$1',[created.id]);
- for(const [path,method]of [['/api/users/'+created.id+'/invitation','POST'],['/api/users/'+created.id+'/permanent','DELETE'],['/api/password','POST'],['/api/collaborateurs/import','POST']])assert.equal((await request(path,method,{})).status,403);
+ for(const [path,method]of [['/api/users/'+created.id+'/invitation','POST'],['/api/password','POST'],['/api/collaborateurs/import','POST']])assert.equal((await request(path,method,{})).status,403);
  assert.equal(externalCalls,0);assert.deepEqual(await snapshot(),protectedBefore);assert.deepEqual(await account(),fresh);
 });

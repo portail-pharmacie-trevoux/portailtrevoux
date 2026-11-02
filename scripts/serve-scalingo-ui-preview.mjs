@@ -8,6 +8,7 @@ import pg from 'pg';
 import {createApp} from '../server.mjs';
 import {hashPassword,token} from '../security.mjs';
 import {validateTemplateDay} from '../schedule-templates.mjs';
+import {ensureScalingoEmployeeDeletionAudit} from './scalingo-employee-deletion.mjs';
 import {registerScalingoEmployeeRecords} from './scalingo-employee-records-preview.mjs';
 import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth} from './scalingo-universal-rights.mjs';
 import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTemperatureRoute} from './scalingo-temperature-preview.mjs';
@@ -48,6 +49,7 @@ try{
  console.log('Scalingo quality followup schema ready; columns added: '+qualitySchema.added.join(','));
  const trainingSchema=await ensureScalingoTrainingDocumentsSchema(db);
  console.log('Scalingo reference documents schema ready; columns added: '+trainingSchema.added.join(','));
+ await ensureScalingoEmployeeDeletionAudit(db);
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
