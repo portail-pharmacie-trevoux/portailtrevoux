@@ -9,13 +9,13 @@ test('Planning: compare additions, deletions, posts, types, comments and optiona
  assert.deepEqual(changedScheduleUsers(old,{[key]:{...a,leaveRequestId:123}}),[]);
 });
 test('Planning publication targets only changed collaborators and preserves unaffected notices',async t=>{
- let row={revision:0,published_revision:null,published:{},draft:{a:entry(2),b:entry(3)}},sent=[],commits=0;
+ let row={revision:0,published_revision:null,published_at:'2026-10-01T00:00:00Z',published:{},draft:{a:entry(2),b:entry(3)}},sent=[],commits=0;
  const db={connect:async()=>({query:db.query,release(){}}),query:async(sql,a)=>{
  if(sql==='COMMIT'){commits++;return {rows:[]};}
  if(sql==='BEGIN'||sql==='ROLLBACK'||sql.includes('pg_advisory_xact_lock')||sql.startsWith('DELETE FROM team_messages'))return {rows:[]};
  if(sql.startsWith('INSERT INTO schedule_weeks'))return{rows:[]};
  if(sql.startsWith('SELECT *'))return{rows:[row]};
- assert.match(sql,/WITH changed/);assert.match(sql,/DELETE FROM team_message_recipients r USING team_messages m/);
+ assert.match(sql,/WITH changed/);assert.match(sql,/published_revision IS DISTINCT FROM revision/);assert.match(sql,/DELETE FROM team_message_recipients r USING team_messages m/);
  assert.match(sql,/r.user_id=ANY\(\$5::int\[\]\)/);assert.match(sql,/u.active=TRUE AND u.id=ANY\(\$5::int\[\]\)/);
  assert.ok(!sql.includes('seen=TRUE'));assert.match(a[3],/semaine du 12\/10\/2026 au 18\/10\/2026/);
  if(row.published_revision===row.revision)return {rows:[]};
@@ -32,3 +32,4 @@ test('Planning publication targets only changed collaborators and preserves unaf
  assert.equal((await post(1)).status,409);assert.equal(sent.length,3);assert.equal(commits,5);
 });
 test('Notification planning : Vu autorisé, archivage refusé côté serveur',async t=>{const app=express();app.use(express.json());const db={query:async(sql,a)=>{if(sql.startsWith('DELETE'))return{rows:[]};assert.match(sql,/m.can_archive OR \$4::boolean IS NOT TRUE/);return{rows:a[3]===true?[]:[{seen:true,archived:false}]};}};registerNews({app,db,auth:pass,ready:pass,csrf:pass,viewUniverse:()=>pass,fail});app.use((e,q,s,n)=>s.status(e.status||500).json({error:e.message}));const server=app.listen(0);t.after(()=>server.close());const patch=body=>fetch('http://127.0.0.1:'+server.address().port+'/api/news/1',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(body)});assert.equal((await patch({archived:true})).status,404);assert.equal((await patch({seen:true})).status,200);});
+

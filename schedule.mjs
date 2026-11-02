@@ -137,7 +137,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const affected=changedScheduleUsers(previous.published||{},previous.draft||{});
     const {rows}=await client.query(`WITH changed AS (
       UPDATE schedule_weeks SET published=draft,published_revision=revision,published_at=now()
-      WHERE week=$1::date AND revision=$2 AND (published_at IS NULL OR published_revision<>revision)
+      WHERE week=$1::date AND revision=$2 AND (published_at IS NULL OR published_revision IS DISTINCT FROM revision)
       RETURNING published_at
     ), publication AS (
       INSERT INTO publications(universe,title) SELECT 'Emplois du temps',$3 FROM changed RETURNING id
@@ -157,9 +157,10 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     ) SELECT publication.id,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Votre emploi du temps a été mis à jour pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.',affected]);
     await client.query("DELETE FROM team_messages m WHERE m.planning_week IS NOT NULL AND m.sender_id IS NULL AND m.sender_name='Portail +' AND m.can_archive=FALSE AND NOT EXISTS(SELECT 1 FROM team_message_recipients r WHERE r.message_id=m.id)");
     await client.query('COMMIT');
-    if(!rows.length){const row=await weekRow(week);if(row?.revision!==revision)throw conflict();return res.json({ok:true,alreadyPublished:true});}
+    if(!rows.length){const row=await weekRow(week);if(!row||row.revision!==revision||!row.published_at||row.published_revision!==revision)throw conflict();return res.json({ok:true,alreadyPublished:true});}
     res.json({ok:true});
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   });
 }
+
 
