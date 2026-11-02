@@ -8,6 +8,7 @@ import pg from 'pg';
 import {createApp} from '../server.mjs';
 import {hashPassword,token} from '../security.mjs';
 import {validateTemplateDay} from '../schedule-templates.mjs';
+import {registerScalingoRegistrationForm,verifyScalingoRegistrationFormAsset} from './scalingo-registration-form-preview.mjs';
 import {ensureScalingoEmployeeDeletionAudit} from './scalingo-employee-deletion.mjs';
 import {registerScalingoEmployeeRecords} from './scalingo-employee-records-preview.mjs';
 import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth} from './scalingo-universal-rights.mjs';
@@ -50,6 +51,8 @@ try{
  const trainingSchema=await ensureScalingoTrainingDocumentsSchema(db);
  console.log('Scalingo reference documents schema ready; columns added: '+trainingSchema.added.join(','));
  await ensureScalingoEmployeeDeletionAudit(db);
+ const registrationPDF=await verifyScalingoRegistrationFormAsset();
+ console.log('Scalingo employee registration PDF verified: '+JSON.stringify(registrationPDF));
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
@@ -81,6 +84,7 @@ try{
  registerScalingoProcedures(gate,app);
  registerScalingoHRDocuments(gate,app);
  registerScalingoTrainingDocuments(gate,app);
+ registerScalingoRegistrationForm(gate,app);
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    // Exact import/detail routes only; app-level authentication and CSRF still run.
