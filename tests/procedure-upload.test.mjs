@@ -88,7 +88,7 @@ test('import protégé, stockage intégral, téléchargement, modification et re
  const beforeRejected=Buffer.from(stored.file_content);
  assert.equal((await previewRequest('/api/procedures/import','POST',body,{'content-type':'multipart/form-data; boundary=unsupported'})).status,415);
  assert.equal((await previewRequest('/api/procedures','POST',{})).status,403);
- assert.equal((await previewRequest('/api/procedures/1','DELETE')).status,403);
+ assert.equal((await previewRequest('/api/procedures/1/purge','DELETE')).status,403);
  assert.equal((await previewRequest('/api/procedures/import','POST',{...body,fileName:'file.exe'})).status,400);
  const oversized=await previewRequest('/api/procedures/import','POST',{...body,fileData:Buffer.alloc(50*1024*1024+1).toString('base64')});
  assert.equal(oversized.status,413);assert.match((await oversized.json()).error,/50 Mo/);

@@ -88,7 +88,7 @@ export function createApp(db,config) {
   }
   registerPortalQuickLinks({app,db,auth,ready,admin,csrf,fail});
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
-  registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:procedureUploadJsonLimit})});
+  registerProcedures({app,db,auth,ready,admin,adminManagement:config.procedureAdminManagement===true,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:procedureUploadJsonLimit})});
   registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser:express.json({limit:'70mb'})});
   registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify});
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});

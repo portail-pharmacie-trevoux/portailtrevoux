@@ -1,6 +1,6 @@
 import { validateProcedureFile, maxProcedureDocumentBytes } from './procedure-files.mjs';
 
-export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser}){
+export function registerProcedures({app,db,auth,ready,admin,adminManagement=false,csrf,viewUniverse,editUniverse,fail,publish,uploadParser}){
  const fields={category:100,title:200,description:1500,keywords:500,url:1000};
  const columns='id,category,title,description,keywords,url,created_at,file_name,file_type,source_url,source_imported_at,octet_length(file_content) AS file_size';
  function validate(body,storedUrl=null){
@@ -18,6 +18,7 @@ export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniv
   return d;
  }
  const guard=[auth,ready,editUniverse('Procédures'),csrf];
+ const manageGuard=adminManagement?[auth,ready,admin,editUniverse('Procédures'),csrf]:guard;
  app.get('/api/procedures',auth,ready,viewUniverse('Procédures'),async(req,res)=>res.json((await db.query('SELECT '+columns+' FROM procedure_documents WHERE active=TRUE ORDER BY lower(category),lower(title),id')).rows));
  app.post('/api/procedures/import',...guard,(req,res,next)=>req.is('application/json')?next():next(fail(415,'Envoyez le document en JSON encodé en Base64.')),uploadParser,async(req,res)=>{
   const file=validateProcedureFile(req.body,fail,maxProcedureDocumentBytes);
@@ -42,7 +43,7 @@ export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniv
   await publish('Procédures','Document ajouté : '+d.title);
   res.status(201).json(row);
  });
- app.put('/api/procedures/:id',...guard,async(req,res)=>{
+ app.put('/api/procedures/:id',...manageGuard,async(req,res)=>{
   const existing=(await db.query('SELECT url,file_name FROM procedure_documents WHERE id=$1 AND active=TRUE',[req.params.id])).rows[0];
   if(!existing)throw fail(404,'Document introuvable.');
   const d=validate(req.body,existing.file_name?existing.url:null);
@@ -50,6 +51,6 @@ export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniv
   if(!row)throw fail(404,'Document introuvable.');
   res.json(row);
  });
- app.delete('/api/procedures/:id',...guard,async(req,res)=>{const row=(await db.query('UPDATE procedure_documents SET active=FALSE WHERE id=$1 AND active=TRUE RETURNING id',[req.params.id])).rows[0];if(!row)throw fail(404,'Document introuvable.');res.json({ok:true});});
- app.post('/api/procedures/:id/restore',...guard,async(req,res)=>{const row=(await db.query('UPDATE procedure_documents SET active=TRUE WHERE id=$1 AND active=FALSE RETURNING id',[req.params.id])).rows[0];if(!row)throw fail(404,'Document introuvable.');res.json({ok:true});});
+ app.delete('/api/procedures/:id',...manageGuard,async(req,res)=>{const row=(await db.query('UPDATE procedure_documents SET active=FALSE WHERE id=$1 AND active=TRUE RETURNING id',[req.params.id])).rows[0];if(!row)throw fail(404,'Document introuvable.');res.json({ok:true});});
+ app.post('/api/procedures/:id/restore',...manageGuard,async(req,res)=>{const row=(await db.query('UPDATE procedure_documents SET active=TRUE WHERE id=$1 AND active=FALSE RETURNING id',[req.params.id])).rows[0];if(!row)throw fail(404,'Document introuvable.');res.json({ok:true});});
 }
