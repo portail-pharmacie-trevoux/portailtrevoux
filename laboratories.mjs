@@ -31,8 +31,9 @@ export function registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,p
   const row=(await db.query('SELECT logo_type,logo_content FROM laboratories WHERE id=$1',[req.params.id])).rows[0];if(!row?.logo_content)throw fail(404,'Logo introuvable.');res.type(row.logo_type).send(row.logo_content);
  });
  app.post('/api/laboratories/:id/logo',...guard,express.json({limit:'3mb'}),async(req,res)=>{
-  const raw=req.body?.fileData;if(typeof raw!=='string'||!raw||raw.length>2800000||! /^[A-Za-z0-9+/]+={0,2}$/.test(raw))throw fail(400,'Choisissez une image PNG, JPEG ou WebP de 2 Mo maximum.');
-  const bytes=Buffer.from(raw,'base64');if(!bytes.length||bytes.length>2*1024*1024)throw fail(400,'Le logo doit peser au maximum 2 Mo.');
+  const raw=req.body?.fileData;if(typeof raw!=='string'||!raw||raw.length>Math.ceil(2*1024*1024/3)*4||raw.length%4!==0||! /^[A-Za-z0-9+/]+={0,2}$/.test(raw))throw fail(400,'Choisissez une image PNG, JPEG ou WebP de 2 Mo maximum.');
+  if(!Number.isSafeInteger(req.body.revision)||req.body.revision<1)throw fail(400,'Actualisez la fiche avant de remplacer le logo.');
+  const bytes=Buffer.from(raw,'base64');if(bytes.toString('base64')!==raw)throw fail(400,'Le logo n’a pas pu être lu.');if(!bytes.length||bytes.length>2*1024*1024)throw fail(400,'Le logo doit peser au maximum 2 Mo.');
   let type;if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))type='image/png';else if(bytes[0]===255&&bytes[1]===216&&bytes[2]===255)type='image/jpeg';else if(bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP')type='image/webp';else throw fail(400,'Format du logo invalide : PNG, JPEG ou WebP attendu.');
   const row=(await db.query('UPDATE laboratories SET logo_content=$2,logo_type=$3,logo_version=logo_version+1,revision=revision+1,updated_at=now(),updated_by=$4 WHERE id=$1 AND revision=$5 RETURNING id',[req.params.id,bytes,type,req.auth.id,req.body.revision])).rows[0];if(!row)throw fail(409,'La fiche a changé. Actualisez-la avant de remplacer le logo.');res.json({ok:true});
  });

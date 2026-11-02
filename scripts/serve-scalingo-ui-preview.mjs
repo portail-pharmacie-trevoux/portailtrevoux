@@ -17,6 +17,7 @@ import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTempera
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
 import {isScalingoTrainingImport,registerScalingoTrainingDocuments} from './scalingo-training-documents-preview.mjs';
 import {ensureScalingoTrainingDocumentsSchema} from './ensure-scalingo-training-documents-schema.mjs';
+import {isScalingoLaboratoryUpload,registerScalingoLaboratories} from './scalingo-laboratories-preview.mjs';
 import {isScalingoPromotionDocumentImport,registerScalingoPromotionDocuments} from './scalingo-promotion-documents-preview.mjs';
 import {isScalingoHRImport,registerScalingoHRDocuments} from './scalingo-hr-documents-preview.mjs';
 import {isScalingoProcedureImport,registerScalingoProcedures} from './scalingo-procedures-preview.mjs';
@@ -60,7 +61,7 @@ try{
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});
  const smallJson=express.json({limit:'64kb'});
- gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req))?next():smallJson(req,res,next));
+ gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req)||isScalingoLaboratoryUpload(req))?next():smallJson(req,res,next));
  // One-time cleanup control: restricted to the exact staging admin and origin.
  // The purge subprocess independently checks the database, account roster and TLS.
  const cleanupAuth=scalingoTestAdminAuth(db);
@@ -87,6 +88,7 @@ try{
  registerScalingoHRDocuments(gate,app);
  registerScalingoTrainingDocuments(gate,app);
  registerScalingoPromotionDocuments(gate,app);
+ registerScalingoLaboratories(gate,app);
  registerScalingoRegistrationForm(gate,app);
  registerScalingoEmployeeImport(gate,app);
  gate.use(async(req,res,next)=>{try{
@@ -138,7 +140,7 @@ try{
    if(req.method==='POST'&&/^\/api\/schedule\/\d{4}-\d{2}-\d{2}\/clear-day$/.test(req.path))return next();
    // Phase 2 laboratory edit: exact record endpoint only; app auth, CSRF and revision checks apply.
    if(req.method==='PUT'&&/^\/api\/laboratories\/\d+$/.test(req.path))return next();
-   // Demo laboratory creation; emails and document operations remain blocked.
+   // Laboratory creation; attachment and email routes are delegated above.
    if(req.method==='POST'&&req.path==='/api/laboratories')return next();
    // Phase 2 Communication: plain-text demo messages and recipient read/archive only.
    if(req.method==='POST'&&req.path==='/api/news'){

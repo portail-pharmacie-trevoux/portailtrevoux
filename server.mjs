@@ -341,7 +341,7 @@ export function createApp(db,config) {
   app.use((error,req,res,next)=>{
     if(error.code==='23505')return res.status(409).json({error:'Cette adresse e-mail est déjà utilisée.'});
     const status=error.status||500;
-    if(status===413)return res.status(413).json({error:req.path==='/api/procedures/import'?`Le fichier dépasse la limite de ${maxProcedureDocumentMiB} Mo.`:'Le fichier dépasse la limite de 10 Mo.'});
+    if(status===413)return res.status(413).json({error:req.path==='/api/procedures/import'?`Le fichier dépasse la limite de ${maxProcedureDocumentMiB} Mo.`:/^\/api\/laboratories\/[1-9]\d*\/logo$/.test(req.path)?'Le logo dépasse la limite de 2 Mo.':'Le fichier dépasse la limite de 10 Mo.'});
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message,...(error.code==='MFA_REQUIRED'?{code:'MFA_REQUIRED'}:{})});
   });
