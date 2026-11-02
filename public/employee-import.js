@@ -11,7 +11,7 @@ export async function renderEmployeeImport({container,api,people,onReview,isCurr
  const newOption=el('option','Créer un nouveau collaborateur');newOption.value='';target.append(newOption);
  people.filter(p=>p.role!=='admin').forEach(p=>{const o=el('option',p.firstName+' '+p.lastName+(p.active?'':' (inactif)'));o.value=p.id;target.append(o);});
  const fileLabel=el('label','Fiche manuscrite'),file=el('input');file.id='employee-scan-file';file.type='file';file.accept='.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';file.required=true;fileLabel.htmlFor=file.id;
- const consentLabel=el('label'),consent=el('input');consent.type='checkbox';consent.required=true;consentLabel.append(consent,' Analyser cette fiche avec le service OpenAI connecté.');
+ const consentLabel=el('label'),consent=el('input');consent.type='checkbox';consent.required=true;file.onchange=()=>{consent.checked=false;};consentLabel.append(consent,' Analyser cette fiche avec le service OpenAI connecté.');
  const submit=el('button','Lire la fiche et vérifier les informations','btn primary');submit.type='submit';submit.disabled=!configured;
  form.append(targetLabel,target,fileLabel,file,el('p','La fiche est transmise au service de lecture pour l’analyse. Le scan n’est pas conservé dans le portail ; les informations ne sont enregistrées qu’après votre validation.','field-note'),consentLabel,feedback,submit);container.append(form);
  function connection(){
@@ -27,14 +27,15 @@ export async function renderEmployeeImport({container,api,people,onReview,isCurr
  connection();
  form.onsubmit=async e=>{
   e.preventDefault();const selected=file.files[0];if(!selected)return;
+  if(!consent.checked){feedback.textContent='Confirmez l’analyse de cette fiche par le service OpenAI connecté.';return;}
   if(!selected.size||selected.size>10*1024*1024){feedback.textContent='Le fichier est vide ou dépasse 10 Mo.';return;}
   if(!/\.(pdf|jpe?g|png)$/i.test(selected.name)){feedback.textContent='Choisissez un PDF, une photo JPEG ou PNG.';return;}
   submit.disabled=true;file.disabled=true;target.disabled=true;feedback.textContent='Lecture de la fiche en cours…';
   try{
    const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(Error('Impossible de lire le fichier.'));reader.readAsDataURL(selected);});
-   const draft=await api('/api/collaborateurs/scan','POST',{fileName:selected.name,fileData:data});if(!isCurrent())return;
+   const draft=await api('/api/collaborateurs/scan','POST',{fileName:selected.name,fileData:data,analysisConsent:true});if(!isCurrent())return;
    if(!Object.keys(draft.values).length){feedback.textContent='Aucune information exploitable détectée. '+draft.notes.join(' ');return;}
-   const person=target.value?people.find(p=>String(p.id)===target.value):{firstName:'',lastName:'',phone:'',birthday:'',job:'',active:true,role:'employee',rights:[],editRights:[],permissionsConfigured:true};
+   const person=target.value?people.find(p=>String(p.id)===target.value):{firstName:'',lastName:'',phone:'',birthday:'',job:'',active:true,role:'employee',rights:[],editRights:[],permissionsConfigured:true,...(status.previewRestrictions?{previewRestrictions:status.previewRestrictions}:{})};
    draft.sourceUrl=URL.createObjectURL(selected);file.value='';
    try{await onReview(person,draft);}catch(e){URL.revokeObjectURL(draft.sourceUrl);throw e;}
   }catch(e){feedback.textContent=e.message;}

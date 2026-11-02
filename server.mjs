@@ -170,7 +170,7 @@ export function createApp(db,config) {
     await db.query('DELETE FROM sessions WHERE user_id=$1',[req.auth.id]);
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
-  registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeScanFetch,uploadParser:express.json({limit:'15mb'})});
+  registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeImportFetch??config.employeeScanFetch,requireConsent:config.employeeImportConsentRequired===true,previewRestrictions:config.employeeAccountsReadOnly?{accountReadOnly:true}:undefined,uploadParser:express.json({limit:'15mb'})});
   registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar});
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');

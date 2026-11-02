@@ -42,10 +42,10 @@ export function cleanEmployeeExtraction(result,fail){
  if(!values.lastName&&values.birthName)values.lastName=values.birthName;
  return {values,warnings,notes:result.notes};
 }
-export function registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey,model='gpt-4.1',uploadParser,fetchImpl=fetch}){
+export function registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey,model='gpt-4.1',uploadParser,fetchImpl=fetch,requireConsent=false,previewRestrictions}){
  const guards=[auth,ready,admin],busy=new Set();
  const readKey=async()=>{if(apiKey)return apiKey;const row=(await db.query("SELECT value FROM settings WHERE key='employee_import_openai_key'")).rows[0];return row?decrypt(row.value,secret).key:null;};
- app.get('/api/collaborateurs/scan/status',...guards,async(req,res)=>res.json({configured:!!await readKey(),managedByEnvironment:!!apiKey}));
+ app.get('/api/collaborateurs/scan/status',...guards,async(req,res)=>res.json({configured:!!await readKey(),managedByEnvironment:!!apiKey,...(requireConsent?{requiresConsent:true}:{}),...(previewRestrictions?{previewRestrictions}:{})}));
  app.post('/api/collaborateurs/scan/config',...guards,csrf,async(req,res)=>{
   if(apiKey)throw fail(409,'La connexion est déjà configurée par le serveur.');
   const key=req.body?.apiKey;
@@ -58,6 +58,7 @@ export function registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret
   await db.query("DELETE FROM settings WHERE key='employee_import_openai_key'");res.json({configured:false});
  });
  app.post('/api/collaborateurs/scan',...guards,csrf,uploadParser,async(req,res)=>{
+  if(requireConsent&&req.body?.analysisConsent!==true)throw fail(400,'Confirmez l’analyse de cette fiche par le service OpenAI connecté.');
   const file=validateEmployeeScan(req.body,fail),key=await readKey();
   if(!key)throw fail(503,'Connectez d’abord le service de lecture avec une clé API OpenAI.');
   if(busy.has(req.auth.id))throw fail(429,'Une fiche est déjà en cours de lecture.');

@@ -2,7 +2,7 @@ import {employeeSections} from './employee-fields.js';
 const el=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;};
 const control=(text,click,cls='btn small')=>{const b=el('button',text,cls);b.type='button';b.onclick=click;return b;};
 export async function renderEmployeeRecord({container,api,person,onClose,onSaved,onPayroll,universes,draft=null,isCurrent=()=>true}) {
-  const loaded=person.id?await api('/api/users/'+person.id+'/details'):{person,details:{},detailsRevision:0};if(!isCurrent())return;
+  const loaded=person.id?await api('/api/users/'+person.id+'/details'):{person,details:{},detailsRevision:0,previewRestrictions:person.previewRestrictions};if(!isCurrent())return;
   const restrictions=loaded.previewRestrictions;
   const p={...loaded.person},details={...loaded.details},inputs=new Map(),basicInputs=new Map(),isAdministrator=p.role==='admin';
   if(draft){for(const [key,value] of Object.entries(draft.values)){if(['firstName','lastName','birthday','phone','job'].includes(key))p[key]=value;else details[key]=value;}}

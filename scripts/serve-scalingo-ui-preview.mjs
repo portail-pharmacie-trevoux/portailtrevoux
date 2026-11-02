@@ -8,6 +8,7 @@ import pg from 'pg';
 import {createApp} from '../server.mjs';
 import {hashPassword,token} from '../security.mjs';
 import {validateTemplateDay} from '../schedule-templates.mjs';
+import {registerScalingoEmployeeImport,isScalingoEmployeeScan,createScalingoEmployeeImportFetch} from './scalingo-employee-import-preview.mjs';
 import {registerScalingoRegistrationForm,verifyScalingoRegistrationFormAsset} from './scalingo-registration-form-preview.mjs';
 import {ensureScalingoEmployeeDeletionAudit} from './scalingo-employee-deletion.mjs';
 import {registerScalingoEmployeeRecords} from './scalingo-employee-records-preview.mjs';
@@ -53,12 +54,12 @@ try{
  await ensureScalingoEmployeeDeletionAudit(db);
  const registrationPDF=await verifyScalingoRegistrationFormAsset();
  console.log('Scalingo employee registration PDF verified: '+JSON.stringify(registrationPDF));
- const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
+ const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});
  const smallJson=express.json({limit:'64kb'});
- gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req))?next():smallJson(req,res,next));
+ gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req))?next():smallJson(req,res,next));
  // One-time cleanup control: restricted to the exact staging admin and origin.
  // The purge subprocess independently checks the database, account roster and TLS.
  const cleanupAuth=scalingoTestAdminAuth(db);
@@ -85,6 +86,7 @@ try{
  registerScalingoHRDocuments(gate,app);
  registerScalingoTrainingDocuments(gate,app);
  registerScalingoRegistrationForm(gate,app);
+ registerScalingoEmployeeImport(gate,app);
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    // Exact import/detail routes only; app-level authentication and CSRF still run.
