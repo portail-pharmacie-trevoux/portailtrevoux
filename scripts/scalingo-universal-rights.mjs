@@ -37,7 +37,7 @@ export function backupReady(env,now=Date.now()){
 }
 // Extra boundary for modules whose historic write guards only checked consultation.
 export function scalingoUniverseBoundary(db){
- const prefixes=[['/api/calendar','Agenda'],['/api/schedule','Emplois du temps'],['/api/schedule-posts','Emplois du temps'],['/api/schedule-templates','Emplois du temps'],['/api/laboratories','Laboratoires'],['/api/merchandising',"Outils d'aide au merchandising"],['/api/challenges','Challenges'],['/api/procedures','Procédures'],['/api/training','Formations'],['/api/contacts','Contacts utiles'],['/api/quality',"Outils d'aide à la démarche qualité"],['/api/music','Fun']];
+ const prefixes=[['/api/calendar','Agenda'],['/api/schedule','Emplois du temps'],['/api/schedule-posts','Emplois du temps'],['/api/schedule-templates','Emplois du temps'],['/api/laboratories','Laboratoires'],['/api/merchandising',"Outils d'aide au merchandising"],['/api/challenges','Challenges'],['/api/procedures','Procédures'],['/api/hr','Ressources humaines'],['/api/training','Formations'],['/api/contacts','Contacts utiles'],['/api/quality',"Outils d'aide à la démarche qualité"],['/api/music','Fun']];
  return async(req,res,next)=>{try{
   const universe=prefixes.find(([prefix])=>req.path===prefix||req.path.startsWith(prefix+'/'))?.[1];
   if(!universe)return next();

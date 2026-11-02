@@ -25,10 +25,9 @@ les autres types de requêtes après authentification, droits et CSRF.
 
 RH utilise également JSON/Base64 et le validateur partagé, mais conserve une
 politique distincte : 10 Mo décodés et parseur de 15 Mo, import administrateur
-uniquement. Le filtre Scalingo ne permet pas actuellement cet import. Une future
-extension RH doit adapter son interface, sa route et le filtre séparément, tout
-en conservant l’accès aux documents personnels pour leur destinataire et les
-administrateurs seulement. Le changement Procédures n’élargit aucun droit RH et
+uniquement. L’ouverture ciblée de cet import et la confidentialité des documents
+personnels sont décrites dans `scalingo-hr-documents.md`. Toute augmentation
+future de la limite RH doit adapter séparément son interface et sa route. Le changement Procédures n’élargit aucun droit RH et
 n’active aucun envoi pour signature.
 
 ## Vérification
