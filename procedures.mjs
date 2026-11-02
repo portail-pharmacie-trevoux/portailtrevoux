@@ -19,7 +19,7 @@ export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniv
  }
  const guard=[auth,ready,editUniverse('Procédures'),csrf];
  app.get('/api/procedures',auth,ready,viewUniverse('Procédures'),async(req,res)=>res.json((await db.query('SELECT '+columns+' FROM procedure_documents WHERE active=TRUE ORDER BY lower(category),lower(title),id')).rows));
- app.post('/api/procedures/import',...guard,uploadParser,async(req,res)=>{
+ app.post('/api/procedures/import',...guard,(req,res,next)=>req.is('application/json')?next():next(fail(415,'Envoyez le document en JSON encodé en Base64.')),uploadParser,async(req,res)=>{
   const file=validateProcedureFile(req.body,fail,maxProcedureDocumentBytes);
   const d=validate(req.body,'uploaded');
   const row=(await db.query(`WITH next_id AS (SELECT nextval(pg_get_serial_sequence('procedure_documents','id')) AS id)

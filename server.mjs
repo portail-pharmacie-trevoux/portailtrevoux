@@ -34,6 +34,7 @@ import express from 'express';
 import { importProcedureDocuments } from './procedure-import.mjs';
 import {registerTrainingDocuments} from './training-documents.mjs';
 import { registerProcedures } from './procedures.mjs';
+import {procedureUploadJsonLimit,maxProcedureDocumentMiB} from './public/procedure-upload-limits.js';
 import { registerContacts } from './contacts.mjs';
 import { registerCollaborateurs } from './collaborateurs.mjs';
 import { createProductSources } from './product-sources.mjs';
@@ -87,7 +88,7 @@ export function createApp(db,config) {
   }
   registerPortalQuickLinks({app,db,auth,ready,admin,csrf,fail});
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
-  registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'70mb'})});
+  registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:procedureUploadJsonLimit})});
   registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser:express.json({limit:'70mb'})});
   registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify});
   registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
@@ -339,7 +340,7 @@ export function createApp(db,config) {
   app.use((error,req,res,next)=>{
     if(error.code==='23505')return res.status(409).json({error:'Cette adresse e-mail est déjà utilisée.'});
     const status=error.status||500;
-    if(status===413)return res.status(413).json({error:req.path==='/api/procedures/import'?'Le fichier dépasse la limite de 50 Mo.':'Le fichier dépasse la limite de 10 Mo.'});
+    if(status===413)return res.status(413).json({error:req.path==='/api/procedures/import'?`Le fichier dépasse la limite de ${maxProcedureDocumentMiB} Mo.`:'Le fichier dépasse la limite de 10 Mo.'});
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message,...(error.code==='MFA_REQUIRED'?{code:'MFA_REQUIRED'}:{})});
   });

@@ -77,11 +77,21 @@ test('import protégé, stockage intégral, téléchargement, modification et re
  assert.deepEqual(stored.file_content,existing);user.role='admin';
  assert.equal((await previewRequest('/api/procedures/import','POST',largeBody)).status,201);
  assert.deepEqual(Buffer.from(await (await previewRequest('/api/procedures/1/file')).arrayBuffer()),largePdf);
+ for(const sizeMiB of [2,10,40])await t.test(`Scalingo : PDF de ${sizeMiB} Mo, import et téléchargement intégraux`,async()=>{
+  const sizedPdf=Buffer.concat([pdf.subarray(0,pdf.length-6),Buffer.alloc(sizeMiB*1024*1024-pdf.length,32),Buffer.from('%%EOF\n')]);
+  assert.equal(sizedPdf.length,sizeMiB*1024*1024);
+  const response=await previewRequest('/api/procedures/import','POST',{...body,fileData:sizedPdf.toString('base64')});
+  assert.equal(response.status,201);assert.deepEqual(stored.file_content,sizedPdf);
+  const downloaded=await previewRequest('/api/procedures/1/file');assert.equal(downloaded.status,200);
+  assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()),sizedPdf);
+ });
+ const beforeRejected=Buffer.from(stored.file_content);
+ assert.equal((await previewRequest('/api/procedures/import','POST',body,{'content-type':'multipart/form-data; boundary=unsupported'})).status,415);
  assert.equal((await previewRequest('/api/procedures','POST',{})).status,403);
  assert.equal((await previewRequest('/api/procedures/1','DELETE')).status,403);
  assert.equal((await previewRequest('/api/procedures/import','POST',{...body,fileName:'file.exe'})).status,400);
  const oversized=await previewRequest('/api/procedures/import','POST',{...body,fileData:Buffer.alloc(50*1024*1024+1).toString('base64')});
  assert.equal(oversized.status,413);assert.match((await oversized.json()).error,/50 Mo/);
- assert.deepEqual(stored.file_content,largePdf);
+ assert.deepEqual(stored.file_content,beforeRejected);
  const form=await request('/api/collaborateurs/registration-form');assert.equal(form.status,200);assert.deepEqual(Buffer.from(await form.arrayBuffer()),pdf);
 });
