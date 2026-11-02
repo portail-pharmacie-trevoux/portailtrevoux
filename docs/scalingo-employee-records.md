@@ -1,0 +1,68 @@
+# Fiches collaborateurs dans la prévisualisation Scalingo
+
+## Diagnostic
+
+Le filtre limitait `GET /api/users/:id/details` aux cinq anciens e-mails fictifs et
+excluait même la fiche Administrateur TEST. L’interface `employee-record.js`
+retirait aussi les détails confidentiels, les droits et leur révision du PUT
+lorsque le nom d’hôte était celui de Scalingo. Enfin, le seul PUT autorisé à cet
+endroit acceptait exclusivement `{rights,editRights}`, pas une fiche complète.
+
+Le fonctionnement de `collaborateurs.mjs` et `employee-details.mjs` a été comparé
+à `origin/main` en lecture seule. Les validations de profil et de fiche, le
+chiffrement et la protection des révisions sont réutilisés, sans changement de
+ces modules ni déploiement Render.
+
+## Ouverture ciblée et protections
+
+`scalingo-employee-records-preview.mjs` est monté avant le filtre général et
+l’ancienne interface de droits. Il ouvre uniquement :
+
+- GET d’une fiche existante, pour l’administrateur TEST authentifié, actif et
+  ayant changé son mot de passe ; réponse confidentielle sans cache ;
+- PUT d’une fiche salariée existante : origine exacte, CSRF, liste fermée des
+  champs, validations, transaction et verrou sur l’utilisateur ;
+- modification explicite des droits de consultation et de modification, avec la
+  validation Scalingo des univers protégés et révocation des sessions du salarié
+  si ses permissions changent. Aucune nouvelle session n’est créée.
+
+Les comptes administrateurs sont consultables mais protégés en écriture.
+Les colonnes de connexion (`email`, `password_hash`, `must_change`), le rôle, le
+statut actif et les traces d’invitation ne sont jamais modifiés par ce PUT.
+Une tentative de changement est refusée. Les données de contact confidentielles
+peuvent être renseignées dans la fiche chiffrée, sans créer un accès personnel.
+Les routes d’invitation, activation, création, retrait et suppression de comptes
+restent bloquées. Aucun service de messagerie n’est appelé.
+
+Le formulaire utilise les restrictions reçues avec la fiche, et conserve le
+comportement habituel hors Scalingo. Il transmet les détails et leur révision,
+laisse les contrôles de connexion désactivés et protège la fiche administrateur.
+Une sauvegarde de coordonnées sans changement des cases de permissions omet les
+droits du PUT : les permissions spécifiques existantes restent intactes. Lors
+d’une modification explicite, les droits spécifiques visibles sont conservés
+s’ils ne sont pas décochés. Les anciens champs confidentiels non remplacés sont
+également conservés côté serveur.
+
+L’API historique avec un corps contenant uniquement les deux listes de droits
+reste soumise à ses contrôles et à sa vérification de sauvegarde. L’action
+globale avec aperçu, conservation des droits spécifiques et confirmation reste
+inchangée. Le nouveau parcours d’édition des fiches ne l’exécute pas.
+
+## Validation et déploiement
+
+Les tests de mutation utilisent exclusivement `127.0.0.1`, dans la base nommée
+`portailplus_employee_test` (`PORTAIL_EMPLOYEE_TEST_DATABASE_URL`). Ils vérifient
+les 16 fiches salariées et la fiche TEST, les refus de sécurité, le chiffrement,
+les révisions périmées, le retour arrière transactionnel, la persistance après
+redémarrage et sur une connexion indépendante. Les champs de connexion de tous
+les comptes et les autres fiches doivent rester strictement identiques.
+
+Un test Chromium vérifie le formulaire, la sauvegarde des données, les droits par
+univers, la conservation d’un droit spécifique, le compte administrateur en
+lecture seule et le comportement hors prévisualisation. Les appels de messagerie
+doivent rester à zéro. Aucun test ne modifie une fiche réelle sur Scalingo.
+
+Aucune migration de schéma n’est nécessaire. Avant déploiement, vérifier une
+sauvegarde Scalingo récente réussie ; déployer exclusivement le SHA de la branche
+Scalingo. Contrôler ensuite le SHA actif, `/health`, le JavaScript public et les
+refus des routes sans session, sans ouvrir ou modifier les données réelles.

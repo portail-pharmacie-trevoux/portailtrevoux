@@ -8,6 +8,7 @@ import pg from 'pg';
 import {createApp} from '../server.mjs';
 import {hashPassword,token} from '../security.mjs';
 import {validateTemplateDay} from '../schedule-templates.mjs';
+import {registerScalingoEmployeeRecords} from './scalingo-employee-records-preview.mjs';
 import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth} from './scalingo-universal-rights.mjs';
 import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTemperatureRoute} from './scalingo-temperature-preview.mjs';
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
@@ -70,6 +71,7 @@ try{
      res.set('Cache-Control','no-store').type('text/plain').send(result.stdout+'\\n'+result.stderr);
    }catch(e){res.status(409).type('text/plain').send('Opération refusée ou annulée : '+(e.stdout||'')+' '+(e.stderr||e.message));}
  });
+ registerScalingoEmployeeRecords({gate,db,adminAuth:cleanupAuth,origin,secret:env.APP_SECRET});
  registerScalingoRights({gate,db,adminAuth:cleanupAuth,origin,env});
  gate.use(scalingoUniverseBoundary(db));
  // POST /api/quality/tiers-payant/import: real app auth, CSRF, referent rights and validation.
@@ -92,12 +94,6 @@ try{
      if(existing!==0)return res.status(409).json({error:'Import initial interdit : collaborateurs déjà présents dans Scalingo.'});
      return next();
    }
-   if(req.method==='GET'&&/^\/api\/users\/\d+\/details$/.test(req.path)){
-     const id=Number(req.path.split('/')[3]);
-     const person=(await db.query('SELECT email,role FROM users WHERE id=$1',[id])).rows[0];
-     if(!person||!demoEmails.includes(person.email)||person.role==='admin')return res.status(403).json({error:'Fiche non disponible dans la prévisualisation.'});
-     return next();
-   }
    if(req.method==='GET'&&/^\/api\/schedule-templates\/\d+$/.test(req.path))return next();
    if(req.method==='GET'&&/^\/api\/leave-requests\/\d+\/preview$/.test(req.path))return next();
    if(req.method==='POST'&&/^\/api\/leave-requests\/\d+\/review$/.test(req.path)){
@@ -113,7 +109,7 @@ try{
      if(!row||row.status!=='approved'||!demoEmails.includes(row.email)||row.start_date!=='2026-11-05'||row.end_date!=='2026-11-05'||!row.comment.includes('DEMANDE FICTIVE'))return res.status(403).json({error:'Annulation réservée au congé fictif validé.'});
      return next();
    }
-   // Permission-only user PUTs are handled above; profile writes stay disabled.
+   // Profile and permission-only PUTs are handled above; account operations stay blocked.
    if(req.method==='GET'&&['/api/music','/api/contacts','/api/training/documents'].includes(req.path))return next();
    if(req.method==='GET'&&/^\/api\/(?:hr\/documents|training\/documents)\/\d+\/(?:file|print)$/.test(req.path))return next();
    if(req.method==='POST'&&req.path==='/api/music')return next();

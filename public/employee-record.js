@@ -3,6 +3,7 @@ const el=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textConten
 const control=(text,click,cls='btn small')=>{const b=el('button',text,cls);b.type='button';b.onclick=click;return b;};
 export async function renderEmployeeRecord({container,api,person,onClose,onSaved,onPayroll,universes,draft=null,isCurrent=()=>true}) {
   const loaded=person.id?await api('/api/users/'+person.id+'/details'):{person,details:{},detailsRevision:0};if(!isCurrent())return;
+  const restrictions=loaded.previewRestrictions;
   const p={...loaded.person},details={...loaded.details},inputs=new Map(),basicInputs=new Map(),isAdministrator=p.role==='admin';
   if(draft){for(const [key,value] of Object.entries(draft.values)){if(['firstName','lastName','birthday','phone','job'].includes(key))p[key]=value;else details[key]=value;}}
   container.replaceChildren();const root=el('section','','employee-record'),form=el('form');form.id='employee-record-form';form.autocomplete='off';
@@ -42,6 +43,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   ],{email:p.email||'',password:''},basicInputs,false);
   basicInputs.get('password').input.minLength=12;basicInputs.get('password').input.autocomplete='new-password';
   account.append(el('p','Renseignez une adresse e-mail, puis utilisez « Envoyer demande de connexion » dans l’annuaire. Le salarié choisira lui-même son mot de passe. Le mot de passe provisoire reste facultatif (12 caractères minimum).','field-note'));
+  if(restrictions?.accountReadOnly){basicInputs.get('email').input.disabled=true;basicInputs.get('password').input.disabled=true;account.append(el('p','Connexion personnelle et invitations indisponibles dans cet environnement.','field-note'));}
   if(isAdministrator){account.classList.add('hidden');basicInputs.get('email').input.disabled=true;basicInputs.get('password').input.disabled=true;}
   const permissions=el('section','','employee-permissions');permissions.id='employee-permissions';
   permissions.append(el('h3','Accès et modification des univers'),el('p','Consulter donne accès à l’univers. Modifier autorise les changements dans son contenu. Cocher Modifier active aussi Consulter.','field-note'));
@@ -49,7 +51,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   ['Univers','Consulter / accéder','Modifier le contenu'].forEach(text=>{const th=el('th',text);th.scope='col';headRow.append(th);});head.append(headRow);table.append(head);
   const body=el('tbody'),rights=new Map(),editRights=new Map();
   const allowed=p.permissionsConfigured?p.rights||[]:[...new Set([...(p.rights||[]),'Collaborateurs','Fun','Outils de calculs rapides','Actualités','Ressources humaines'])];
-  const modifiable=p.permissionsConfigured?p.editRights||[]:['Fun'];
+  const modifiable=p.permissionsConfigured?p.editRights||[]:restrictions?[...new Set([...(p.editRights||[]),'Fun'])]:['Fun'];
   for(const universe of universes){
     const tr=el('tr'),name=el('th',universe==='Actualités'?'Communication':universe);name.scope='row';tr.append(name);
     const read=el('input');read.type='checkbox';read.checked=isAdministrator||["Outils d'aide à la démarche qualité",'Actualités','Agenda'].includes(universe)||allowed.includes(universe);read.disabled=isAdministrator||["Outils d'aide à la démarche qualité",'Actualités','Agenda'].includes(universe);read.setAttribute('aria-label','Consulter '+(universe==='Actualités'?'Communication':universe));
@@ -63,7 +65,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     tr.append(editCell);body.append(tr);
   }
   table.append(body);wrap.append(table);permissions.append(wrap);
-  const adminLabel=el('label'),adminRights=el('input');adminRights.type='checkbox';adminRights.checked=isAdministrator;adminRights.disabled=isAdministrator;adminRights.id='employee-administrator-rights';adminLabel.htmlFor=adminRights.id;adminLabel.append(adminRights,' Donner des droits administrateur');
+  const adminLabel=el('label'),adminRights=el('input');adminRights.type='checkbox';adminRights.checked=isAdministrator;adminRights.disabled=isAdministrator||!!restrictions?.accountReadOnly;adminRights.id='employee-administrator-rights';adminLabel.htmlFor=adminRights.id;adminLabel.append(adminRights,' Donner des droits administrateur');
   permissions.append(adminLabel,el('p','Donne les mêmes droits que l’administrateur : accès et modification de tous les univers, gestion des collaborateurs et consultation des fiches confidentielles. Un compte de connexion actif est nécessaire.','field-note'));
   const initialReads=new Map([...rights].map(([key,input])=>[key,input.checked])),initialEdits=new Map([...editRights].map(([key,input])=>[key,input.checked]));
   adminRights.onchange=()=>{for(const [key,input] of rights){input.checked=adminRights.checked||initialReads.get(key);input.disabled=adminRights.checked||["Outils d'aide à la démarche qualité",'Actualités','Agenda'].includes(key);}for(const [key,input] of editRights){input.checked=adminRights.checked||initialEdits.get(key);input.disabled=adminRights.checked||key==='Actualités';}};
@@ -71,7 +73,8 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   permissions.append(el('p',isAdministrator?'Ce compte administrateur conserve l’accès et la gestion de tous les univers.':'Les données des collaborateurs et les connexions Google restent gérées par l’administrateur. Les droits de modification s’appliquent aux outils de contenu disponibles ; les autres univers sont prêts à recevoir leurs futurs éditeurs.','field-note'));form.append(permissions);
   const status=el('p','','error');status.id='employee-record-status';status.setAttribute('role','alert');
   if(draft){const label=el('label'),confirmed=el('input');confirmed.type='checkbox';confirmed.required=true;label.append(confirmed,' J’ai vérifié l’identité du salarié et les informations importées sur le document original.');form.append(label);}
-  const actions=el('div','','employee-record-save');const save=el('button','Enregistrer la fiche','btn primary');save.type='submit';actions.append(control('Annuler',onClose),save);form.append(status,actions);root.append(form);container.append(root);
+  const actions=el('div','','employee-record-save');const save=el('button','Enregistrer la fiche','btn primary');save.type='submit';if(restrictions?.profileReadOnly){save.disabled=true;form.append(el('p','Ce compte administrateur est protégé et reste en consultation seule.','field-note'));}actions.append(control('Annuler',onClose),save);form.append(status,actions);root.append(form);container.append(root);
+  if(restrictions?.profileReadOnly)form.querySelectorAll('input,select,textarea').forEach(input=>input.disabled=true);
   form.onsubmit=async e=>{
     e.preventDefault();status.textContent='';save.disabled=true;
     const value=({field,input})=>field.type==='checkbox'?input.checked:input.value;
@@ -79,10 +82,11 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     if(data.job==='Autres précisez')data.job=otherJob.value.trim();
     data.administratorRights=adminRights.checked;data.active=p.active!==false;data.details=Object.fromEntries([...inputs].map(([key,item])=>[key,value(item)]));data.detailsRevision=loaded.detailsRevision;
     if(!isAdministrator){data.rights=[...rights].filter(([,check])=>check.checked).map(([key])=>key);data.editRights=[...editRights].filter(([,check])=>check.checked).map(([key])=>key);}
-    // The isolated Scalingo preview permits profession changes only for existing demo staff.
-    if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'&&p.id){
-      for(const key of Object.keys(data))if(!['firstName','lastName','phone','birthday','job','active','email'].includes(key))delete data[key];
+    if(restrictions?.accountReadOnly){
+      delete data.email;delete data.password;delete data.administratorRights;
+      if([...rights].every(([key,input])=>input.checked===initialReads.get(key))&&[...editRights].every(([key,input])=>input.checked===initialEdits.get(key))){delete data.rights;delete data.editRights;}
     }
+    if(restrictions?.profileReadOnly){status.textContent='Ce compte administrateur est protégé.';save.disabled=true;return;}
     try{const result=await api('/api/users'+(p.id?'/'+p.id:''),p.id?'PUT':'POST',data);await onSaved(result,'Fiche enregistrée. Les droits sont appliqués immédiatement.');}
     catch(error){status.textContent=error.message;status.scrollIntoView?.({block:'center'});save.disabled=false;}
   };
