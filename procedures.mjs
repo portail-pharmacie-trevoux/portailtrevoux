@@ -1,4 +1,4 @@
-import { validateProcedureFile } from './procedure-files.mjs';
+import { validateProcedureFile, maxProcedureDocumentBytes } from './procedure-files.mjs';
 
 export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser}){
  const fields={category:100,title:200,description:1500,keywords:500,url:1000};
@@ -20,7 +20,7 @@ export function registerProcedures({app,db,auth,ready,csrf,viewUniverse,editUniv
  const guard=[auth,ready,editUniverse('Procédures'),csrf];
  app.get('/api/procedures',auth,ready,viewUniverse('Procédures'),async(req,res)=>res.json((await db.query('SELECT '+columns+' FROM procedure_documents WHERE active=TRUE ORDER BY lower(category),lower(title),id')).rows));
  app.post('/api/procedures/import',...guard,uploadParser,async(req,res)=>{
-  const file=validateProcedureFile(req.body,fail);
+  const file=validateProcedureFile(req.body,fail,maxProcedureDocumentBytes);
   const d=validate(req.body,'uploaded');
   const row=(await db.query(`WITH next_id AS (SELECT nextval(pg_get_serial_sequence('procedure_documents','id')) AS id)
    INSERT INTO procedure_documents(id,category,title,description,keywords,url,file_name,file_type,file_content)

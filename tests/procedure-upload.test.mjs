@@ -1,4 +1,7 @@
 import test from 'node:test';
+import express from 'express';
+import {isScalingoProcedureImport,registerScalingoProcedures} from '../scripts/scalingo-procedures-preview.mjs';
+import {scalingoUniverseBoundary} from '../scripts/scalingo-universal-rights.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {once} from 'node:events';
@@ -24,7 +27,7 @@ test('import protégé, stockage intégral, téléchargement, modification et re
  let user={id:1,role:'admin',csrf:'test',active:true,must_change:false},stored=null;
  const metadata=()=>{const {file_content,active,...rest}=stored;return rest;};
  const db={query:async(sql,args=[])=>{
-  if(sql.startsWith('SELECT s.id'))return {rows:[user]};
+  if(sql.startsWith('SELECT s.id')||sql.startsWith('SELECT u.* FROM sessions'))return {rows:[user]};
   if(sql.startsWith('INSERT INTO publications'))return {rows:[]};
   if(sql.startsWith('WITH next_id')){stored={id:1,category:args[0],title:args[1],description:args[2],keywords:args[3],url:'/api/procedures/1/file',file_name:args[4],file_type:args[5],file_content:args[6],active:true};return {rows:[metadata()]};}
   if(sql.startsWith('SELECT file_name,file_type,file_content'))return {rows:stored?.active?[stored]:[]};
@@ -34,7 +37,7 @@ test('import protégé, stockage intégral, téléchargement, modification et re
   if(sql.includes('FROM procedure_documents'))return {rows:stored?.active?[metadata()]:[]};
   throw Error('Unexpected query: '+sql);
  }};
- const {app}=createApp(db,{origin:'https://portal.test',secret:'x'.repeat(32)}),server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>server.close());
+ const {app}=createApp(db,{origin:'https://portal.test',secret:'x'.repeat(32)}),server=app.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();server.close();});
  const base='http://127.0.0.1:'+server.address().port;
  const headers={origin:'https://portal.test',cookie:'trevoux_session='+'a'.repeat(43),'x-csrf-token':'test','content-type':'application/json'};
  const request=(path,method='GET',body,extra={})=>fetch(base+path,{method,headers:{...headers,...extra},body:body===undefined?undefined:JSON.stringify(body)});
@@ -54,6 +57,31 @@ test('import protégé, stockage intégral, téléchargement, modification et re
  assert.equal((await request('/api/procedures/1','DELETE')).status,200);assert.equal((await request('/api/procedures/1/file')).status,404);
  assert.equal((await request('/api/procedures/1/restore','POST',{})).status,200);assert.equal((await request('/api/procedures/1/file')).status,200);
  const word=wordZip();const wordImport=await request('/api/procedures/import','POST',{...body,fileName:'procedure.docx',fileData:word.toString('base64')});assert.equal(wordImport.status,201);assert.deepEqual(Buffer.from(await (await request('/api/procedures/1/file')).arrayBuffer()),word);
- const largePdf=Buffer.concat([pdf.subarray(0,pdf.length-6),Buffer.alloc(20000,32),Buffer.from('%%EOF\n')]);assert.equal((await request('/api/procedures/import','POST',{...body,fileData:largePdf.toString('base64')})).status,201);
+ const largePdf=Buffer.concat([pdf.subarray(0,pdf.length-6),Buffer.alloc(12*1024*1024,32),Buffer.from('%%EOF\n')]);assert.equal((await request('/api/procedures/import','POST',{...body,fileData:largePdf.toString('base64')})).status,201);
+ // Exercise the Scalingo raw-body exception and default-deny boundary over HTTP.
+ const gate=express(),small=express.json({limit:'64kb'});
+ gate.use((req,res,next)=>isScalingoProcedureImport(req)?next():small(req,res,next));
+ gate.use(scalingoUniverseBoundary(db));registerScalingoProcedures(gate,app);
+ gate.use((req,res)=>res.status(403).json({error:'Fonction désactivée dans la prévisualisation'}));
+ gate.use((error,req,res,next)=>res.status(error.status||500).json({error:error.message}));
+ const preview=gate.listen(0,'127.0.0.1');await once(preview,'listening');t.after(()=>{preview.closeAllConnections();preview.close();});
+ const previewRequest=(path,method='GET',payload,extra={})=>fetch('http://127.0.0.1:'+preview.address().port+path,{method,headers:{...headers,...extra},body:payload===undefined?undefined:JSON.stringify(payload)});
+ const existing=Buffer.from(stored.file_content);
+ assert.deepEqual(Buffer.from(await (await previewRequest('/api/procedures/1/file')).arrayBuffer()),existing);
+ const largeBody={...body,fileData:largePdf.toString('base64')};
+ assert.ok(largePdf.length>10*1024*1024&&largePdf.length<50*1024*1024);
+ assert.equal((await previewRequest('/api/procedures/import','POST',largeBody,{cookie:''})).status,401);
+ assert.equal((await previewRequest('/api/procedures/import','POST',largeBody,{'x-csrf-token':''})).status,403);
+ user.role='employee';user.rights=['Procédures'];user.edit_rights=[];
+ assert.equal((await previewRequest('/api/procedures/import','POST',largeBody)).status,403);
+ assert.deepEqual(stored.file_content,existing);user.role='admin';
+ assert.equal((await previewRequest('/api/procedures/import','POST',largeBody)).status,201);
+ assert.deepEqual(Buffer.from(await (await previewRequest('/api/procedures/1/file')).arrayBuffer()),largePdf);
+ assert.equal((await previewRequest('/api/procedures','POST',{})).status,403);
+ assert.equal((await previewRequest('/api/procedures/1','DELETE')).status,403);
+ assert.equal((await previewRequest('/api/procedures/import','POST',{...body,fileName:'file.exe'})).status,400);
+ const oversized=await previewRequest('/api/procedures/import','POST',{...body,fileData:Buffer.alloc(50*1024*1024+1).toString('base64')});
+ assert.equal(oversized.status,413);assert.match((await oversized.json()).error,/50 Mo/);
+ assert.deepEqual(stored.file_content,largePdf);
  const form=await request('/api/collaborateurs/registration-form');assert.equal(form.status,200);assert.deepEqual(Buffer.from(await form.arrayBuffer()),pdf);
 });

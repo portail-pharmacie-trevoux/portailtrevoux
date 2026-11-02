@@ -1,4 +1,6 @@
 export const maxProcedureFileBytes=10*1024*1024;
+// Procédures only; other modules retain the shared 10 MiB default.
+export const maxProcedureDocumentBytes=50*1024*1024;
 const docxType='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 function isDocx(bytes,mainFile='word/document.xml'){
   // Inspect the ZIP central directory without inflating untrusted content.
