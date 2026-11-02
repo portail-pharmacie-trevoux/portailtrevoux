@@ -17,6 +17,7 @@ import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTempera
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
 import {isScalingoTrainingImport,registerScalingoTrainingDocuments} from './scalingo-training-documents-preview.mjs';
 import {ensureScalingoTrainingDocumentsSchema} from './ensure-scalingo-training-documents-schema.mjs';
+import {registerScalingoNewsThreads} from './scalingo-news-threads-preview.mjs';
 import {isScalingoLaboratoryUpload,registerScalingoLaboratories} from './scalingo-laboratories-preview.mjs';
 import {isScalingoPromotionDocumentImport,registerScalingoPromotionDocuments} from './scalingo-promotion-documents-preview.mjs';
 import {isScalingoHRImport,registerScalingoHRDocuments} from './scalingo-hr-documents-preview.mjs';
@@ -89,6 +90,7 @@ try{
  registerScalingoTrainingDocuments(gate,app);
  registerScalingoPromotionDocuments(gate,app);
  registerScalingoLaboratories(gate,app);
+ registerScalingoNewsThreads(gate,app);
  registerScalingoRegistrationForm(gate,app);
  registerScalingoEmployeeImport(gate,app);
  gate.use(async(req,res,next)=>{try{
