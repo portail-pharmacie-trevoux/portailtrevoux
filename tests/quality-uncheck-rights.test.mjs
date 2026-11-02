@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';import {registerQualityErrors,isErrorFollowupPharmacist} from '../quality-errors.mjs';
+test('Only pharmacy professions may uncheck followup boxes, including for direct API requests',async t=>{
+ for(const value of ['Pharmacien','Pharmacienne','Pharmacien (cienne)','Pharmacien titulaire'])assert.equal(isErrorFollowupPharmacist(value),true);
+ for(const value of ['',undefined,'Préparateur(trice)','Secrétaire','Autres précisez','Non pharmacien'])assert.equal(isErrorFollowupPharmacist(value),false);
+ const app=express();app.use(express.json());let job='Préparateur(trice)',role='admin',queries=0;const pass=(q,s,n)=>{q.auth={id:1,name:'Test',job,role};n();};const fail=(status,message)=>Object.assign(Error(message),{status});registerQualityErrors({app,db:{query:async()=>{queries++;return{rows:[{id:1,revision:2}]};}},auth:pass,ready:pass,csrf:pass,viewUniverse:()=>pass,fail});app.use((e,q,s,n)=>s.status(e.status||500).json({error:e.message}));const server=app.listen(0);t.after(()=>server.close());const url='http://127.0.0.1:'+server.address().port+'/api/quality/errors/1/notification';const send=(target,checked)=>fetch(url,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({target,checked,revision:1,job:'Pharmacien'})});
+ for(const target of ['operator','patient','doctor','corrected'])assert.equal((await send(target,false)).status,403);assert.equal(queries,0);
+ assert.equal((await send('patient',true)).status,200);job='Pharmacienne';role='employee';for(const target of ['operator','patient','doctor','corrected'])assert.equal((await send(target,false)).status,200);
+});

@@ -8,7 +8,7 @@ import {scalingoUniverseBoundary} from '../scripts/scalingo-universal-rights.mjs
 import {isScalingoQualityErrorRoute} from '../scripts/scalingo-quality-errors-preview.mjs';
 const universe="Outils d'aide à la démarche qualité",origin='https://portailplus-hds.osc-fr1.scalingo.io';
 test('Scalingo : seules les méthodes et routes exactes du registre et du suivi lié sont ouvertes',()=>{
- const allowed={GET:['/api/quality/errors','/api/quality/errors/export.xlsx','/api/quality/prescriber-calls'],POST:['/api/quality/errors','/api/quality/prescriber-calls'],PUT:['/api/quality/errors/1','/api/quality/errors/1/status','/api/quality/errors/1/notification','/api/quality/prescriber-calls/2'],DELETE:['/api/quality/errors/1']};
+ const allowed={GET:['/api/quality/errors','/api/quality/errors/export.xlsx','/api/quality/prescriber-calls'],POST:['/api/quality/errors','/api/quality/prescriber-calls'],PUT:['/api/quality/errors/1','/api/quality/errors/1/status','/api/quality/errors/1/notification','/api/quality/errors/1/correction-note','/api/quality/prescriber-calls/2'],DELETE:['/api/quality/errors/1']};
  for(const [method,paths]of Object.entries(allowed))for(const path of paths)assert.equal(isScalingoQualityErrorRoute({method,path}),true,method+' '+path);
  for(const [method,path]of [['PATCH','/api/quality/errors/1'],['POST','/api/quality/errors/1'],['POST','/api/quality/errors/import'],['GET','/api/quality/errors/1'],['DELETE','/api/quality/prescriber-calls/1'],['PUT','/api/quality/errors/0'],['PUT','/api/quality/errors/1/email'],['POST','/api/quality/errors/1/notification'],['POST','/api/quality/errors/extra'],['POST','/api/quality/other']])assert.equal(isScalingoQualityErrorRoute({method,path}),false,method+' '+path);
 });
@@ -32,6 +32,14 @@ test('HTTP Scalingo : création, lecture, modification, notifications, état, ex
   }
   if(sql.startsWith('UPDATE quality_errors SET status=')){
    const row=errors.find(e=>e.id===args[0]&&e.revision===args[2]&&e.status!==args[1]);if(!row)return {rows:[]};writes++;row.status_history.push({from:row.status,to:args[1],by:args[3]});row.status=args[1];row.revision++;return {rows:[row]};
+  }
+  if(sql.startsWith('WITH next_state')){
+   const row=errors.find(e=>e.id===args[0]&&e.revision===args[4]);if(!row)return {rows:[]};
+   const field=sql.match(/SET\s+(\w+)_at=/)[1];writes++;const previous=row.status;
+   Object.assign(row,{[field+'_at']:args[1]?'2026-10-01T12:00:00Z':null,[field+'_by']:args[1]?args[2]:null,[field+'_name']:args[1]?args[3]:null});
+   if(field==='corrected')row.error_corrected=args[1];
+   row.status=row.error_corrected?'closed':row.patient_notified_at||row.doctor_notified_at?'in_progress':'declared';
+   if(previous!==row.status)row.status_history.push({from:previous,to:row.status,by:args[3]});row.revision++;return {rows:[row]};
   }
   if(sql.startsWith('UPDATE quality_errors SET')){
    const row=errors.find(e=>e.id===args[0]&&e.revision===args[4]);if(!row)return {rows:[]};const field=sql.match(/SET (\w+)_at=/)[1];writes++;Object.assign(row,{[field+'_at']:args[1]?'2026-10-01T12:00:00Z':null,[field+'_by']:args[1]?args[2]:null,[field+'_name']:args[1]?args[3]:null});row.revision++;return {rows:[row]};
@@ -65,12 +73,13 @@ test('HTTP Scalingo : création, lecture, modification, notifications, état, ex
  assert.equal((await send(root,'POST',body)).status,403);assert.equal((await send(root+'/900/notification','PUT',{target:'patient',checked:true,revision:1})).status,403);assert.equal(writes,0);
  actor={...actor,edit_rights:[universe]};
  response=await send(root,'POST',{...body,createdBy:999,operatorName:'Forged'});assert.equal(response.status,200,await response.clone().text());let row=await response.json();assert.equal(row.created_by,3);assert.equal(row.operator_name,'Lecteur local');
- for(const [method,path,b]of [['PUT',root+'/1',{...body,revision:1}],['DELETE',root+'/1',{revision:1}],['PUT',root+'/1/status',{status:'closed',revision:1}]])assert.equal((await send(path,method,b)).status,403);
+ for(const [method,path,b]of [['PUT',root+'/1',{...body,revision:1}],['DELETE',root+'/1',{revision:1}]])assert.equal((await send(path,method,b)).status,403);
  actor=admin;response=await send(root+'/1','PUT',{...body,details:'Correction technique',revision:1});assert.equal(response.status,200);assert.equal((await response.json()).revision,2);
  assert.equal((await send(root+'/1','PUT',{...body,revision:1})).status,409);
  response=await send(root+'/1/notification','PUT',{target:'doctor',checked:true,revision:2});assert.equal(response.status,200);row=await response.json();assert.equal(row.doctor_notified_by,1);
  assert.equal((await send(root+'/1/notification','PUT',{target:'patient',checked:true,revision:2})).status,409);
- response=await send(root+'/1/status','PUT',{status:'in_progress',revision:3});assert.equal(response.status,200);assert.equal((await response.json()).status_history[0].by,admin.name);
+ response=await send(root+'/1/status','PUT',{status:'in_progress',revision:3});assert.equal(response.status,409);
+ response=await send(root+'/1/notification','PUT',{target:'corrected',checked:true,revision:3});assert.equal(response.status,200);assert.equal((await response.json()).status_history[0].by,admin.name);
  const callBody={requestId:'00000000-0000-4000-8000-000000000001',errorId:1,callDate:'2026-10-01',prescriber:'Prescripteur de test',reason:'Vérification technique sans identité patient',outcome:'Contrôle local',followUp:'Vérifier',followUpDate:'2026-11-01'};
  response=await send('/api/quality/prescriber-calls','POST',callBody);assert.equal(response.status,201);
  assert.equal((await send('/api/quality/prescriber-calls','POST',callBody)).status,409);

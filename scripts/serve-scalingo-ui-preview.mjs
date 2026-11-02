@@ -13,6 +13,7 @@ import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTempera
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
 import {registerScalingoTiersPayantImport} from './scalingo-tiers-payant-preview.mjs';
 import {ensureScalingoTemperatureSchema} from './ensure-scalingo-temperature-schema.mjs';
+import {ensureScalingoQualityFollowupSchema} from './ensure-scalingo-quality-followup-schema.mjs';
 const env=process.env;
 const origin='https://portailplus-hds.osc-fr1.scalingo.io';
 if(env.SCALINGO_PREVIEW_SAFE_MODE!=='true'||env.SCALINGO_PREVIEW_UI_ENABLED!=='true')throw Error('Explicit safe UI preview opt-in required');
@@ -38,6 +39,8 @@ try{
  await db.query('ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS title TEXT CHECK (title IS NULL OR char_length(title)<=120)');
  const temperatureSchema=await ensureScalingoTemperatureSchema(db);
  console.log('Scalingo temperature schema ready; columns added: '+temperatureSchema.added.join(','));
+ const qualitySchema=await ensureScalingoQualityFollowupSchema(db);
+ console.log('Scalingo quality followup schema ready; columns added: '+qualitySchema.added.join(','));
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');

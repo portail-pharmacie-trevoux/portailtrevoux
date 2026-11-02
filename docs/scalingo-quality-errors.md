@@ -72,3 +72,9 @@ lancé. Aucune donnée métier distante n’a été lue ou modifiée. Avant dép
 4. Déployer exclusivement sur `portailplus-hds`, puis vérifier santé, connexion
    et consultation du registre. Effectuer tout essai métier uniquement avec les
    autorisations et données anonymisées appropriées, puis contrôler le résultat.
+
+## Évolution du suivi automatique
+
+Le portage ultérieur depuis main remplace les changements manuels d’état par les
+coches et ajoute la précision de correction historisée. Les règles détaillées,
+migrations et contrôles sont dans `scalingo-quality-followup-parity.md`.
