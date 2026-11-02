@@ -80,11 +80,16 @@ test('Scalingo/PostgreSQL : import 10 Mo, association, relecture, téléchargeme
  const list=await(await request(endpoint,'GET',undefined,2)).json();assert.deepEqual(list.documents.map(d=>Number(d.id)).sort((a,b)=>a-b),added.map(Number).sort((a,b)=>a-b));assert.equal(list.canDelete,false);
  const independent=new pg.Client({connectionString:database});await independent.connect();try{assert.equal((await independent.query('SELECT count(*)::int AS n FROM merchandising_promotion_documents WHERE promotion_id=1')).rows[0].n,5);}finally{await independent.end();}
  for(const user of [0,4,5,6])assert.equal((await request(endpoint+'/'+added[0]+'/file','GET',undefined,user)).status,[0,6].includes(user)?401:403);
- assert.equal((await request(endpoint+'/'+added[0],'DELETE',undefined,3)).status,403);
- assert.equal((await request(endpoint+'/'+added[0],'DELETE',undefined,7)).status,200);
+ const promotionsBefore=(await db.query('SELECT * FROM merchandising_promotions ORDER BY id')).rows;
+ const otherDocumentsBefore=(await db.query('SELECT * FROM merchandising_promotion_documents WHERE id<>$1 ORDER BY id',[added[0]])).rows;
+ assert.equal((await(await request(endpoint,'GET',undefined,3)).json()).canDelete,true);
+ assert.equal((await request(endpoint+'/'+added[0],'DELETE',undefined,3)).status,200);
+ assert.deepEqual((await db.query('SELECT * FROM merchandising_promotions ORDER BY id')).rows,promotionsBefore);
+ assert.deepEqual((await db.query('SELECT * FROM merchandising_promotion_documents ORDER BY id')).rows,otherDocumentsBefore);
+ server.closeAllConnections();await new Promise(r=>server.close(r));server=start();await once(server,'listening');
  assert.equal((await request(endpoint+'/'+added[0]+'/file')).status,404);
  assert.equal((await(await request(endpoint)).json()).documents.some(d=>d.id===added[0]),false);
- assert.equal((await request(endpoint+'/'+added[1],'DELETE')).status,200);
+ assert.equal((await request(endpoint+'/'+added[1],'DELETE',undefined,7)).status,200);
  assert.equal((await db.query('SELECT count(*)::int AS n FROM merchandising_promotion_documents WHERE id=$1',[added[1]])).rows[0].n,0);
  assert.deepEqual(await protectedRow(),before);
 });
