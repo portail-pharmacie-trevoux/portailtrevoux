@@ -1,11 +1,11 @@
 import {validateProcedureFile} from './procedure-files.mjs';
 export const maxMerchDocumentBytes=50*1024*1024;
-export function validateMerchDocument(body,fail){
- if(!/\.(png|jpe?g)$/i.test(body?.fileName||''))return validateProcedureFile(body,fail,maxMerchDocumentBytes);
+export function validateMerchDocument(body,fail,maxBytes=maxMerchDocumentBytes){
+ if(!/\.(png|jpe?g)$/i.test(body?.fileName||''))return validateProcedureFile(body,fail,maxBytes);
  const {fileName,fileData}=body;
- if(fileName.length>240||/[\x00-\x1f\x7f/\\]/.test(fileName)||typeof fileData!=='string'||!fileData||fileData.length>Math.ceil(maxMerchDocumentBytes/3)*4||fileData.length%4||! /^[A-Za-z0-9+/]+={0,2}$/.test(fileData))throw fail(400,'Choisissez un PDF, Word, PNG ou JPEG de 50 Mo maximum.');
+ if(fileName.length>240||/[\x00-\x1f\x7f/\\]/.test(fileName)||typeof fileData!=='string'||!fileData||fileData.length>Math.ceil(maxBytes/3)*4||fileData.length%4||! /^[A-Za-z0-9+/]+={0,2}$/.test(fileData))throw fail(400,`Choisissez un PDF, Word, PNG ou JPEG de ${maxBytes/1024/1024} Mo maximum.`);
  const bytes=Buffer.from(fileData,'base64'),png=/\.png$/i.test(fileName),valid=png?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
- if(!valid||!bytes.length||bytes.length>maxMerchDocumentBytes||bytes.toString('base64')!==fileData)throw fail(400,'Image invalide ou supérieure à 50 Mo.');
+ if(!valid||!bytes.length||bytes.length>maxBytes||bytes.toString('base64')!==fileData)throw fail(400,`Image invalide ou supérieure à ${maxBytes/1024/1024} Mo.`);
  return {fileName:fileName.trim(),fileType:png?'image/png':'image/jpeg',bytes};
 }
 export function registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser}){

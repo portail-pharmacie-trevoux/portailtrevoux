@@ -17,6 +17,7 @@ import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTempera
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
 import {isScalingoTrainingImport,registerScalingoTrainingDocuments} from './scalingo-training-documents-preview.mjs';
 import {ensureScalingoTrainingDocumentsSchema} from './ensure-scalingo-training-documents-schema.mjs';
+import {isScalingoPromotionDocumentImport,registerScalingoPromotionDocuments} from './scalingo-promotion-documents-preview.mjs';
 import {isScalingoHRImport,registerScalingoHRDocuments} from './scalingo-hr-documents-preview.mjs';
 import {isScalingoProcedureImport,registerScalingoProcedures} from './scalingo-procedures-preview.mjs';
 import {registerScalingoTiersPayantImport} from './scalingo-tiers-payant-preview.mjs';
@@ -59,7 +60,7 @@ try{
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});
  const smallJson=express.json({limit:'64kb'});
- gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req))?next():smallJson(req,res,next));
+ gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req))?next():smallJson(req,res,next));
  // One-time cleanup control: restricted to the exact staging admin and origin.
  // The purge subprocess independently checks the database, account roster and TLS.
  const cleanupAuth=scalingoTestAdminAuth(db);
@@ -85,6 +86,7 @@ try{
  registerScalingoProcedures(gate,app);
  registerScalingoHRDocuments(gate,app);
  registerScalingoTrainingDocuments(gate,app);
+ registerScalingoPromotionDocuments(gate,app);
  registerScalingoRegistrationForm(gate,app);
  registerScalingoEmployeeImport(gate,app);
  gate.use(async(req,res,next)=>{try{
@@ -151,7 +153,6 @@ try{
    if((req.method==='POST'&&req.path==='/api/merchandising/promotions')||(['PUT','DELETE'].includes(req.method)&&/^\/api\/merchandising\/promotions\/\d+$/.test(req.path))||(req.method==='PUT'&&/^\/api\/merchandising\/promotions\/\d+\/assignment$/.test(req.path)))return next();
    // Phase 2 pilot: only local personal demo tasks; existing app auth and CSRF still apply.
    if(['POST','PUT','DELETE'].includes(req.method)&&(/^\/api\/calendar\/tasks$/.test(req.path)&&req.method==='POST'||/^\/api\/calendar\/tasks\/\d+$/.test(req.path)&&['PUT','DELETE'].includes(req.method)))return next();
-   if(req.method==='GET'&&/^\/api\/merchandising\/promotions\/\d+\/documents$/.test(req.path))return next();
    if(api&&!permittedApi)return res.status(403).json({error:`Fonction désactivée dans la prévisualisation (${req.method} ${req.path}).`});
    if(!api&&!['GET','HEAD'].includes(req.method))return res.status(403).type('text/plain').send('Action non disponible.');
    next();
