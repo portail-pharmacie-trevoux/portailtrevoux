@@ -48,7 +48,7 @@ try{
  console.log('Scalingo quality followup schema ready; columns added: '+qualitySchema.added.join(','));
  const trainingSchema=await ensureScalingoTrainingDocumentsSchema(db);
  console.log('Scalingo reference documents schema ready; columns added: '+trainingSchema.added.join(','));
- const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
+ const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});

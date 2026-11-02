@@ -50,6 +50,7 @@ const root=fileURLToPath(new URL('.',import.meta.url));
 const cleanUser=u=>({id:u.id,name:u.name,job:u.job,phone:u.phone||'',email:u.email,role:u.role,rights:u.rights,editRights:u.edit_rights||[],permissionsConfigured:!!u.permissions_configured,mustChange:u.must_change});
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function createApp(db,config) {
+  const sessionFeatures=config.employeeAccountsReadOnly===true?{features:{employeeAccountsReadOnly:true}}:{};
   const app=express(), secret=config.secret, origin=new URL(config.origin).origin;
   const secure=origin.startsWith('https:');
   app.set('trust proxy',1); app.disable('x-powered-by');
@@ -140,7 +141,7 @@ export function createApp(db,config) {
     const raw=token(),session=digest(raw),csrfToken=token();
     await db.query("INSERT INTO sessions(id,user_id,csrf,expires_at) VALUES($1,$2,$3,now()+interval '8 hours')",[session,user.id,csrfToken]);
     res.cookie('trevoux_session',raw,cookieOptions);
-    return {user:cleanUser(user),csrf:csrfToken};
+    return {user:cleanUser(user),csrf:csrfToken,...sessionFeatures};
   }
   registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession});
   app.get('/health',async(req,res)=>{await db.query('SELECT 1');res.json({ok:true});});
@@ -158,7 +159,7 @@ export function createApp(db,config) {
     if(req.auth)await db.query('DELETE FROM sessions WHERE id=$1',[req.auth.session_id]);
     res.json(await newSession(user,res));
   });
-  app.get('/api/me',auth,(req,res)=>res.json({user:cleanUser(req.auth),csrf:req.auth.csrf}));
+  app.get('/api/me',auth,(req,res)=>res.json({user:cleanUser(req.auth),csrf:req.auth.csrf,...sessionFeatures}));
   app.post('/api/logout',auth,csrf,async(req,res)=>{await db.query('DELETE FROM sessions WHERE id=$1',[req.auth.session_id]);res.clearCookie('trevoux_session',{...cookieOptions,maxAge:undefined});res.json({ok:true});});
   app.post('/api/password',auth,csrf,async(req,res)=>{
     if(!passwordValid(req.body.password))throw fail(400,'Choisissez un mot de passe de 12 caractères minimum (256 octets maximum).');

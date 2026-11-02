@@ -12,7 +12,7 @@ const dateText=d=>d instanceof Date?d.toISOString().slice(0,10):String(d||'').sl
 export function publicPerson(p,isAdmin,selfId) {
   const base={id:p.id,firstName:p.first_name,lastName:p.last_name,phone:p.phone,active:p.active,isSelf:p.id===selfId};
   // Keep the full name for administrator pages opened before the directory update.
-  return isAdmin?{...base,name:p.first_name&&p.last_name?p.first_name+' '+p.last_name.toLocaleUpperCase('fr-FR'):p.name,job:p.job,birthday:dateText(p.birthday),email:p.email||'',rights:p.rights,editRights:p.edit_rights||[],permissionsConfigured:!!p.permissions_configured,role:p.role,passwordConfigured:!!p.password_hash&&!p.must_change,invitationSentAt:p.invitation_sent_at||null}:base;
+  return isAdmin?{...base,name:p.first_name&&p.last_name?p.first_name+' '+p.last_name.toLocaleUpperCase('fr-FR'):p.name,job:p.job,birthday:dateText(p.birthday),email:p.email||'',rights:p.rights,editRights:p.edit_rights||[],permissionsConfigured:!!p.permissions_configured,role:p.role,passwordConfigured:!!p.password_hash&&!p.must_change,invitationSentAt:p.invitation_sent_at||null,...(p.directory_key?.startsWith('scalingo-manual:')?{previewManualRecord:true}:{})}:base;
 }
 export function validatePerson(data,fail) {
   const text=(key,max=100)=>{const v=data[key]??'';if(typeof v!=='string'||v.length>max)throw fail(400,'Champ invalide : '+key);return v.trim();};

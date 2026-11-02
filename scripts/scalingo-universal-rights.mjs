@@ -20,7 +20,7 @@ export function validateRights(body){
  return {rights:sorted(rights),editRights:sorted(editRights)};
 }
 export function rightsPreview(rows){
- const employees=rows.filter(p=>p.role==='employee');
+ const employees=rows.filter(p=>p.role==='employee'&&!p.directory_key?.startsWith('scalingo-manual:'));
  if(employees.length!==16||employees.some(p=>!p.active))throw fail(409,'Les 16 collaborateurs actifs attendus doivent être présents. Aucun changement effectué.');
  const people=employees.map(p=>{
   const current={rights:sorted(p.rights),editRights:sorted(p.edit_rights)};
@@ -56,14 +56,14 @@ export function registerScalingoRights({gate,db,adminAuth,origin,env}){
   if(!backupReady(env))return next(fail(409,'Sauvegarde Scalingo récente non vérifiée : renseignez sa référence et la date de vérification après contrôle de sa réussite.'));
   next();
  };
- const roster=client=>client.query('SELECT id,name,role,active,rights,edit_rights,permissions_configured FROM users ORDER BY id FOR UPDATE');
+ const roster=client=>client.query('SELECT id,name,role,active,rights,edit_rights,permissions_configured,directory_key FROM users ORDER BY id FOR UPDATE');
  async function transaction(work){const client=await db.connect();try{await client.query('BEGIN');const result=await work(client);await client.query('COMMIT');return result;}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}}
  async function save(client,id,rights,editRights){
   await client.query("UPDATE users SET rights=$2::jsonb,edit_rights=$3::jsonb,permissions_configured=TRUE WHERE id=$1 AND role='employee'",[id,JSON.stringify(rights),JSON.stringify(editRights)]);
   await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);
  }
  gate.get('/api/staging-universal-rights',adminAuth,async(req,res,next)=>{try{
-  const rows=(await db.query('SELECT id,name,role,active,rights,edit_rights,permissions_configured FROM users ORDER BY id')).rows;
+  const rows=(await db.query('SELECT id,name,role,active,rights,edit_rights,permissions_configured,directory_key FROM users ORDER BY id')).rows;
   res.set('Cache-Control','no-store').json({...rightsPreview(rows),csrf:req.cleanupAdmin.csrf,universes,universalReads,universalEdits,backupReady:backupReady(env)});
  }catch(e){next(e);}});
  gate.post('/api/staging-universal-rights',adminAuth,write,async(req,res,next)=>{try{

@@ -192,17 +192,17 @@ function renderPeople(){
             catch(e){if(currentUniverse==='Collaborateurs'){q('#feedback').textContent=e.message;sendStatus.className='invitation-status error';sendStatus.textContent=e.message;const panel=q('#invitation-mail');if(panel)panel.open=true;invite.disabled=false;invite.textContent='Envoyer demande de connexion';}}
           },'btn small primary');
           invite.setAttribute('aria-label','Envoyer demande de connexion à '+personName(p));
-          invite.disabled=!p.invitationEmail;invite.title=p.invitationEmail?'Envoyer à '+p.invitationEmail:'Renseignez une adresse e-mail dans la fiche du collaborateur.';
+          invite.disabled=!!session.features?.employeeAccountsReadOnly||!p.invitationEmail;invite.title=session.features?.employeeAccountsReadOnly?'Les invitations restent désactivées.':p.invitationEmail?'Envoyer à '+p.invitationEmail:'Renseignez une adresse e-mail dans la fiche du collaborateur.';
           const invitation=node('div','','person-invitation');invitation.dataset.invitationUser=p.id;invitation.append(invite,node('small',p.invitationEmail||'E-mail à renseigner','field-note'),sendStatus);
           if(p.invitationSentAt)invitation.append(node('small','Dernière invitation : '+new Date(p.invitationSentAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'}),'field-note'));
           actions.append(invitation);
         }
-        if(p.role!=='admin'){
+        if(p.role!=='admin'&&(!session.features?.employeeAccountsReadOnly||p.previewManualRecord)){
           if(active){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
-          else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);const permanent=button('Supprimer définitivement',async()=>{
+          else {const restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);if(!session.features?.employeeAccountsReadOnly){const permanent=button('Supprimer définitivement',async()=>{
             if(!confirm('Supprimer définitivement '+personName(p)+' ? Sa fiche confidentielle, ses accès et ses entrées de planning seront effacés du portail. Cette action est irréversible.'))return;
             permanent.disabled=true;restore.disabled=true;try{await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id});await reloadPeople('Collaborateur supprimé définitivement.');}catch(e){error(e);permanent.disabled=false;restore.disabled=false;}
-          },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));actions.append(permanent);}
+          },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));actions.append(permanent);}}
         }
         tr.append(actions);
       }
@@ -250,7 +250,9 @@ function openEditor(id=null){
   const p=people.find(p=>p.id===id);q('#first-name').value=p?.firstName||'';q('#last-name').value=p?.lastName||'';q('#phone').value=p?.phone||'';q('#birthday').value=p?.birthday||'';q('#job').value=p?.job||'';q('#email').value=p?.email||'';
   q('#account-options').classList.toggle('hidden',p?.role==='admin');q('#account-options').open=!!p?.email&&p?.role!=='admin';
   q('#email').required=false;q('#temporary-password').required=false;
+  const accountLocked=session.features?.employeeAccountsReadOnly===true;q('#email').disabled=accountLocked;q('#temporary-password').disabled=accountLocked;
   q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'Renseignez un e-mail, puis envoyez une demande de connexion depuis l’annuaire. Le salarié choisira son mot de passe. Le mot de passe provisoire est facultatif.';
+  if(accountLocked)q('#password-help').textContent='La fiche sera créée sans accès personnel. Aucune invitation ne sera envoyée.';
   document.querySelectorAll('[name=right]').forEach(c=>c.checked=p?.rights?.includes(c.value)||false);
   q('#editor').showModal();q('#first-name').focus();
 }
@@ -258,7 +260,7 @@ q('#add').onclick=()=>openEditor();q('#cancel').onclick=()=>q('#editor').close()
 q('#form').onsubmit=async e=>{
   e.preventDefault();const btn=e.submitter;btn.disabled=true;
   const existing=people.find(p=>p.id===editId),data={firstName:q('#first-name').value,lastName:q('#last-name').value,phone:q('#phone').value,birthday:q('#birthday').value,job:q('#job').value,active:existing?.active!==false};
-  if(existing?.role!=='admin')Object.assign(data,{email:q('#email').value,password:q('#temporary-password').value,rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
+  if(existing?.role!=='admin')Object.assign(data,{...(session.features?.employeeAccountsReadOnly?{}:{email:q('#email').value,password:q('#temporary-password').value}),rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
   try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',data);q('#form').reset();q('#editor').close();await reloadPeople('Fiche enregistrée.');}
   catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}
 };
