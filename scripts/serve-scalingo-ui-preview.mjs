@@ -11,6 +11,8 @@ import {validateTemplateDay} from '../schedule-templates.mjs';
 import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth} from './scalingo-universal-rights.mjs';
 import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTemperatureRoute} from './scalingo-temperature-preview.mjs';
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
+import {isScalingoTrainingImport,registerScalingoTrainingDocuments} from './scalingo-training-documents-preview.mjs';
+import {ensureScalingoTrainingDocumentsSchema} from './ensure-scalingo-training-documents-schema.mjs';
 import {isScalingoHRImport,registerScalingoHRDocuments} from './scalingo-hr-documents-preview.mjs';
 import {isScalingoProcedureImport,registerScalingoProcedures} from './scalingo-procedures-preview.mjs';
 import {registerScalingoTiersPayantImport} from './scalingo-tiers-payant-preview.mjs';
@@ -43,12 +45,14 @@ try{
  console.log('Scalingo temperature schema ready; columns added: '+temperatureSchema.added.join(','));
  const qualitySchema=await ensureScalingoQualityFollowupSchema(db);
  console.log('Scalingo quality followup schema ready; columns added: '+qualitySchema.added.join(','));
+ const trainingSchema=await ensureScalingoTrainingDocumentsSchema(db);
+ console.log('Scalingo reference documents schema ready; columns added: '+trainingSchema.added.join(','));
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});
  const smallJson=express.json({limit:'64kb'});
- gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req))?next():smallJson(req,res,next));
+ gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req))?next():smallJson(req,res,next));
  // One-time cleanup control: restricted to the exact staging admin and origin.
  // The purge subprocess independently checks the database, account roster and TLS.
  const cleanupAuth=scalingoTestAdminAuth(db);
@@ -72,6 +76,7 @@ try{
  registerScalingoTiersPayantImport(gate,app);
  registerScalingoProcedures(gate,app);
  registerScalingoHRDocuments(gate,app);
+ registerScalingoTrainingDocuments(gate,app);
  gate.use(async(req,res,next)=>{try{
    const api=req.path.startsWith('/api/')||req.path==='/api';
    // Exact import/detail routes only; app-level authentication and CSRF still run.

@@ -262,6 +262,9 @@ CREATE TABLE IF NOT EXISTS training_documents(
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 
+ALTER TABLE training_documents ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ;
+ALTER TABLE training_documents ADD COLUMN IF NOT EXISTS removed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT;
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_type TEXT;
 ALTER TABLE team_messages ADD COLUMN IF NOT EXISTS attachment_content BYTEA;
