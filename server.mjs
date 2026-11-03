@@ -135,7 +135,7 @@ export function createApp(db,config) {
   const mailSender=config.mailEmail||'pharmacie.trevoux@gmail.com';
   const mailer=config.invitationMailer||createInvitationMailer({getSetting,setSetting,secret,clientId:config.googleId,clientSecret:config.googleSecret,sender:mailSender,fail,fetchImpl:config.mailFetch});
   registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,publish,mailer});
-  registerChallenges({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,mailer,fetchImpl:config.employeeScanFetch});
+  registerChallenges({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret,allowDelete:config.scalingoChallengeDeletion===true,apiKey:config.openaiKey,model:config.employeeScanModel,mailer,fetchImpl:config.employeeScanFetch});
   const cookieOptions={httpOnly:true,secure,sameSite:'lax',path:'/',maxAge:8*60*60*1000};
   async function newSession(user,res){
     const raw=token(),session=digest(raw),csrfToken=token();

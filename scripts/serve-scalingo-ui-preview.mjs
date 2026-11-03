@@ -1,6 +1,7 @@
 // Restricted staging UI entrypoint. Not enabled by the production start command.
 // Explicit opt-in only after a security review; Render's server.mjs is unchanged.
 import express from 'express';
+import {registerScalingoChallengeDeletionGateway} from './scalingo-challenge-deletion-preview.mjs';
 import {registerScalingoCalendarReminders} from './scalingo-calendar-reminders-preview.mjs';
 import {scalingoGoogleCalendarConfig,registerScalingoGoogleCalendar} from './scalingo-google-calendar-preview.mjs';
 import {execFile} from 'node:child_process';
@@ -63,7 +64,7 @@ try{
  await ensureScalingoEmployeeDeletionAudit(db);
  const registrationPDF=await verifyScalingoRegistrationFormAsset();
  console.log('Scalingo employee registration PDF verified: '+JSON.stringify(registrationPDF));
- const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
+ const {app}=createApp(db,{origin,secret:env.APP_SECRET,scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});
@@ -101,6 +102,7 @@ try{
  registerScalingoMusic(gate,app);
  registerScalingoGoogleCalendar(gate,app,googleCalendar);
  registerScalingoCalendarReminders(gate,app);
+ registerScalingoChallengeDeletionGateway(gate,app);
  registerScalingoRegistrationForm(gate,app);
  registerScalingoEmployeeImport(gate,app);
  gate.use(async(req,res,next)=>{try{
