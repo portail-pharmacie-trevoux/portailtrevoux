@@ -1,5 +1,6 @@
 import {validateProcedureFile} from './procedure-files.mjs';
 import express from 'express';
+import {canModify} from './security.mjs';
 import {emailValid,sameMailAccount} from './invitations.mjs';
 const limits={conditions:4000,franco:1000,commercialName:160,commercialRole:160,commercialEmail:254,commercialPhone:50,commercialMobile:50,labAddress:500,labPhone:50,labEmail:254,labWebsite:500,orderEmail:254,customerNumber:100,notes:4000};
 export function validateLaboratory(body,fail){
@@ -13,7 +14,7 @@ export function validateLaboratory(body,fail){
  const conditionsYear=body.conditionsYear==null||body.conditionsYear===''?null:Number(body.conditionsYear);if(conditionsYear!==null&&(!Number.isInteger(conditionsYear)||conditionsYear<2000||conditionsYear>2100))throw fail(400,'Choisissez une année civile entre 2000 et 2100.');details.conditionsYear=conditionsYear;
  return {name:body.name.trim(),orderMode:body.orderMode,responsibleId,details};
 }
-export function conditionsWithHistory(details,previous={}){const history={...(previous.conditionsHistory||{})};if(previous.conditions||previous.franco){const key=previous.conditionsYear?String(previous.conditionsYear):'non-datees';history[key]={year:previous.conditionsYear||null,conditions:previous.conditions||'',franco:previous.franco||''};}if(details.conditions||details.franco){const key=details.conditionsYear?String(details.conditionsYear):'non-datees';history[key]={year:details.conditionsYear,conditions:details.conditions,franco:details.franco};}return {...details,conditionsHistory:history};}
+export function conditionsWithHistory(details,previous={}){const history={...(previous.conditionsHistory||{})};if(previous.conditions||previous.franco){const key=previous.conditionsYear?String(previous.conditionsYear):'non-datees';history[key]={...history[key],year:previous.conditionsYear||null,conditions:previous.conditions||'',franco:previous.franco||''};}if(details.conditions||details.franco){const key=details.conditionsYear?String(details.conditionsYear):'non-datees';history[key]={...history[key],year:details.conditionsYear,conditions:details.conditions,franco:details.franco};}return {...details,conditionsHistory:history};}
 export function registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,publish,mailer}){
  const access=viewUniverse('Laboratoires'),guard=[auth,ready,access,csrf];
  const rowSQL='SELECT l.id,l.name,l.order_mode,l.responsible_id,l.details,l.revision,l.logo_version,u.name AS responsible_name FROM laboratories l LEFT JOIN users u ON u.id=l.responsible_id';
@@ -38,7 +39,7 @@ export function registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,p
   const row=(await db.query('UPDATE laboratories SET logo_content=$2,logo_type=$3,logo_version=logo_version+1,revision=revision+1,updated_at=now(),updated_by=$4 WHERE id=$1 AND revision=$5 RETURNING id',[req.params.id,bytes,type,req.auth.id,req.body.revision])).rows[0];if(!row)throw fail(409,'La fiche a changé. Actualisez-la avant de remplacer le logo.');res.json({ok:true});
  });
  app.delete('/api/laboratories/:id/logo',...guard,async(req,res)=>{const row=(await db.query('UPDATE laboratories SET logo_content=NULL,logo_type=NULL,logo_version=0,revision=revision+1,updated_at=now(),updated_by=$2 WHERE id=$1 AND revision=$3 RETURNING id',[req.params.id,req.auth.id,req.body.revision])).rows[0];if(!row)throw fail(409,'La fiche a changé. Actualisez-la.');res.json({ok:true});});
- app.get('/api/laboratories/:id/documents',auth,ready,access,async(req,res)=>res.json((await db.query('SELECT id,title,file_name,created_at FROM laboratory_documents WHERE laboratory_id=$1 ORDER BY created_at DESC,id DESC',[req.params.id])).rows));
+ app.get('/api/laboratories/:id/documents',auth,ready,access,async(req,res)=>res.json((await db.query('SELECT id,title,file_name,created_at FROM laboratory_documents WHERE laboratory_id=$1 ORDER BY created_at DESC,id DESC',[req.params.id])).rows.map(row=>({...row,canRename:canModify(req.auth,'Laboratoires')}))));
  app.post('/api/laboratories/:id/documents',...guard,express.json({limit:'15mb'}),async(req,res)=>{
   if(!(await db.query('SELECT id FROM laboratories WHERE id=$1',[req.params.id])).rows[0])throw fail(404,'Laboratoire introuvable.');
   const file=validateProcedureFile(req.body,fail),title=req.body?.title;if(typeof title!=='string'||!title.trim()||title.trim().length>200)throw fail(400,'Renseignez un nom de document (200 caractères maximum).');
@@ -46,6 +47,15 @@ export function registerLaboratories({app,db,auth,ready,csrf,viewUniverse,fail,p
  });
  app.get('/api/laboratories/:id/documents/:documentId/file',auth,ready,access,async(req,res)=>{
   const row=(await db.query('SELECT file_name,file_type,file_content FROM laboratory_documents WHERE laboratory_id=$1 AND id=$2',[req.params.id,req.params.documentId])).rows[0];if(!row)throw fail(404,'Document introuvable.');res.type(row.file_type).attachment(row.file_name).send(row.file_content);
+ });
+ app.put('/api/laboratories/:id/documents/:documentId',...guard,async(req,res)=>{
+  if(!canModify(req.auth,'Laboratoires'))throw fail(403,'Le renommage nécessite le droit de modification des laboratoires.');
+  const lab=Number(req.params.id),document=Number(req.params.documentId),b=req.body;
+  if(!Number.isSafeInteger(lab)||lab<1||!Number.isSafeInteger(document)||document<1)throw fail(400,'Document invalide.');
+  if(!b||Object.keys(b).some(k=>!['title','previousTitle'].includes(k))||typeof b.title!=='string'||!b.title.trim()||b.title.trim().length>200||/[\x00-\x1f\x7f]/.test(b.title)||typeof b.previousTitle!=='string'||!b.previousTitle||b.previousTitle.length>200||b.previousTitle.includes('\0'))throw fail(400,'Renseignez un intitulé de 1 à 200 caractères et actualisez le document.');
+  const row=(await db.query('UPDATE laboratory_documents SET title=$3 WHERE laboratory_id=$1 AND id=$2 AND title=$4 RETURNING id,title,file_name,created_at',[lab,document,b.title.trim(),b.previousTitle])).rows[0];
+  if(!row){const exists=(await db.query('SELECT id FROM laboratory_documents WHERE laboratory_id=$1 AND id=$2',[lab,document])).rows.length;throw fail(exists?409:404,exists?'Ce document a été renommé. Actualisez la liste avant de réessayer.':'Document introuvable.');}
+  res.json({...row,canRename:true});
  });
  app.delete('/api/laboratories/:id/documents/:documentId',...guard,async(req,res)=>{const row=(await db.query('DELETE FROM laboratory_documents WHERE laboratory_id=$1 AND id=$2 RETURNING id',[req.params.id,req.params.documentId])).rows[0];if(!row)throw fail(404,'Document introuvable.');res.json({ok:true});});
  async function validate(body){const data=validateLaboratory(body,fail);if(data.responsibleId&&!(await db.query('SELECT id FROM users WHERE id=$1 AND active=TRUE',[data.responsibleId])).rows[0])throw fail(400,'Le responsable doit être un collaborateur actif.');return data;}

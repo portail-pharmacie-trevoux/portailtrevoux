@@ -9,6 +9,7 @@ export function registerScalingoLaboratories(gate,app){
  gate.get('/api/laboratories/:id/documents',dispatch);
  gate.post('/api/laboratories/:id/documents',dispatch);
  gate.get('/api/laboratories/:id/documents/:documentId/file',dispatch);
+ gate.put('/api/laboratories/:id/documents/:documentId',dispatch);
  gate.delete('/api/laboratories/:id/documents/:documentId',dispatch);
  gate.post('/api/laboratories/:id/email',dispatch);
 }
