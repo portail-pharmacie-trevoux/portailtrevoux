@@ -19,7 +19,11 @@ Conserver `SCALINGO_PREVIEW_SAFE_MODE=true`, `SCALINGO_PREVIEW_UI_ENABLED=true`,
 `SCALINGO_REQUIRE_DB_TLS=true`; ne pas activer le démarrage métier ni les tâches
 planifiées. Calendar reste désactivé sans son indicateur. Une configuration OAuth
 partielle ou sans cet indicateur est refusée au démarrage : saisir les quatre
-paramètres d'activation en une seule sauvegarde.
+paramètres d'activation en une seule sauvegarde. Après enregistrement, redémarrer
+les conteneurs web Scalingo : les processus déjà démarrés conservent leur ancienne
+configuration. Le statut administrateur `/api/google/status` doit ensuite indiquer
+`configured: true`, `calendarEnabled: true`, `environment: scalingo`. Le journal
+`SCALINGO_GOOGLE_CALENDAR_CONFIG` expose seulement deux booléens, aucun secret.
 
 Le client Web Google doit autoriser exactement :
 `https://portailplus-hds.osc-fr1.scalingo.io/auth/google/callback`.

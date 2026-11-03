@@ -56,6 +56,8 @@ try{
  assert.equal(settings.has('mail_tokens'),false);assert.equal(settings.has('youtube_tokens'),false);
  assert.equal((await nativeFetch(base+'/api/google/calendars',{headers})).status,200);
  for(const path of ['calendar','sync'])assert.equal((await nativeFetch(base+'/api/google/'+path,{method:'POST',headers,body:JSON.stringify({id:'dummy-calendar'})})).status,200);
+ const status=await (await nativeFetch(base+'/api/google/status',{headers})).json();
+ assert.equal(status.configured,true);assert.equal(status.environment,'scalingo');assert.equal(status.calendarEnabled,true);assert.doesNotMatch(JSON.stringify(status),/dummy-secret|dummy-client|dummy-refresh/);
  assert.equal(settings.get('calendar_id'),'dummy-calendar');
  assert.ok(calls.filter(c=>c.url.includes('/calendar/v3/')).every(c=>c.method==='GET'));
 

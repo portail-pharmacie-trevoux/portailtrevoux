@@ -34,6 +34,7 @@ if(env.SCALINGO_PREVIEW_SAFE_MODE!=='true'||env.SCALINGO_PREVIEW_UI_ENABLED!=='t
 if(env.SCALINGO_REQUIRE_DB_TLS!=='true'||env.SCALINGO_ENABLE_BUSINESS_STARTUP==='true'||env.SCALINGO_ENABLE_SCHEDULED_JOBS==='true')throw Error('Unsafe staging configuration');
 if(env.APP_URL!==origin||!env.APP_SECRET||env.APP_SECRET.length<32||!env.DATABASE_URL)throw Error('Staging URL, secret or DB missing');
 const googleCalendar=scalingoGoogleCalendarConfig(env);
+console.log('SCALINGO_GOOGLE_CALENDAR_CONFIG '+JSON.stringify({enabled:googleCalendar.enabled,configured:!!(googleCalendar.googleId&&googleCalendar.googleSecret&&googleCalendar.googleEmail)}));
 const blockedIntegrations=['MAIL_SENDER_EMAIL','YOUTRUST_API_KEY','OPENAI_API_KEY','SERPAPI_KEY','ADMIN_PASSWORD','PROCEDURES_IMPORT_JSON','PROCEDURE_FILES_IMPORT_JSON','LABORATORIES_IMPORT_JSON','LABORATORY_LOGOS_IMPORT_JSON'];
 if(blockedIntegrations.some(name=>env[name]))throw Error('External integration configured; staging preview refused');
 const url=new URL(env.DATABASE_URL);

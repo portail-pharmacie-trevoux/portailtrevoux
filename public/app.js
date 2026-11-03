@@ -314,8 +314,8 @@ async function renderCalendar(){
   if(session.user.role==='admin'){
     const status=await api('/api/google/status');if(currentUniverse!=='Agenda')return;
     const tools=node('details','','calendar-tools admin-menu');tools.open=!status.connected;tools.append(node('summary','Administration — Agenda'));
-    if(!status.configured){tools.append(node('p','Ajoutez les identifiants Google dans les paramètres Render pour activer la connexion.','admin-hint'),node('p','Adresse de retour à renseigner dans Google : '+status.callback,'admin-hint'));}
-    else tools.append(button(status.connected?'Renouveler l’autorisation Google':'Connecter Google Agenda',()=>runCalendarAction(async()=>{const result=await api('/api/google/connect','POST');window.location.assign(result.url);}),'btn primary'));
+    if(!status.configured){tools.append(node('p',status.configurationMessage||'Ajoutez les identifiants Google dans les paramètres Render pour activer la connexion.','admin-hint'),node('p','Adresse de retour à renseigner dans Google : '+status.callback,'admin-hint'));}
+    else tools.append(button(status.connected?'Renouveler l’autorisation Google':status.environment==='scalingo'?'Connecter Google Calendar':'Connecter Google Agenda',()=>runCalendarAction(async()=>{const result=await api('/api/google/connect','POST');window.location.assign(result.url);}),'btn primary'));
     if(status.connected){
       try{const calendars=await api('/api/google/calendars');if(currentUniverse!=='Agenda')return;const label=node('label','Agenda à afficher');label.htmlFor='calendar-choice';const select=node('select','','calendar-select');select.id='calendar-choice';select.append(new Option('Choisir un agenda',''));calendars.forEach(c=>select.append(new Option(c.name,c.id)));select.value=status.calendarId;tools.append(label,select,button('Enregistrer cet agenda',()=>runCalendarAction(async()=>{if(!select.value)throw Error('Choisissez un agenda.');await api('/api/google/calendar','POST',{id:select.value});})));}
       catch(e){tools.append(node('p',e.message,'calendar-warning'));}
