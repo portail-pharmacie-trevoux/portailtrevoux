@@ -1,6 +1,7 @@
 // Restricted staging UI entrypoint. Not enabled by the production start command.
 // Explicit opt-in only after a security review; Render's server.mjs is unchanged.
 import express from 'express';
+import {scalingoGoogleCalendarConfig,registerScalingoGoogleCalendar} from './scalingo-google-calendar-preview.mjs';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const execFileAsync=promisify(execFile);
@@ -32,7 +33,8 @@ const origin='https://portailplus-hds.osc-fr1.scalingo.io';
 if(env.SCALINGO_PREVIEW_SAFE_MODE!=='true'||env.SCALINGO_PREVIEW_UI_ENABLED!=='true')throw Error('Explicit safe UI preview opt-in required');
 if(env.SCALINGO_REQUIRE_DB_TLS!=='true'||env.SCALINGO_ENABLE_BUSINESS_STARTUP==='true'||env.SCALINGO_ENABLE_SCHEDULED_JOBS==='true')throw Error('Unsafe staging configuration');
 if(env.APP_URL!==origin||!env.APP_SECRET||env.APP_SECRET.length<32||!env.DATABASE_URL)throw Error('Staging URL, secret or DB missing');
-const blockedIntegrations=['GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_ACCOUNT_EMAIL','MAIL_SENDER_EMAIL','YOUTRUST_API_KEY','OPENAI_API_KEY','SERPAPI_KEY','ADMIN_PASSWORD','PROCEDURES_IMPORT_JSON','PROCEDURE_FILES_IMPORT_JSON','LABORATORIES_IMPORT_JSON','LABORATORY_LOGOS_IMPORT_JSON'];
+const googleCalendar=scalingoGoogleCalendarConfig(env);
+const blockedIntegrations=['MAIL_SENDER_EMAIL','YOUTRUST_API_KEY','OPENAI_API_KEY','SERPAPI_KEY','ADMIN_PASSWORD','PROCEDURES_IMPORT_JSON','PROCEDURE_FILES_IMPORT_JSON','LABORATORIES_IMPORT_JSON','LABORATORY_LOGOS_IMPORT_JSON'];
 if(blockedIntegrations.some(name=>env[name]))throw Error('External integration configured; staging preview refused');
 const url=new URL(env.DATABASE_URL);
 for(const key of ['sslmode','sslcert','sslkey','sslrootcert'])url.searchParams.delete(key);
@@ -59,7 +61,7 @@ try{
  await ensureScalingoEmployeeDeletionAudit(db);
  const registrationPDF=await verifyScalingoRegistrationFormAsset();
  console.log('Scalingo employee registration PDF verified: '+JSON.stringify(registrationPDF));
- const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:'',googleSecret:'',googleEmail:'',youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
+ const {app}=createApp(db,{origin,secret:env.APP_SECRET,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});
@@ -95,6 +97,7 @@ try{
  registerScalingoNewsThreads(gate,app);
  registerScalingoSchedulePublication(gate,app);
  registerScalingoMusic(gate,app);
+ registerScalingoGoogleCalendar(gate,app,googleCalendar);
  registerScalingoRegistrationForm(gate,app);
  registerScalingoEmployeeImport(gate,app);
  gate.use(async(req,res,next)=>{try{
