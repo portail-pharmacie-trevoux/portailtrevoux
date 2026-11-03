@@ -17,6 +17,7 @@ import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTempera
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
 import {isScalingoTrainingImport,registerScalingoTrainingDocuments} from './scalingo-training-documents-preview.mjs';
 import {ensureScalingoTrainingDocumentsSchema} from './ensure-scalingo-training-documents-schema.mjs';
+import {registerScalingoMusic,isScalingoMusicImport} from './scalingo-music-preview.mjs';
 import {registerScalingoSchedulePublication} from './scalingo-schedule-publication-preview.mjs';
 import {registerScalingoNewsThreads} from './scalingo-news-threads-preview.mjs';
 import {isScalingoLaboratoryUpload,registerScalingoLaboratories} from './scalingo-laboratories-preview.mjs';
@@ -63,7 +64,7 @@ try{
  gate.disable('x-powered-by');
  registerScalingoTemperaturePreview(gate,{db,origin});
  const smallJson=express.json({limit:'64kb'});
- gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req)||isScalingoLaboratoryUpload(req))?next():smallJson(req,res,next));
+ gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req)||isScalingoLaboratoryUpload(req)||isScalingoMusicImport(req))?next():smallJson(req,res,next));
  // One-time cleanup control: restricted to the exact staging admin and origin.
  // The purge subprocess independently checks the database, account roster and TLS.
  const cleanupAuth=scalingoTestAdminAuth(db);
@@ -93,6 +94,7 @@ try{
  registerScalingoLaboratories(gate,app);
  registerScalingoNewsThreads(gate,app);
  registerScalingoSchedulePublication(gate,app);
+ registerScalingoMusic(gate,app);
  registerScalingoRegistrationForm(gate,app);
  registerScalingoEmployeeImport(gate,app);
  gate.use(async(req,res,next)=>{try{

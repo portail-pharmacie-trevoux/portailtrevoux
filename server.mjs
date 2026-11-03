@@ -63,7 +63,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/merchandising\/promotions\/[1-9]\d*\/documents$/.test(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/music/import','/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/merchandising\/promotions\/[1-9]\d*\/documents$/.test(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')!==origin)return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -306,7 +306,7 @@ export function createApp(db,config) {
 
 
   registerMusicCSV({app,db,auth,ready,admin,csrf,fail});
-  app.post('/api/music/import',auth,ready,admin,csrf,async(req,res)=>{
+  app.post('/api/music/import',auth,ready,admin,csrf,express.json({limit:'64kb'}),async(req,res)=>{
     if(!Array.isArray(req.body.tracks)||!req.body.tracks.length||req.body.tracks.length>25)throw fail(400,'Importez de 1 à 25 morceaux par lot.');
     const tracks=req.body.tracks.map(validateMusic);
     const {rows}=await db.query(`INSERT INTO music_tracks(artist,title,track_key,contributor,source)
@@ -341,7 +341,7 @@ export function createApp(db,config) {
   app.use((error,req,res,next)=>{
     if(error.code==='23505')return res.status(409).json({error:'Cette adresse e-mail est déjà utilisée.'});
     const status=error.status||500;
-    if(status===413)return res.status(413).json({error:req.path==='/api/procedures/import'?`Le fichier dépasse la limite de ${maxProcedureDocumentMiB} Mo.`:/^\/api\/laboratories\/[1-9]\d*\/logo$/.test(req.path)?'Le logo dépasse la limite de 2 Mo.':'Le fichier dépasse la limite de 10 Mo.'});
+    if(status===413)return res.status(413).json({error:req.path==='/api/music/import'?'Lot d’import trop volumineux : 64 Ko maximum.':req.path==='/api/procedures/import'?`Le fichier dépasse la limite de ${maxProcedureDocumentMiB} Mo.`:/^\/api\/laboratories\/[1-9]\d*\/logo$/.test(req.path)?'Le logo dépasse la limite de 2 Mo.':'Le fichier dépasse la limite de 10 Mo.'});
     if(status>=500)console.error('Erreur du portail:',error.code||error.name); // Do not log tokens or request bodies.
     res.status(status).json({error:status===500?'Le service est momentanément indisponible.':error.message,...(error.code==='MFA_REQUIRED'?{code:'MFA_REQUIRED'}:{})});
   });
