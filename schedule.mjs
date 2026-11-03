@@ -119,7 +119,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision);await ensureWeek(week);
     const {rows}=await db.query(`WITH changed AS (
       UPDATE schedule_weeks SET published=draft,published_revision=revision,published_at=now()
-      WHERE week=$1::date AND revision=$2 AND (published_at IS NULL OR published_revision<>revision)
+      WHERE week=$1::date AND revision=$2 AND (published_at IS NULL OR published_revision IS DISTINCT FROM revision OR published IS DISTINCT FROM draft)
       RETURNING published_at
     ), publication AS (
       INSERT INTO publications(universe,title) SELECT 'Emplois du temps',$3 FROM changed RETURNING id
@@ -129,9 +129,14 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     ), deliveries AS (
       INSERT INTO team_message_recipients(message_id,user_id)
       SELECT notice.id,u.id FROM notice CROSS JOIN users u WHERE u.active=TRUE RETURNING message_id
-    ) SELECT publication.id,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Un nouvel emploi du temps est disponible pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.']);
-    if(!rows.length){const row=await weekRow(week);if(row?.revision!==revision)throw conflict();return res.json({ok:true,alreadyPublished:true});}
-    res.json({ok:true});
+    ) SELECT publication.id,changed.published_at,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication CROSS JOIN changed`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Un nouvel emploi du temps est disponible pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.']);
+    if(!rows.length){
+      const row=(await db.query('SELECT revision,published_revision,published_at,published IS NOT DISTINCT FROM draft AS publication_matches_draft FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];
+      if(row?.revision!==revision)throw conflict();
+      if(!row.published_at||row.published_revision!==revision||row.publication_matches_draft!==true)throw fail(409,'La publication n’a pas été enregistrée. Rechargez la semaine avant de réessayer.');
+      return res.json({ok:true,alreadyPublished:true,publishedRevision:row.published_revision,publishedAt:row.published_at});
+    }
+    res.json({ok:true,publishedRevision:revision,publishedAt:rows[0].published_at});
   });
 }
 
