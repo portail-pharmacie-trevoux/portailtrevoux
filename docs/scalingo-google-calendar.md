@@ -47,3 +47,10 @@ La synchronisation lit Google et actualise le cache PostgreSQL; elle peut créer
 les publications Agenda internes prévues par l'application pour de nouveaux
 événements. Aucune création/modification/suppression d'événement Google n'existe
 dans ce flux. Déconnecter supprime l'autorisation locale et révoque son jeton OAuth.
+
+Les cases « Me le rappeler » utilisent uniquement `POST /api/calendar/reminders`
+avec `{eventId, enabled}`. Cette route locale conserve les droits Agenda Scalingo,
+la session, l'origine et le CSRF; elle n'appelle aucune API Google. Le retrait
+utilise la même route avec `enabled: false`. Chaque rappel est propre au compte
+Portail+ et à l'agenda choisi, conservé dans `calendar_reminders`. La tuile Agenda
+présente les rappels des sept prochains jours (dates du fuseau Europe/Paris).
