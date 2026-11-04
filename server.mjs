@@ -337,6 +337,7 @@ export function createApp(db,config) {
   app.get('/api/promoflash/image/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>{const result=await products.image(req.params.ean);res.type(result.type).send(Buffer.from(result.bytes));});
   app.get('/api/promoflash/prices/:ean',auth,ready,viewUniverse('Outils de calculs rapides'),async(req,res)=>res.json(await products.prices(req.params.ean)));
   app.get('/api/universes/:name',auth,ready,(req,res)=>{if(!canAccess(req.auth,req.params.name))throw fail(403,'Accès refusé.');res.json({items:[]});});
+  if(config.homepageHTML)app.get(['/','/index.html'],(req,res)=>res.type('html').send(config.homepageHTML));
   app.use(express.static(root+'public',{index:'index.html',etag:false}));
   app.use((error,req,res,next)=>{
     if(error.code==='23505')return res.status(409).json({error:'Cette adresse e-mail est déjà utilisée.'});

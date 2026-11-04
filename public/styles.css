@@ -621,3 +621,6 @@ body>header .account-actions .btn:focus-visible,body>header #portal-home:focus-v
 .temperature-validation{display:inline-block;font-weight:800;margin-left:6px}.temperature-validation.mastered,.temperature-validation-choice.mastered{color:#116332}.temperature-validation.problem,.temperature-validation-choice.problem{color:#ac152b}.temperature-validation-choice{display:inline-flex!important;align-items:center;gap:6px;margin-right:18px}.temperature-event fieldset{border:1px solid #b9cbd5;border-radius:8px;margin:8px 0 14px}.temperature-day.alert .temperature-validation{background:#fff;border-radius:4px;padding:1px 4px}
 
 .lab-doc-row .lab-doc-rename{flex-basis:100%;margin-top:0}.lab-doc-rename .btn{margin-right:8px}
+
+/* Scalingo only: the two remaining compact shortcuts share the final row. */
+@media(min-width:561px){#home .grid.scalingo-without-calculations>.tile.compact-space{grid-column:auto / span 6}}

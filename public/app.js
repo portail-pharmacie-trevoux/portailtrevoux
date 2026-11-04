@@ -147,6 +147,8 @@ function setUniverseHeading(name){
   heading.append(node('span',displayUniverse(name)));
 }
 async function openUniverse(name){
+  // A retired Scalingo tile cannot be reopened from stale navigation or console calls.
+  if(name==='Outils de calculs rapides'&&!q('.grid [data-universe="Outils de calculs rapides"]'))return;
   const viewRequest=++universeViewRequest;
   q('#hr-import-action')?.remove();
   q('#universe-publications')?.remove();
