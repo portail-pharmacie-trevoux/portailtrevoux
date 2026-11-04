@@ -1,6 +1,7 @@
 // Restricted staging UI entrypoint. Not enabled by the production start command.
 // Explicit opt-in only after a security review; Render's server.mjs is unchanged.
 import express from 'express';
+import {registerScalingoOrderMFA} from './scalingo-order-mfa-preview.mjs';
 import {scalingoHomepage,registerScalingoRetiredCalculations} from './scalingo-retired-calculations-preview.mjs';
 import {registerScalingoChallengeDeletionGateway} from './scalingo-challenge-deletion-preview.mjs';
 import {registerScalingoCalendarReminders} from './scalingo-calendar-reminders-preview.mjs';
@@ -104,6 +105,7 @@ try{
  registerScalingoMusic(gate,app);
  registerScalingoGoogleCalendar(gate,app,googleCalendar);
  registerScalingoCalendarReminders(gate,app);
+ registerScalingoOrderMFA(gate,app);
  registerScalingoChallengeDeletionGateway(gate,app);
  registerScalingoRegistrationForm(gate,app);
  registerScalingoEmployeeImport(gate,app);
