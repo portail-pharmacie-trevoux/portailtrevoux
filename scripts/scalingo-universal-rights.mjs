@@ -50,9 +50,9 @@ export function scalingoUniverseBoundary(db){
   next();
  }catch(e){next(e);}};
 }
-export function registerScalingoRights({gate,db,adminAuth,origin,env}){
+export function registerScalingoRights({gate,db,adminAuth,origin,env,isAllowedOrigin=value=>value===origin}){
  const write=(req,res,next)=>{
-  if(req.get('origin')!==origin||req.get('x-csrf-token')!==req.cleanupAdmin.csrf)return next(fail(403,'Origine ou CSRF invalide.'));
+  if(!isAllowedOrigin(req.get('origin'))||req.get('x-csrf-token')!==req.cleanupAdmin.csrf)return next(fail(403,'Origine ou CSRF invalide.'));
   if(!backupReady(env))return next(fail(409,'Sauvegarde Scalingo récente non vérifiée : renseignez sa référence et la date de vérification après contrôle de sa réussite.'));
   next();
  };

@@ -8,19 +8,19 @@ export const isScalingoTemperatureRoute=req=>isTemperatureImport(req)||isTempera
 
 // Register before the preview's 64 KB parser. Authenticate before reading a large
 // upload; server.mjs retains its own session, readiness, origin and CSRF checks.
-export function registerScalingoTemperaturePreview(gate,{db,origin}){
+export function registerScalingoTemperaturePreview(gate,{db,origin,isAllowedOrigin=value=>value===origin}){
  const commentAuth=scalingoTestAdminAuth(db);
  gate.use((req,res,next)=>{
   if(!isTemperatureCommentWrite(req))return next();
   commentAuth(req,res,error=>{
    if(error)return next(error);
-   if(req.get('origin')!==origin||!req.get('x-csrf-token')||req.get('x-csrf-token')!==req.cleanupAdmin.csrf)return res.status(403).json({error:'Origine ou CSRF invalide.'});
+   if(!isAllowedOrigin(req.get('origin'))||!req.get('x-csrf-token')||req.get('x-csrf-token')!==req.cleanupAdmin.csrf)return res.status(403).json({error:'Origine ou CSRF invalide.'});
    if(!req.is('application/json'))return res.status(415).json({error:'Un commentaire JSON est attendu.'});
    next();
   });
  });
  gate.post(importPath,scalingoTestAdminAuth(db),(req,res,next)=>{
-  if(req.get('origin')!==origin||!req.get('x-csrf-token')||req.get('x-csrf-token')!==req.cleanupAdmin.csrf)return res.status(403).json({error:'Origine ou CSRF invalide.'});
+  if(!isAllowedOrigin(req.get('origin'))||!req.get('x-csrf-token')||req.get('x-csrf-token')!==req.cleanupAdmin.csrf)return res.status(403).json({error:'Origine ou CSRF invalide.'});
   if(!req.is('application/json'))return res.status(415).json({error:'Un import JSON contenant le fichier Excel est attendu.'});
   next();
  },express.json({limit:'22mb'}),(req,res,next)=>next(),(error,req,res,next)=>{

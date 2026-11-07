@@ -9,9 +9,9 @@ const fail=(status,message)=>Object.assign(Error(message),{status});
 const fields=new Set(['firstName','lastName','phone','birthday','job','active','email','password','administratorRights','rights','editRights','details','detailsRevision']);
 const equal=(a,b)=>JSON.stringify([...new Set(a||[])].sort())===JSON.stringify([...new Set(b||[])].sort());
 const idOf=req=>{const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||id>2147483647)throw fail(400,'Profil invalide.');return id;};
-export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret}){
+export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret,isAllowedOrigin=value=>value===origin}){
  const privacy=(req,res,next)=>{res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});next();};
- const write=(req,res,next)=>req.get('origin')===origin&&req.get('x-csrf-token')===req.cleanupAdmin.csrf?next():next(fail(403,'Origine ou CSRF invalide.'));
+ const write=(req,res,next)=>isAllowedOrigin(req.get('origin'))&&req.get('x-csrf-token')===req.cleanupAdmin.csrf?next():next(fail(403,'Origine ou CSRF invalide.'));
  gate.post('/api/users',privacy,adminAuth,write,async(req,res,next)=>{let client;try{
   const body=req.body;
   if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!fields.has(k)))throw fail(400,'Champs de fiche invalides.');

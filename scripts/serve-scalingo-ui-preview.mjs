@@ -1,6 +1,7 @@
 // Restricted staging UI entrypoint. Not enabled by the production start command.
 // Explicit opt-in only after a security review; Render's server.mjs is unchanged.
 import express from 'express';
+import {scalingoAllowedOrigins,isScalingoOrigin} from './scalingo-origins-preview.mjs';
 import {registerScalingoTrevouxEntry} from './scalingo-trevoux-entry-preview.mjs';
 import {registerScalingoOrderMFA} from './scalingo-order-mfa-preview.mjs';
 import {scalingoHomepage,registerScalingoRetiredCalculations} from './scalingo-retired-calculations-preview.mjs';
@@ -67,13 +68,13 @@ try{
  await ensureScalingoEmployeeDeletionAudit(db);
  const registrationPDF=await verifyScalingoRegistrationFormAsset();
  console.log('Scalingo employee registration PDF verified: '+JSON.stringify(registrationPDF));
- const {app}=createApp(db,{origin,secret:env.APP_SECRET,homepageHTML:scalingoHomepage(),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
+ const {app}=createApp(db,{origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:scalingoHomepage(),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  // Trévoux staging entry point keeps the same security middleware as root.
  registerScalingoTrevouxEntry(gate,app);
  registerScalingoRetiredCalculations(gate);
- registerScalingoTemperaturePreview(gate,{db,origin});
+ registerScalingoTemperaturePreview(gate,{db,origin,isAllowedOrigin:isScalingoOrigin});
  const smallJson=express.json({limit:'64kb'});
  gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req)||isScalingoLaboratoryUpload(req)||isScalingoMusicImport(req))?next():smallJson(req,res,next));
  // One-time cleanup control: restricted to the exact staging admin and origin.
@@ -83,7 +84,7 @@ try{
    res.set('Cache-Control','no-store').type('html').send(`<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Nettoyage Scalingo</title><body style="font:16px system-ui;max-width:680px;margin:4rem auto;padding:1rem"><h1>Nettoyage des cinq comptes fictifs</h1><p>Environnement : Scalingo uniquement. Administrateur TEST conservé. Sauvegarde préalable obligatoire.</p><p>Effectuez d'abord la simulation, puis la purge après vérification.</p><form method="post" action="/api/staging-demo-cleanup"><input type="hidden" name="csrf" value="${req.cleanupAdmin.csrf}"><button name="mode" value="check" formnovalidate>1. Vérifier sans supprimer</button><hr><label><input type="checkbox" name="backup" value="confirmed" required> Je confirme que la sauvegarde manuelle Scalingo est réussie.</label><p><label>Saisir SUPPRIMER LES CINQ COMPTES : <input name="confirmation" autocomplete="off"></label></p><button name="mode" value="execute">2. Supprimer définitivement</button></form></body></html>`);
  });
  gate.post('/api/staging-demo-cleanup',express.urlencoded({extended:false,limit:'2kb'}),cleanupAuth,async(req,res)=>{
-   if(req.get('origin')!==origin||req.body.csrf!==req.cleanupAdmin.csrf)return res.status(403).send('Origine ou session invalide.');
+   if(!isScalingoOrigin(req.get('origin'))||req.body.csrf!==req.cleanupAdmin.csrf)return res.status(403).send('Origine ou session invalide.');
    const execute=req.body.mode==='execute';
    if(!execute&&req.body.mode!=='check')return res.status(400).send('Mode inconnu.');
    if(execute&&(req.body.backup!=='confirmed'||req.body.confirmation!=='SUPPRIMER LES CINQ COMPTES'))return res.status(400).send('Confirmation incomplète.');
@@ -93,8 +94,8 @@ try{
      res.set('Cache-Control','no-store').type('text/plain').send(result.stdout+'\\n'+result.stderr);
    }catch(e){res.status(409).type('text/plain').send('Opération refusée ou annulée : '+(e.stdout||'')+' '+(e.stderr||e.message));}
  });
- registerScalingoEmployeeRecords({gate,db,adminAuth:cleanupAuth,origin,secret:env.APP_SECRET});
- registerScalingoRights({gate,db,adminAuth:cleanupAuth,origin,env});
+ registerScalingoEmployeeRecords({gate,db,adminAuth:cleanupAuth,origin,secret:env.APP_SECRET,isAllowedOrigin:isScalingoOrigin});
+ registerScalingoRights({gate,db,adminAuth:cleanupAuth,origin,env,isAllowedOrigin:isScalingoOrigin});
  gate.use(scalingoUniverseBoundary(db));
  // POST /api/quality/tiers-payant/import: real app auth, CSRF, referent rights and validation.
  registerScalingoTiersPayantImport(gate,app);
