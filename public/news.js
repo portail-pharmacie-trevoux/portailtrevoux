@@ -1,3 +1,5 @@
+import {reminderTaskPreset} from './news-reminder-presets.js';
+import {openNewsReminderTask} from './news-reminder-task.js';
 import {messageKind,groupNewsThreads} from './news-threads.js';
 import {orderAlertIcon,legacyOrderAlerts} from './order-alerts.js';
 import {printNewsMessage} from './news-print.js';
@@ -5,7 +7,7 @@ const node=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textCont
 const button=(text,action,cls='btn small')=>{const e=node('button',text,cls);e.type='button';e.onclick=action;return e;};
 const attachmentLink=message=>{const link=node('a','📎 '+message.attachment_name,'btn small news-attachment');link.href='/api/news/'+message.id+'/attachment';link.download=message.attachment_name;return link;};
 const date=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'});
-export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{},onOpenOrders=()=>{},onOpenMerchandising=()=>{}}){
+export async function renderNews({container,api,isAdmin=false,isCurrent=()=>true,onChanged=()=>{},onOpenPlanning=()=>{},onOpenOrders=()=>{},onOpenMerchandising=()=>{}}){
   const [recipients,initialMessages,initialSent]=await Promise.all([api('/api/news/recipients'),api('/api/news'),api('/api/news/sent')]);
   if(!isCurrent())return;
   const expandedThreads=new Set(),threadCache=new Map();let sentMessages=initialSent,view='inbox',replyTo=null;let messages=initialMessages,filter='all',request=0,sending=false;
@@ -77,7 +79,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
         };label.append(input,node('span',labelText));actions.append(label);
       }
       if(message.merchandising_month)card.append(button('Consulter le planning merchandising',()=>onOpenMerchandising(message.merchandising_month),'btn primary small'));
-      if(message.planning_week)card.append(button('Consulter le planning',()=>onOpenPlanning(message.planning_week?String(message.planning_week).slice(0,10):null),'btn primary small'));if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));return card;
+      if(message.planning_week)card.append(button('Consulter le planning',()=>onOpenPlanning(message.planning_week?String(message.planning_week).slice(0,10):null),'btn primary small'));if(message.can_archive===false)card.append(node('p','Message automatique · Non archivable','field-note'));if(reminderTaskPreset(message)){const reminder=button('📅 Créer un événement personnel avec rappel',()=>openNewsReminderTask({message,api,onChanged,onCreated:()=>{reminder.textContent='✓ Événement ajouté à mon agenda';reminder.disabled=true;}}),'btn primary small');card.append(reminder);}card.append(actions,node('p',message.archived?'Archivé · Conservé dans votre espace':'Disparaîtra le '+date(message.expires_at),'field-note'));return card;
   }
   function outgoingCard(message){const card=node('article','','news-message news-message-outgoing news-origin-'+messageKind(message));card.append(originBadge(message,true),node('strong','Vous · '+date(message.created_at)));if(message.title)card.append(node('h4',message.title,'news-message-title'));card.append(node('p',message.text,'news-message-text'));if(message.attachment_name)card.append(attachmentLink(message));if(message.recipients){const seen=message.recipients.filter(p=>p.seen).length;card.append(node('p',seen+' / '+message.recipients.length+' destinataires ont coché « Vu »','field-note'));const people=node('ul');message.recipients.forEach(p=>people.append(node('li',p.name+' · '+(p.seen?'Vu'+(p.seenAt?' le '+date(p.seenAt):''):'Non vu'))));card.append(people);}card.append(button('Imprimer',()=>printNewsMessage(card,{sent:true,hasAttachment:!!message.attachment_name})));return card;}
   function threadCard(group,outgoing){
@@ -105,5 +107,7 @@ export async function renderNews({container,api,isCurrent=()=>true,onChanged=()=
       try{await reload();}catch(e){inboxError.textContent=e.message;}onChanged();
     }catch(e){if(isCurrent())feedback.textContent=e.message;}finally{sending=false;form.inert=false;submit.disabled=!recipients.length;attachment.disabled=false;removeAttachment.disabled=false;}
   };
-  layout.append(compose,inbox);container.replaceChildren(note,layout);redraw();
+  layout.append(compose,inbox);container.replaceChildren(note,layout);
+  if(isAdmin){const toolbar=node('div','','news-automation-toolbar universe-toolbar'),admin=node('details','','admin-menu news-automation-menu'),summary=node('summary','Administration'),body=node('div');admin.append(summary,body);toolbar.append(admin);container.prepend(toolbar);let loaded=false;admin.ontoggle=async()=>{if(!admin.open||loaded)return;loaded=true;body.textContent='Chargement des programmations…';try{if(!document.querySelector('link[href="/news-automations.css"]')){const css=document.createElement('link');css.rel='stylesheet';css.href='/news-automations.css';document.head.append(css);}const module=await import('/news-automations.js');if(isCurrent())await module.renderNewsAutomations({container:body,api,isCurrent});}catch(error){body.textContent=error.message;loaded=false;}};}
+  redraw();
 }
