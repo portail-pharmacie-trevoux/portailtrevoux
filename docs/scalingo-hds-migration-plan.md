@@ -103,3 +103,12 @@ Consignes de migration :
 - Préserver les facteurs Ente Auth et secrets chiffrés associés ; `APP_SECRET` est utilisé pour le chiffrement applicatif et nécessite une stratégie de continuité sécurisée. Ne jamais écrire des empreintes, secrets, mots de passe ou données réelles dans le dépôt ou les journaux.
 - Tester après import avec des comptes autorisés : connexion e-mail + ancien mot de passe, droits effectifs, MFA Commandes, refus des accès non autorisés. Ne pas affirmer que les mots de passe sont conservés avant ces tests.
 - Aucun transfert réel, aucune modification de Render ou de main dans cette mise à jour documentaire.
+
+## Audit accéléré des précontrôles — 7 novembre 2026
+Inspection de code effectuée, sans connexion à la base ni transfert de données :
+- `scripts/check-scalingo-authentication.mjs` exige `users.length===1` et uniquement `admin-test@portailplus.invalid` ; il est obsolète pour la cible comportant déjà 16 collaborateurs.
+- `scripts/check-scalingo-functional-preflight.mjs` exige également un seul utilisateur fictif et zéro session ; il est obsolète pour les comptes réels.
+- `scripts/check-scalingo-staging-db.mjs` considère `users===0` comme seul résultat OK ; il est obsolète pour la base peuplée.
+- Ces trois scripts **ne doivent pas servir de critères de Go/No-Go sans adaptation**. Conserver leur contrôle de TLS, base cible, mode sûr et absence de tâches planifiées, mais remplacer les hypothèses d'effectif par des vérifications de cohérence : 16 collaborateurs attendus, 2 administrateurs réels après import, administrateur TEST distinct, absence de doublons e-mail, présence d'empreintes valides pour les comptes activés, sessions et rôles cohérents. Les chiffres doivent être comparés à l'inventaire autorisé, non codés en dur dans une vérification générique.
+- Contrôles de connexion et MFA à réaliser après import en conditions autorisées, sans exposer de mots de passe ou secrets ; pas de conclusion positive avant exécution effective.
+- Les vérifications précédentes sont **statiques uniquement** ; aucun test live de Scalingo ni de Render n'a été réalisé dans ce passage.
