@@ -20,3 +20,9 @@ Après utilisation, retirer les deux fichiers `scripts/scalingo-personal-admin-d
 - Présent mais inactif ou non administrateur : présenter l'ajustement minimal avant toute modification ; ne pas écraser les autres informations.
 
 Après connexion personnelle, ouvrir **Commandes**, choisir la configuration **Ente Auth**, saisir son mot de passe personnel et valider le code de l'entrée créée dans Ente Auth. Le secret est créé sur Scalingo et chiffré avec sa propre `APP_SECRET`. Ne pas partager QR, secret ou codes de secours dans le chat. Les contrôles MFA serveur restent obligatoires.
+
+## Correctif de navigation et formulaire
+
+Une navigation explicite vers le formulaire depuis un autre site (par exemple un lien ChatGPT) est autorisée uniquement pour un GET avec `Sec-Fetch-Mode: navigate` et `Sec-Fetch-Dest: document`. Elle exige toujours la session du compte de test et ne lance aucune recherche. Un Origin étranger explicitement fourni reste interdit, de même qu'une requête cross-site hors navigation.
+
+`Referrer-Policy: same-origin` remplace `no-referrer` sur cette page : Chromium conserve ainsi l'Origin HTTPS du formulaire POST au lieu d'envoyer `null`. Aucun référent n'est transmis aux autres origines. Le POST conserve sa liste HTTPS exacte, sa session et son CSRF ; `Origin: null` reste refusé. Les en-têtes Host et X-Forwarded-* ne sont jamais utilisés pour élargir les origines autorisées. Les variantes avec et sans www et l'adresse Scalingo historique restent explicitement admises, sans changer la configuration DNS ni les cookies.

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import {request as httpRequest} from 'node:http';
 import {registerScalingoPersonalAdminDiagnostic,diagnosticPath,diagnosticExpiry,diagnosticHomepage} from '../scripts/scalingo-personal-admin-diagnostic.mjs';
 import {scalingoTestAdminAuth} from '../scripts/scalingo-universal-rights.mjs';
 import {token} from '../security.mjs';
@@ -20,11 +21,21 @@ test('temporary diagnostic: exact test administrator, session, origin, CSRF, fix
  for(const patch of [{role:'employee'},{email:'other-admin@example.invalid'},{active:false},{must_change:true}]){const original={...actor};Object.assign(actor,patch);assert.equal((await post()).status,403);actor=original;}
  for(const origin of ['null','http://portailplus-officine.fr','https://portailplus-officine.fr.evil.invalid','https://foreign.invalid',''])assert.equal((await post({origin})).status,403);
  assert.equal((await request(diagnosticPath,'GET',{'sec-fetch-site':'cross-site'})).status,403);
+ // External top-level links may open the form, never bypass the account check.
+ const navigate=headers=>new Promise((resolve,reject)=>{const req=httpRequest(base+diagnosticPath,{headers:{cookie,...headers}},res=>{res.resume();resolve(res.statusCode);});req.on('error',reject);req.end();});
+ const navigation={'sec-fetch-site':'cross-site','sec-fetch-mode':'navigate','sec-fetch-dest':'document'};
+ for(const origin of ['',...scalingoAllowedOrigins])assert.equal(await navigate({...navigation,origin}),200);
+ assert.equal(await navigate({...navigation,origin:'https://foreign.invalid'}),403);
+ assert.equal(await navigate({...navigation,origin:'',cookie:''}),401);
+ assert.equal((await request(diagnosticPath,'GET',{'sec-fetch-site':'cross-site','sec-fetch-mode':'cors','sec-fetch-dest':'empty',origin:''})).status,403);
+ // Proxy metadata must never authorize a foreign or null Origin.
+ for(const origin of ['null','https://foreign.invalid'])assert.equal((await post({origin,'x-forwarded-host':'portailplus-officine.fr','x-forwarded-proto':'https','sec-fetch-site':'same-origin'})).status,403);
+
  assert.equal((await post({},'csrf=wrong')).status,403);assert.equal((await post({},'')).status,403);
  assert.equal((await post({},'csrf=csrf&email=someone@example.invalid')).status,403);
  assert.equal((await post({},'csrf=csrf','/api/staging-personal-admin-diagnostic?email=other')).status,403);
  assert.equal(targetQueries,0);
- const page=await request();assert.equal(page.status,200);assert.equal(page.headers.get('cache-control'),'no-store');assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+ const page=await request();assert.equal(page.status,200);assert.equal(page.headers.get('cache-control'),'no-store');assert.equal(page.headers.get('referrer-policy'),'same-origin');assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
  assert(!/Compte existant|pharmaciedetrevoux@gmail.com/.test(await page.text()));assert.equal(targetQueries,0);
  for(const origin of scalingoAllowedOrigins){const r=await post({origin});assert.equal(r.status,200);const html=await r.text();assert.equal((html.match(/<dd>OUI<\/dd>/g)||[]).length,3);assert(!/MUST_NOT_LEAK|pharmaciedetrevoux|password_hash/.test(html));}
  result={exists:false,active:false,admin:false};let r=await post();assert.equal((await r.text()).match(/<dd>NON<\/dd>/g).length,3);
