@@ -45,3 +45,21 @@
 - Ne pas déposer de données de santé, de sauvegardes ou de secrets dans GitHub.
 - Ne pas activer de ressource Scalingo payante avant validation commerciale.
 - Ne pas considérer une sauvegarde comme opérationnelle avant un test de restauration réussi.
+
+## Décision du 7 novembre 2026 — reprise manuelle après publication
+Décision du titulaire : ne pas importer automatiquement depuis Render les données métier suivantes :
+- **Challenges** : challenges et données associées ; ressaisie manuelle après publication Scalingo.
+- **Merchandising / Organisation de l'espace de vente** : affectations, zones et contenus de ce sous-module ; ressaisie manuelle après publication.
+- **Outils d'aide aux commandes** : commandes et données métier associées ; reprise manuelle après publication, **uniquement après validation HDS/RGPD et autorisation de traiter les données patients**.
+- **Fun** : contenus et paramétrages métier ; reprise manuelle après publication.
+
+La décision concerne les **données**, et non le retrait des modules, des schémas, des fonctionnalités ou des contrôles de sécurité. Les autres modules restent dans le périmètre de migration, sous réserve de validation de leur inventaire.
+
+### Mesures impératives avant exécution
+1. Inventorier précisément les tables, fichiers, dépendances et éventuelles clés étrangères de ces quatre modules ; ne pas exclure des tables partagées ni des comptes ou habilitations nécessaires aux autres fonctionnalités.
+2. Adapter les scripts de transfert pour exclure uniquement les enregistrements métier ciblés ; vérifier sur données fictives et documenter les exclusions. **Aucun script de migration n'est modifié par cette seule décision documentaire.**
+3. Ne pas supprimer les données existantes de Render. Ne pas effacer des données déjà présentes sur Scalingo sans audit et approbation.
+4. Conserver **à l'identique de Render** le module Commandes, les contrôles d'accès, les logs requis et le MFA TOTP Ente Auth. Une reprise manuelle des commandes ne dispense pas de tester la compatibilité APP_SECRET, la gestion des secrets MFA et la continuité des accès si les comptes existants sont conservés.
+5. Aucun transfert de données réelles sur staging sans validation contractuelle et réglementaire HDS/RGPD. Ne pas autoriser la saisie de données patients en production Scalingo avant validation de la conformité de l'environnement (app, PostgreSQL, sauvegardes, sous-traitants, droits, journaux, conservation, chiffrement).
+6. Prévoir une recette de chaque module vide, puis une vérification après ressaisie manuelle ; maintenir un suivi des éléments saisis et un rapprochement avec Render.
+7. La décision Go/No-Go du 11 novembre reste conditionnée aux contrôles HDS/RGPD, à la synchronisation du code, aux tests, à la restauration, aux fichiers et au plan de retour arrière. Cette simplification ne constitue pas une autorisation de bascule.
