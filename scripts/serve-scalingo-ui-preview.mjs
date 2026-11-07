@@ -69,6 +69,8 @@ try{
  const {app}=createApp(db,{origin,secret:env.APP_SECRET,homepageHTML:scalingoHomepage(),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
+ // Trévoux staging entry point; absolute asset and API paths remain unchanged.
+ gate.get(['/trevoux','/trevoux/'],(_req,res)=>res.set('Cache-Control','no-store').type('html').send(scalingoHomepage()));
  registerScalingoRetiredCalculations(gate);
  registerScalingoTemperaturePreview(gate,{db,origin});
  const smallJson=express.json({limit:'64kb'});
