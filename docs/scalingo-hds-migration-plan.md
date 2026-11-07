@@ -73,3 +73,12 @@ Ordre de reprise des opérations techniques :
 3. Terminer la configuration des droits collaborateurs et les tests Ente Auth, sans changer la procédure MFA.
 4. Tester les migrations autorisées des autres données et documents, la restauration et le retour arrière.
 5. Préparer domaine, DNS, OAuth et décision Go/No-Go.
+
+## Reprise de la synchronisation GitHub — 7 novembre 2026
+- Comparaison effective `main...chore/scalingo-hds-preparation-2026-10` : branches divergentes, **134 commits d'avance / 61 de retard** au moment du contrôle. Les commits de retard doivent être analysés par contenu : ne pas fusionner aveuglément.
+- Fichiers métier sensibles dans le différentiel : `server.mjs`, `security.mjs`, `schema.sql`, `schedule.mjs`, `collaborateurs.mjs`, `challenges.mjs`, `merchandising.mjs`, `public/app.js`, ainsi que les scripts de prévisualisation et les documents de préparation. Revue fonctionnelle et de sécurité obligatoire avant reprise de changements.
+- Le document `docs/scalingo-universal-rights.md` indique une interface dédiée de gestion des droits des 16 collaborateurs avec verrou de sauvegarde vérifiée et tests préalables : ne pas écraser cette adaptation en synchronisant.
+- `docs/scalingo-order-mfa.md` documente la passerelle MFA ciblée et le chiffrement des secrets avec APP_SECRET ; conserver strictement les contrôles et la continuité de la procédure Ente Auth.
+- `docs/scalingo-music.md` documente un import CSV Fun existant ; il peut faciliter la reprise manuelle après mise en service.
+- **Aucune fusion ni synchronisation effective du code métier n'a encore été exécutée dans cette étape de revue.** Ne pas présenter ce contrôle documentaire comme une synchronisation achevée.
+- Suite : analyser les 61 commits manquants et les conflits par fichier, reprendre seulement les changements nécessaires sur cette branche, lancer les tests, puis adapter les exclusions de données des quatre modules avant toute migration autorisée.
