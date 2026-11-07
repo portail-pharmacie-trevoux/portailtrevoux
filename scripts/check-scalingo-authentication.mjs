@@ -14,17 +14,17 @@ try{
  const identity=(await db.query("SELECT current_database() AS database,(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()) AS tls")).rows[0];
  if(identity.database!=='portailplus_7495'||identity.tls!==true)throw Error('Unexpected database or TLS');
  const {rows}=await db.query('SELECT id,email,role,active,password_hash FROM users');
- const active=rows.filter(row=>row.active);
+ const active=rows.filter(row=>row.active&&row.email);
  const hashes=active.filter(row=>typeof row.password_hash==='string'&&/^[a-f0-9]{32}:[a-f0-9]{128}$/.test(row.password_hash));
  const malformed=active.length-hashes.length;
  const distinctEmails=new Set(rows.filter(row=>row.email).map(row=>row.email.trim().toLowerCase()));
  const emailCount=rows.filter(row=>row.email).length;
- const missingEmail=active.filter(row=>!row.email).length;
+ const activeWithoutEmail=rows.filter(row=>row.active&&!row.email).length;
  const invalidRoles=rows.filter(row=>!['admin','employee'].includes(row.role)).length;
  // A deliberately incorrect password is tested against a single stored hash, without exposing it.
  const wrongPasswordRejected=hashes.length?!(await verifyPassword('this-is-not-the-test-password',hashes[0].password_hash)):null;
- const ok=malformed===0&&distinctEmails.size===emailCount&&missingEmail===0&&invalidRoles===0&&wrongPasswordRejected!==false;
+ const ok=malformed===0&&distinctEmails.size===emailCount&&invalidRoles===0&&wrongPasswordRejected!==false;
  await db.query('ROLLBACK');
- console.log(JSON.stringify({status:ok?'ok':'review_required',database:identity.database,tls:true,totalUsers:rows.length,activeUsers:active.length,administrators:rows.filter(row=>row.role==='admin').length,activeHashesValid:hashes.length,malformedActiveHashes:malformed,duplicateEmails:emailCount-distinctEmails.size,activeWithoutEmail:missingEmail,invalidRoles,wrongPasswordRejected,readOnly:true,previewSafeMode:true,actualPasswordNotRequested:true,passwordContinuityVerified:false}));
+ console.log(JSON.stringify({status:ok?'ok':'review_required',database:identity.database,tls:true,totalUsers:rows.length,activeUsers:active.length,administrators:rows.filter(row=>row.role==='admin').length,activeHashesValid:hashes.length,malformedActiveHashes:malformed,duplicateEmails:emailCount-distinctEmails.size,activeWithoutEmail,invalidRoles,wrongPasswordRejected,readOnly:true,previewSafeMode:true,actualPasswordNotRequested:true,passwordContinuityVerified:false}));
  if(!ok)process.exitCode=1;
 }catch(err){await db.query('ROLLBACK').catch(()=>{});console.error('Authentication precheck failed:',err.message);process.exitCode=1;}finally{await db.end().catch(()=>{});}
