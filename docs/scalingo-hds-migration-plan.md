@@ -82,3 +82,12 @@ Ordre de reprise des opérations techniques :
 - `docs/scalingo-music.md` documente un import CSV Fun existant ; il peut faciliter la reprise manuelle après mise en service.
 - **Aucune fusion ni synchronisation effective du code métier n'a encore été exécutée dans cette étape de revue.** Ne pas présenter ce contrôle documentaire comme une synchronisation achevée.
 - Suite : analyser les 61 commits manquants et les conflits par fichier, reprendre seulement les changements nécessaires sur cette branche, lancer les tests, puis adapter les exclusions de données des quatre modules avant toute migration autorisée.
+
+## Décision complémentaire du 7 novembre 2026 — deux administrateurs Render
+- Ajouter au périmètre de migration les **deux comptes administrateurs existants sur Render**, avec leurs identités, e-mails, rôles et autorisations existantes. Ne pas confondre ces comptes avec l'Administrateur TEST de Scalingo ; éviter les doublons par correspondance contrôlée d'identifiants et d'e-mails.
+- **Ne pas inventer les identités des deux comptes** : vérifier leurs fiches réelles dans la source autorisée avant préparation de l'import. Préserver les liens d'identité, historiques et références des modules conservés.
+- Les mots de passe ne doivent jamais être copiés en clair. Évaluer si les empreintes de mot de passe et les sessions sont compatibles avec Scalingo ; sinon organiser une réinitialisation sécurisée individuelle, sans envoyer de secrets par courriel non protégé.
+- Préserver les paramètres MFA existants, y compris Ente Auth pour les commandes, lorsqu'ils doivent rester utilisables. Vérifier la compatibilité de APP_SECRET et des données chiffrées dans un environnement autorisé ; ne pas exposer ni consigner le secret.
+- Les deux comptes administrateurs sont **hors de la matrice de droits groupée des 16 employés** décrite dans `docs/scalingo-universal-rights.md`. Ne pas leur appliquer les droits limités des employés.
+- Préparer une recette : connexion de chacun des deux administrateurs, autorisations effectives, accès aux modules et Ente Auth ; comptes test et production distincts. Aucune donnée réelle transférée vers staging sans autorisation et aucune modification de Render ou main.
+- **État : exigence ajoutée au plan, migration des comptes non exécutée.**
