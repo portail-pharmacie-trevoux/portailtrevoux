@@ -63,3 +63,13 @@ La décision concerne les **données**, et non le retrait des modules, des sché
 5. Aucun transfert de données réelles sur staging sans validation contractuelle et réglementaire HDS/RGPD. Ne pas autoriser la saisie de données patients en production Scalingo avant validation de la conformité de l'environnement (app, PostgreSQL, sauvegardes, sous-traitants, droits, journaux, conservation, chiffrement).
 6. Prévoir une recette de chaque module vide, puis une vérification après ressaisie manuelle ; maintenir un suivi des éléments saisis et un rapprochement avec Render.
 7. La décision Go/No-Go du 11 novembre reste conditionnée aux contrôles HDS/RGPD, à la synchronisation du code, aux tests, à la restauration, aux fichiers et au plan de retour arrière. Cette simplification ne constitue pas une autorisation de bascule.
+
+## Décision du 7 novembre 2026 — pilotage de la migration
+À la demande du titulaire, l'audit RGPD/HDS est retiré de la liste des travaux à conduire par l'assistant dans ce chantier : le titulaire indique disposer des informations nécessaires. **Cette décision n'est ni une attestation de conformité ni une preuve de signature contractuelle.** Les garde-fous existants sur le transfert des données réelles, les autorisations, les secrets et les droits restent inchangés.
+
+Ordre de reprise des opérations techniques :
+1. Comparer et synchroniser les changements utiles entre `main` et la branche Scalingo, sans modifier `main` ni Render.
+2. Identifier les tables et dépendances, puis adapter et tester les exclusions d'import automatique des quatre ensembles de données repris manuellement (Challenges, Merchandising / Organisation de l'espace de vente, Commandes, Fun).
+3. Terminer la configuration des droits collaborateurs et les tests Ente Auth, sans changer la procédure MFA.
+4. Tester les migrations autorisées des autres données et documents, la restauration et le retour arrière.
+5. Préparer domaine, DNS, OAuth et décision Go/No-Go.
