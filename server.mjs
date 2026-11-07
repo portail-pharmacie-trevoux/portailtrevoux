@@ -28,6 +28,7 @@ import {registerLaboratories} from './laboratories.mjs';
 import {createYoutrust} from './youtrust.mjs';
 import {registerHRDocuments} from './hr-documents.mjs';
 import {registerNews,purgeNews,unreadNews} from './news.mjs';
+import {registerMessageAutomationAdmin} from './message-automation-admin.mjs';
 import {createInvitationMailer,registerInvitations,gmailSendScope,sameMailAccount} from './invitations.mjs';
 import {registerEmployeeImport} from './employee-import.mjs';
 import express from 'express';
@@ -103,6 +104,8 @@ export function createApp(db,config) {
   app.use('/api/order-planning',auth,ready,viewUniverse("Outils d'aide aux commandes"),orderMFA.guard);
   registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret});
   registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'15mb'})});
+   // Administrative CRUD only; scheduling and message delivery remain disabled.
+   if(config.messageAutomationAdminEnabled===true)registerMessageAutomationAdmin({app,db,auth,ready,admin,csrf,fail});
   const youtrust=config.youtrustClient||createYoutrust({getSetting,setSetting,deleteSetting:key=>db.query('DELETE FROM settings WHERE key=$1',[key]),secret,origin,fail,config,fetchImpl:config.youtrustFetch});
   registerHRDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,secret,publish,uploadParser:express.json({limit:'15mb'}),youtrust});
   const allowedPublications=user=>universes.filter(name=>!['Collaborateurs','Actualités'].includes(name)&&canAccess(user,name));
