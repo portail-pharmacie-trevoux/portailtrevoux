@@ -91,3 +91,15 @@ Ordre de reprise des opérations techniques :
 - Les deux comptes administrateurs sont **hors de la matrice de droits groupée des 16 employés** décrite dans `docs/scalingo-universal-rights.md`. Ne pas leur appliquer les droits limités des employés.
 - Préparer une recette : connexion de chacun des deux administrateurs, autorisations effectives, accès aux modules et Ente Auth ; comptes test et production distincts. Aucune donnée réelle transférée vers staging sans autorisation et aucune modification de Render ou main.
 - **État : exigence ajoutée au plan, migration des comptes non exécutée.**
+
+## Confirmation des accès — 7 novembre 2026
+Le titulaire confirme que les deux administrateurs Render doivent conserver **exactement leurs droits existants**, notamment l'accès aux Commandes avec Ente Auth. Les adresses e-mail de connexion des 16 collaborateurs et des deux administrateurs doivent rester identiques. L'objectif est de conserver également les mots de passe existants et de **ne pas renvoyer d'invitation** aux comptes déjà activés.
+
+**Vérification du code sur la branche Scalingo :** `security.mjs` implémente `hashPassword`/`verifyPassword` avec scrypt (sel et empreinte stockés sous forme `salt:hex`) ; `schema.sql` comporte `users.password_hash` ; `collaborateurs.mjs` conserve ce champ. La migration de l'empreinte inchangée permet normalement de conserver le mot de passe, sans le connaître ni le déchiffrer, si les données et le code sont compatibles. **Cela reste à confirmer par un test réel de connexion autorisé après import.**
+
+Consignes de migration :
+- Identifier précisément les deux administrateurs réels sur Render ; préserver e-mails, `password_hash`, `role=admin`, droits et attributs d'activation pertinents, sans écraser l'Administrateur TEST ni créer de doublons.
+- Pour les 16 collaborateurs, comparer les identifiants et e-mails de la source et de la cible, préserver `password_hash`, rôle, statut et droits. Les comptes sans accès activé restent soumis à leur processus normal d'activation ; ne pas générer d'invitations en masse.
+- Préserver les facteurs Ente Auth et secrets chiffrés associés ; `APP_SECRET` est utilisé pour le chiffrement applicatif et nécessite une stratégie de continuité sécurisée. Ne jamais écrire des empreintes, secrets, mots de passe ou données réelles dans le dépôt ou les journaux.
+- Tester après import avec des comptes autorisés : connexion e-mail + ancien mot de passe, droits effectifs, MFA Commandes, refus des accès non autorisés. Ne pas affirmer que les mots de passe sont conservés avant ces tests.
+- Aucun transfert réel, aucune modification de Render ou de main dans cette mise à jour documentaire.
