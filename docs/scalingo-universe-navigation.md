@@ -8,6 +8,8 @@ Collaborateurs/fiches, Agenda, Messagerie, Démarche qualité et ses sous-module
 
 Les anciens boutons de retour de page sont masqués, leurs callbacks métier ne sont pas réécrits. Les formulaires et sous-pages existants sont reconnus par leurs repères ; toute nouvelle page peut déclarer `data-portal-subpage` sur son conteneur. Un ancien bouton de page peut déclarer `data-portal-back` pour être remplacé par le second onglet commun. Le récapitulatif planning et le panneau merchandising emploient cette convention.
 
+Le retour au merchandising demande explicitement son menu principal, sans reprendre l'ouverture automatique d'une organisation mensuelle. Le parcours depuis une tuile ou un rappel conserve son comportement existant. Un test navigateur utilise le code réel de l'application et du merchandising pour vérifier cette distinction ainsi que les destinations de Procédures.
+
 Les deux onglets ont une hauteur minimale de 44 px, la même typographie, une flèche de dimensions fixes et un espacement commun. Ils sont placés avant le panneau de contenu et les menus Admin, avec retour à la ligne si nécessaire. Aucun déplacement des champs métier.
 
 ## Exceptions conservées
