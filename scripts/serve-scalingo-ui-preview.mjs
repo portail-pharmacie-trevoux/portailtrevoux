@@ -1,6 +1,7 @@
 // Restricted staging UI entrypoint. Not enabled by the production start command.
 // Explicit opt-in only after a security review; Render's server.mjs is unchanged.
 import express from 'express';
+import {registerScalingoWwwRedirect} from './scalingo-www-redirect.mjs';
 import {diagnosticHomepage,registerScalingoPersonalAdminDiagnostic} from './scalingo-personal-admin-diagnostic.mjs';
 import {scalingoAllowedOrigins,isScalingoOrigin} from './scalingo-origins-preview.mjs';
 import {registerScalingoTrevouxEntry} from './scalingo-trevoux-entry-preview.mjs';
@@ -72,6 +73,7 @@ try{
  const {app}=createApp(db,{origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:diagnosticHomepage(scalingoHomepage()),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
+ registerScalingoWwwRedirect(gate);
  // Trévoux staging entry point keeps the same security middleware as root.
  registerScalingoTrevouxEntry(gate,app);
  registerScalingoRetiredCalculations(gate);
