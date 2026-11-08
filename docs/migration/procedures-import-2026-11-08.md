@@ -1,3 +1,14 @@
+> Mise à jour opérationnelle : les IDs 1 et 2 Scalingo sont à préserver. Pour ce
+> lot, utiliser le paquet Windows en mode `allocation: remap` décrit dans
+> [le guide Windows](../../scripts/migration/windows-procedures/README.md), pas
+> l’ancienne commande interne ci-dessous en mode de conservation des IDs source.
+> L’utilisateur accepte explicitement l’absence de test de restauration réel :
+> cette dispense est enregistrée séparément (`restoreRiskAccepted`), sans marquer
+> `restoreVerified` comme vrai. Les IDs et liens internes sont remappés ; toutes
+> les autres métadonnées et tous les binaires restent exacts. Le paquet contient
+> des données réelles et est construit hors Git. Aucun import ni déploiement n’a
+> été exécuté depuis Codex.
+
 # Procédures Render → Scalingo — préparation, aucune écriture autorisée
 
 ## Archive effectivement reçue et vérifiée
