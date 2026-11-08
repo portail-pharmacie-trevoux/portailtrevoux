@@ -37,6 +37,17 @@ test('Navigateur fiches : données et droits transmis, permissions spécifiques 
   check(writes[1].rights.includes('Formations')&&writes[1].editRights.includes('Formations'),'Universe rights not submitted');check(writes[1].editRights.includes('Laboratoires'),'Specific laboratory grant overwritten');
   administrator=true;await render();check(root.querySelector('button[type=submit]').disabled,'Protected admin can save');check([...root.querySelectorAll('input,select,textarea')].every(n=>n.disabled),'Protected admin fields editable');root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));check(writes.length===2,'Admin profile write attempted');
   administrator=false;preview=false;await render();check(!root.querySelector('#employee-email').disabled,'Non-preview account form changed');root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));await until(()=>saves===3);check('email' in writes[2]&&'password' in writes[2]&&'administratorRights' in writes[2],'Non-preview payload changed');
+  preview=true;person.job='Ancienne fonction personnalisée';await render();
+  const choose=value=>{const select=root.querySelector('#employee-job');select.value=value;select.dispatchEvent(new Event('change'));};
+  check(root.querySelector('#employee-job-other').value===person.job,'Existing custom function lost');
+  check(getComputedStyle(root.querySelector('.employee-job-other')).display!=='none','Other field missing');
+  choose('Pharmacien');check(getComputedStyle(root.querySelector('.employee-job-other')).display==='none','Empty controls remain below standard function');
+  choose('Autres précisez');check(root.querySelector('#employee-job-other').value==='Ancienne fonction personnalisée','Toggle erased custom function');
+  root.querySelector('#employee-job-other').value='Nouvelle fonction spécifique';root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));await until(()=>saves===4);
+  await render();check(root.querySelector('#employee-job-other').value==='Nouvelle fonction spécifique','Custom function not persistent');
+  choose('Préparateur');root.querySelector('form').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));await until(()=>saves===5);
+  await render();check(getComputedStyle(root.querySelector('.employee-job-other')).display==='none','Hidden custom function shows after reload');
+  choose('Autres précisez');check(root.querySelector('#employee-job-other').value==='Nouvelle fonction spécifique','Saved custom function lost when standard chosen');
   document.body.dataset.result='passed';
  }catch(e){document.body.dataset.result='failed';document.body.dataset.error=e.message;}
  </script></body></html>`));

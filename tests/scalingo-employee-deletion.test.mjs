@@ -51,6 +51,9 @@ test('Scalingo/PostgreSQL : suppression inactive, dépendances FK/JSON conservé
  for(const column of ['draft','published'])await t.test('Planning : '+column+' préservé',async()=>{
   await db.query(`INSERT INTO schedule_weeks(week,${column}) VALUES('2026-11-02',$1::jsonb)`,[JSON.stringify({'2:2026-11-02':{userId:2,day:'2026-11-02',kind:'travail'}})]);const before=(await db.query('SELECT * FROM schedule_weeks')).rows;await blocked(/Planning/);assert.deepEqual((await db.query('SELECT * FROM schedule_weeks')).rows,before);await db.query('DELETE FROM schedule_weeks');
  });
+ await t.test('Planning legacy avec clé utilisateur sans userId : suppression bloquée',async()=>{
+  await db.query("INSERT INTO schedule_weeks(week,draft) VALUES('2026-11-02',$1)",[JSON.stringify({'2:2026-11-02':{kind:'repos'}})]);await blocked(/Planning/);await db.query('DELETE FROM schedule_weeks');
+ });
  await t.test('Historique de planning et semaine type',async()=>{
   await db.query('INSERT INTO schedule_history_fixture(snapshot) VALUES($1)',[JSON.stringify({before:{entries:[{userId:'2'}]}})]);await blocked(/Planning/);await db.query('DELETE FROM schedule_history_fixture');
   await db.query("INSERT INTO schedule_templates(name,content) VALUES('Locale',$1)",[JSON.stringify({entry:{userId:2,weekday:0}})]);const before=(await db.query('SELECT * FROM schedule_templates')).rows;await blocked(/Planning/);assert.deepEqual((await db.query('SELECT * FROM schedule_templates')).rows,before);await db.query('DELETE FROM schedule_templates');
@@ -72,7 +75,7 @@ test('Scalingo/PostgreSQL : suppression inactive, dépendances FK/JSON conservé
  });
  await t.test('Échec tardif : audit et données confidentielles reviennent en arrière',async()=>{
   await db.query("CREATE FUNCTION fail_local_deletion() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF OLD.id=4 THEN RAISE EXCEPTION 'local fixture'; END IF;RETURN OLD;END $$;CREATE TRIGGER fail_local_deletion BEFORE DELETE ON users FOR EACH ROW EXECUTE FUNCTION fail_local_deletion()");
-  assert.equal((await send(4)).status,500);assert.equal(await auditCount(),0);assert.ok((await db.query('SELECT * FROM employee_details WHERE user_id=4')).rows[0]);assert.equal((await db.query('SELECT count(*)::int AS n FROM sessions WHERE user_id=4')).rows[0].n,1);await db.query('DROP TRIGGER fail_local_deletion ON users;DROP FUNCTION fail_local_deletion()');
+  assert.equal((await send(4)).status,409);assert.equal(await auditCount(),0);assert.ok((await db.query('SELECT * FROM employee_details WHERE user_id=4')).rows[0]);assert.equal((await db.query('SELECT count(*)::int AS n FROM sessions WHERE user_id=4')).rows[0].n,1);await db.query('DROP TRIGGER fail_local_deletion ON users;DROP FUNCTION fail_local_deletion()');
  });
  const deleted=await send(4);assert.equal(deleted.status,200,await deleted.clone().text());assert.equal((await db.query('SELECT id FROM users WHERE id=4')).rows.length,0);assert.equal((await db.query('SELECT * FROM employee_details WHERE user_id=4')).rows.length,0);assert.equal((await db.query('SELECT * FROM sessions WHERE user_id=4')).rows.length,0);
  const audit=(await db.query('SELECT * FROM scalingo_employee_deletion_audit')).rows;assert.equal(audit.length,1);assert.equal(audit[0].deleted_user_id,4);assert.equal(audit[0].deleted_by,1);assert.equal(audit[0].action,'employee_deleted');assert.deepEqual(Object.keys(audit[0]).sort(),['id','deleted_user_id','deleted_by','deleted_at','action','checks_version'].sort());assert.equal(JSON.stringify(audit).includes('Fixture'),false);

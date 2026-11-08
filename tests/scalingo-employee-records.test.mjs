@@ -63,7 +63,11 @@ test('Scalingo/PostgreSQL : 16 fiches hors liste de démonstration, droits persi
  record=await (await request('/api/users/2/details')).json();assert.equal(record.person.firstName,'Prénom local');assert.equal(record.details.address,'Adresse privée modifiée');assert.deepEqual([...record.person.rights].sort(),[...permissions.rights].sort());assert.deepEqual([...record.person.editRights].sort(),[...permissions.editRights].sort());assert.equal(record.person.permissionsConfigured,true);
  const independent=new pg.Client({connectionString:database});await independent.connect();try{const row=(await independent.query('SELECT first_name,rights,edit_rights FROM users WHERE id=2')).rows[0];assert.equal(row.first_name,'Prénom local');assert.deepEqual([...row.edit_rights].sort(),[...permissions.editRights].sort());}finally{await independent.end();}
  assert.equal((await request('/api/users/2','PUT',permissions)).status,409,'Legacy permission-only backup gate retained');
- for(const [path,method]of [['/api/users/2/invitation','POST'],['/api/users/2/restore','POST'],['/api/users/2','DELETE'],['/api/password','POST'],['/api/collaborateurs/import','POST'],['/api/invitations/accept','POST']]){const response=await request(path,method,{});assert.equal(response.status,403,path);assert.match((await response.json()).error,/prévisualisation/);}
+ for(const [path,method]of [['/api/users/2/invitation','POST'],['/api/password','POST'],['/api/collaborateurs/import','POST'],['/api/invitations/accept','POST']]){const response=await request(path,method,{});assert.equal(response.status,403,path);assert.match((await response.json()).error,/prévisualisation/);}
  assert.equal((await request('/api/users','POST',{})).status,400);
+ assert.equal((await request('/api/users/2','PUT',{...body,detailsRevision:5,job:'Fonction locale personnalisée',details:{jobOther:'Fonction locale personnalisée'}})).status,200);
+ assert.equal((await (await request('/api/users/2/details')).json()).details.jobOther,'Fonction locale personnalisée');
+ assert.equal((await request('/api/users/2','PUT',{...body,detailsRevision:6,details:{}})).status,200);
+ assert.equal((await (await request('/api/users/2/details')).json()).details.jobOther,'Fonction locale personnalisée','Standard function must preserve saved custom detail');
  assert.equal(externalCalls,0);assert.deepEqual(await accountState(),accountsBefore);assert.deepEqual(await protectedState(),protectedBefore);
 });

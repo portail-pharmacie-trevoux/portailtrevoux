@@ -200,8 +200,8 @@ function renderPeople(){
           actions.append(invitation);
         }
         if(p.role!=='admin'){
-          const canRetire=!session.features?.employeeAccountsReadOnly||p.previewManualRecord;
-          if(active&&canRetire){const remove=button('Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
+          const canRetire=!session.features?.employeeAccountsReadOnly||session.features?.scalingoEmployeeLifecycle===true||p.previewManualRecord;
+          if(active&&canRetire){const remove=button(session.features?.scalingoEmployeeLifecycle?'Désactiver':'Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
           else if(!active){
             let restore=null;if(canRetire){restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);}
             const permanent=button('Supprimer définitivement',async()=>{

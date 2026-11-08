@@ -2,7 +2,7 @@ import { employeeFields } from './public/employee-fields.js';
 import { encrypt, decrypt } from './security.mjs';
 export function validateEmployeeDetails(value,fail) {
   if(!value||typeof value!=='object'||Array.isArray(value))throw fail(400,'Fiche administrative invalide.');
-  const known=new Map(employeeFields.map(f=>[f.key,f])),clean={};
+  const known=new Map([...employeeFields.map(f=>[f.key,f]),['jobOther',{key:'jobOther',label:'Autre fonction',type:'text',maxLength:100}]]),clean={};
   for(const [key,raw] of Object.entries(value)){
     const f=known.get(key);if(!f)throw fail(400,'Champ non prévu dans la fiche.');
     if(f.type==='checkbox'){if(typeof raw!=='boolean')throw fail(400,f.label+' : valeur invalide.');clean[key]=raw;continue;}

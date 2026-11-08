@@ -23,7 +23,7 @@ import {registerScalingoEmployeeImport,isScalingoEmployeeScan,createScalingoEmpl
 import {registerScalingoRegistrationForm,verifyScalingoRegistrationFormAsset} from './scalingo-registration-form-preview.mjs';
 import {ensureScalingoEmployeeDeletionAudit} from './scalingo-employee-deletion.mjs';
 import {registerScalingoEmployeeRecords} from './scalingo-employee-records-preview.mjs';
-import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth} from './scalingo-universal-rights.mjs';
+import {registerScalingoRights,scalingoUniverseBoundary,scalingoTestAdminAuth,scalingoAdminAuth} from './scalingo-universal-rights.mjs';
 import {registerScalingoTemperaturePreview,isTemperatureImport,isScalingoTemperatureRoute} from './scalingo-temperature-preview.mjs';
 import {isScalingoQualityErrorRoute} from './scalingo-quality-errors-preview.mjs';
 import {isScalingoTrainingImport,registerScalingoTrainingDocuments} from './scalingo-training-documents-preview.mjs';
@@ -72,7 +72,7 @@ try{
  await ensureScalingoEmployeeDeletionAudit(db);
  const registrationPDF=await verifyScalingoRegistrationFormAsset();
  console.log('Scalingo employee registration PDF verified: '+JSON.stringify(registrationPDF));
- const {app}=createApp(db,{origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:inventoryHomepage(diagnosticHomepage(scalingoHomepage())),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoAccountCreation:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
+ const {app}=createApp(db,{origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:inventoryHomepage(diagnosticHomepage(scalingoHomepage())),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,scalingoAccountCreation:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  registerScalingoWwwRedirect(gate);
@@ -103,7 +103,7 @@ try{
  });
  registerScalingoAccountCreation({gate,db,adminAuth:cleanupAuth,secret:env.APP_SECRET});
  registerScalingoPasswordChange(gate,app);
- registerScalingoEmployeeRecords({gate,db,adminAuth:cleanupAuth,origin,secret:env.APP_SECRET,isAllowedOrigin:isScalingoOrigin});
+ registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db),origin,secret:env.APP_SECRET,isAllowedOrigin:isScalingoOrigin});
  registerScalingoRights({gate,db,adminAuth:cleanupAuth,origin,env,isAllowedOrigin:isScalingoOrigin});
  gate.use(scalingoUniverseBoundary(db));
  // POST /api/quality/tiers-payant/import: real app auth, CSRF, referent rights and validation.

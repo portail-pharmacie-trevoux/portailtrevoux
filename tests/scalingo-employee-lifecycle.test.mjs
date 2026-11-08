@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {once} from 'node:events';
+import express from 'express';
+import pg from 'pg';
+import {createApp} from '../server.mjs';
+import {hashPassword,encrypt} from '../security.mjs';
+import {registerScalingoEmployeeRecords} from '../scripts/scalingo-employee-records-preview.mjs';
+import {scalingoAdminAuth} from '../scripts/scalingo-universal-rights.mjs';
+import {ensureScalingoEmployeeDeletionAudit} from '../scripts/scalingo-employee-deletion.mjs';
+import {isScalingoOrigin,scalingoAllowedOrigins} from '../scripts/scalingo-origins-preview.mjs';
+const database=process.env.PORTAIL_LIFECYCLE_TEST_DATABASE_URL;
+test('isolated PostgreSQL: imported employee lifecycle, all admins, login/session refusal, immutable history and roster',{skip:!database,timeout:30000},async t=>{
+ const url=new URL(database);assert.equal(url.hostname,'127.0.0.1');assert.equal(url.port,'55443');assert.equal(url.pathname,'/portailplus_lifecycle_test');
+ const db=new pg.Pool({connectionString:database,max:5});t.after(()=>db.end());
+ await db.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');await db.query(await readFile(new URL('../schema.sql',import.meta.url),'utf8'));await ensureScalingoEmployeeDeletionAudit(db);
+ const password='Only-a-fictional-password-2026',hash=await hashPassword(password),secret='fictional-lifecycle-secret-'.repeat(3),origin=scalingoAllowedOrigins[0];
+ for(const id of [1,59,...Array.from({length:16},(_,i)=>i+7)])await db.query('INSERT INTO users(id,name,first_name,last_name,job,role,active,email,password_hash,must_change,directory_key) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,$10)',[id,'Fixture '+id,'Fixture','Employee '+id,id%2?'Pharmacien':'Ancienne fonction spécifique',[1,59].includes(id)?'admin':'employee',id!==8,id===1?'admin-test@portailplus.invalid':'fixture'+id+'@example.invalid',hash,'imported-stable-key-'+id]);
+ await db.query('INSERT INTO employee_details(user_id,payload,updated_by) VALUES(7,$1,1)',[encrypt({address:'Fictional private address',jobOther:'Fonction spécifique conservée'},secret)]);
+ await db.query("INSERT INTO schedule_weeks(week,draft) VALUES('2026-11-02',$1)",[JSON.stringify({'7:2026-11-02':{userId:7,day:'2026-11-02',kind:'repos',slots:[]}})]);
+ await db.query("INSERT INTO leave_requests(user_id,leave_type,start_date,end_date,start_part,end_part) VALUES(7,'Congé','2026-11-02','2026-11-02','full','full')");
+ const protectedState=async()=>JSON.stringify((await db.query('SELECT * FROM users WHERE id<>8 ORDER BY id')).rows),before=await protectedState();
+ const history=async()=>JSON.stringify({details:(await db.query('SELECT * FROM employee_details')).rows,weeks:(await db.query('SELECT * FROM schedule_weeks')).rows,leave:(await db.query('SELECT * FROM leave_requests')).rows}),historyBefore=await history();
+ let externalCalls=0;
+ const {app}=createApp(db,{origin,allowedOrigins:scalingoAllowedOrigins,secret,dummyHash:hash,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,mailFetch:async()=>{externalCalls++;throw Error('No external mail allowed');}});
+ const gate=express();gate.use(express.json());registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db),origin,secret,isAllowedOrigin:isScalingoOrigin});gate.use(app);gate.use((e,req,res,next)=>res.status(e.status||500).json({error:e.status?e.message:'Local failure'}));
+ const server=gate.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();server.close();});
+ const base='http://127.0.0.1:'+server.address().port;
+ const request=(path,method='GET',body,session={},extra={})=>fetch(base+path,{method,headers:{origin,'content-type':'application/json',cookie:session.cookie||'','x-csrf-token':session.csrf||'',...extra},body:body===undefined?undefined:JSON.stringify(body)});
+ const login=async id=>{const r=await request('/api/login','POST',{email:id===1?'admin-test@portailplus.invalid':'fixture'+id+'@example.invalid',password});assert.equal(r.status,200);return {...await r.json(),cookie:r.headers.get('set-cookie').split(';')[0]};};
+ const admin=await login(59),testAdmin=await login(1),employee=await login(7),other=await login(9);
+ assert.equal(admin.features.scalingoEmployeeLifecycle,true);assert.equal((await request('/api/users/7/details','GET',undefined,admin)).status,200);
+ assert.equal((await request('/api/users/7','DELETE')).status,401);assert.equal((await request('/api/users/7','DELETE',undefined,other)).status,403);
+ for(const extra of [{origin:'https://foreign.invalid'},{'x-csrf-token':'wrong'}])assert.equal((await request('/api/users/7','DELETE',undefined,admin,extra)).status,403);
+ for(const id of [1,59])for(const [suffix,method]of [['','DELETE'],['/restore','POST'],['/permanent','DELETE']])assert.equal((await request('/api/users/'+id+suffix,method,{confirmation:id,confirmationText:'SUPPRIMER'},testAdmin)).status,403);
+ // No action for an abandoned confirmation; all state remains unchanged.
+ assert.equal(await protectedState(),before);
+ assert.equal((await request('/api/users/7','DELETE',undefined,admin,{origin:scalingoAllowedOrigins[2]})).status,200);
+ assert.equal((await request('/api/me','GET',undefined,employee)).status,401);
+ assert.equal((await request('/api/login','POST',{email:'fixture7@example.invalid',password})).status,401);
+ let people=await (await request('/api/users','GET',undefined,admin)).json();assert.equal(people.find(p=>p.id===7).active,false);
+ assert.equal(await history(),historyBefore);
+ const denied=await request('/api/users/7/permanent','DELETE',{confirmation:7,confirmationText:'SUPPRIMER'},admin);assert.equal(denied.status,409);assert.match((await denied.json()).error,/Planning|Congés/);assert.equal(await history(),historyBefore);
+ assert.equal((await request('/api/users/7/restore','POST',undefined,testAdmin)).status,200);assert.equal((await request('/api/me','GET',undefined,employee)).status,401,'Old sessions must never revive');await login(7);
+ people=await (await request('/api/users','GET',undefined,admin)).json();assert.equal(people.find(p=>p.id===7).active,true);
+ // Inactive account without business links is deletable by the other admin.
+ assert.equal((await request('/api/users/8/permanent','DELETE',{confirmation:8,confirmationText:'wrong'},admin)).status,400);
+ assert.equal((await request('/api/users/8/permanent','DELETE',{confirmation:8,confirmationText:'SUPPRIMER'},admin)).status,200);
+ assert.equal((await db.query('SELECT id FROM users WHERE id=8')).rows.length,0);
+ const independent=new pg.Client({connectionString:database});await independent.connect();try{assert.equal((await independent.query('SELECT id FROM users WHERE id=8')).rows.length,0);}finally{await independent.end();}
+ await db.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id=59");assert.equal((await request('/api/users/9','DELETE',undefined,admin)).status,403);
+ assert.equal(await protectedState(),before);assert.equal(await history(),historyBefore);assert.equal(externalCalls,0);
+});

@@ -1,5 +1,5 @@
 // Scalingo-only profile editing. Never dispatch writes to the general account
-// management endpoint: credentials, activation, role and invitations stay locked.
+// management endpoint: credentials, role and invitations stay locked.
 import {deleteScalingoEmployee} from './scalingo-employee-deletion.mjs';
 import {randomUUID} from 'node:crypto';
 import {publicPerson,validatePerson} from '../collaborateurs.mjs';
@@ -30,8 +30,7 @@ export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret
  const lifecycle=active=>async(req,res,next)=>{let client;try{
   const id=idOf(req);client=await db.connect();await client.query('BEGIN');
   const existing=(await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!existing)throw fail(404,'Collaborateur introuvable.');
-  if(existing.role!=='employee'||!existing.directory_key?.startsWith('scalingo-manual:'))throw fail(403,'Action réservée aux fiches créées manuellement dans la prévisualisation.');
-  if(existing.email||existing.password_hash||existing.invitation_sent_at)throw fail(409,'Cette fiche possède un accès personnel : son état ne peut pas être modifié ici.');
+  if(existing.role!=='employee'||existing.id===req.cleanupAdmin.id)throw fail(403,'Compte administrateur protégé.');
   const person=(await client.query("UPDATE users SET active=$2 WHERE id=$1 AND role='employee' RETURNING *",[id,active])).rows[0];
   await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);
   await client.query('COMMIT');res.json(active?publicPerson(person,true,req.cleanupAdmin.id):{ok:true});
@@ -45,7 +44,7 @@ export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret
  gate.post('/api/users/:id/restore',privacy,adminAuth,write,lifecycle(true));
  gate.get('/api/users/:id/details',privacy,adminAuth,async(req,res,next)=>{try{
   const id=idOf(req),person=(await db.query('SELECT * FROM users WHERE id=$1',[id])).rows[0];if(!person)throw fail(404,'Collaborateur introuvable.');
-  res.json({person:publicPerson(person,true,req.cleanupAdmin.id),...await readEmployeeDetails(db,id,secret),previewRestrictions:{accountReadOnly:true,profileReadOnly:person.role==='admin'}});
+  res.json({person:publicPerson(person,true,req.cleanupAdmin.id),...await readEmployeeDetails(db,id,secret),previewRestrictions:{accountReadOnly:true,profileReadOnly:person.role==='admin',lifecycleAllowed:person.role==='employee'}});
  }catch(e){next(e);}});
  gate.put('/api/users/:id',privacy,(req,res,next)=>{
   // Retain the existing backup-gated permission-only interface for its callers.

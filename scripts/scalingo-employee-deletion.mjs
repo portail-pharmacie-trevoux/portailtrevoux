@@ -43,6 +43,10 @@ export async function deleteScalingoEmployee({db,id,actorId}){
   // deleting. This blocks concurrent writes rather than editing linked history.
   const tables=[...new Set(['"public"."users"',...columns.foreign.map(table),...columns.structured.map(table)])].sort();
   await client.query('LOCK TABLE '+tables.join(',')+' IN SHARE ROW EXCLUSIVE MODE');
+  const hidden=(await client.query('SELECT count(*)::int AS n FROM pg_class WHERE oid=ANY($1::regclass[]) AND (relrowsecurity OR relforcerowsecurity)',[tables])).rows[0].n;
+  const hooks=(await client.query("SELECT count(*)::int AS n FROM pg_trigger WHERE tgrelid='public.users'::regclass AND NOT tgisinternal AND tgenabled<>'D' AND (tgtype & 8)<>0")).rows[0].n;
+  const rules=(await client.query("SELECT count(*)::int AS n FROM pg_rewrite WHERE ev_class='public.users'::regclass AND rulename<>'_RETURN'")).rows[0].n;
+  if(hidden||hooks||rules)throw fail(409,'Suppression impossible : les règles de la base nécessitent une vérification préalable. Conservez la fiche inactive.');
   const person=(await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];
   if(!person)throw fail(404,'Collaborateur introuvable.');
   if(person.role!=='employee'||person.id===actorId||person.email==='admin-test@portailplus.invalid')throw fail(403,'Compte administrateur protégé : suppression interdite.');
@@ -66,6 +70,7 @@ export async function deleteScalingoEmployee({db,id,actorId}){
    const path='lax $.** ? ('+predicate+')';
    const vars=JSON.stringify({id,sid:String(id)});
    if((await client.query(`SELECT EXISTS(SELECT 1 FROM ${table(r)} WHERE jsonb_path_exists(${quote(r.column_name)}::jsonb,$1::jsonpath,$2::jsonb)) AS found`,[path,vars])).rows[0].found)blockers.add(label(r.table_name));
+   if(/schedule|leave/.test(r.table_name)&&(await client.query(`SELECT EXISTS(SELECT 1 FROM ${table(r)} WHERE jsonb_path_exists(${quote(r.column_name)}::jsonb,'lax $.** ? (@.type() == "object").keyvalue() ? (@.key starts with $prefix)',$1::jsonb)) AS found`,[JSON.stringify({prefix:id+':'})])).rows[0].found)blockers.add(label(r.table_name));
    if(r.column_name==='participants'&&(await client.query(`SELECT EXISTS(SELECT 1 FROM ${table(r)} WHERE jsonb_path_exists(${quote(r.column_name)}::jsonb,'lax $[*] ? (@ == $id || @ == $sid)',$1::jsonb)) AS found`,[vars])).rows[0].found)blockers.add(label(r.table_name));
    if(/challenge/.test(r.table_name)&&(await client.query(`SELECT EXISTS(SELECT 1 FROM ${table(r)} WHERE jsonb_path_exists(${quote(r.column_name)}::jsonb,'lax $.** ? (@.type() == "object").keyvalue() ? (@.key == $sid)',$1::jsonb)) AS found`,[vars])).rows[0].found)blockers.add(label(r.table_name));
   }
@@ -79,7 +84,7 @@ export async function deleteScalingoEmployee({db,id,actorId}){
   if(!result.rows[0])throw fail(409,'Le statut a changé. Rechargez l’annuaire.');
   await client.query('COMMIT');return {ok:true};
  }catch(e){await client.query('ROLLBACK').catch(()=>{});
-  if(['23503','55P03','57014','40001','40P01'].includes(e.code))throw fail(409,'Suppression non effectuée : une dépendance ou une opération en cours empêche une suppression sûre. Conservez la fiche inactive et réessayez après vérification.');
+  if(['23503','55P03','57014','40001','40P01','42501'].includes(e.code))throw fail(409,'Suppression non effectuée : une dépendance ou une opération en cours empêche une suppression sûre. Conservez la fiche inactive et réessayez après vérification.');
   throw e;
  }finally{client.release();}
 }

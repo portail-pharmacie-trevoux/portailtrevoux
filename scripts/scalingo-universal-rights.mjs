@@ -6,13 +6,15 @@ const protectedEdits=['Emplois du temps','Collaborateurs','Ressources humaines']
 const sorted=a=>[...new Set(a||[])].sort();
 const equal=(a,b)=>JSON.stringify(sorted(a))===JSON.stringify(sorted(b));
 const fail=(status,message)=>Object.assign(Error(message),{status});
-export function scalingoTestAdminAuth(db){return async(req,res,next)=>{try{
+function scalingoAdministratorAuth(db,testOnly){return async(req,res,next)=>{try{
  const raw=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('trevoux_session='))?.slice(16);
  if(!raw||! /^[\w-]{43}$/.test(raw))throw fail(401,'Connexion administrateur requise.');
  const row=(await db.query('SELECT u.id,u.email,u.role,u.active,u.must_change,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now()',[digest(raw)])).rows[0];
- if(!row||row.email!=='admin-test@portailplus.invalid'||row.role!=='admin'||!row.active||row.must_change)throw fail(403,'Administrateur TEST uniquement, mot de passe personnel requis.');
+ if(!row||(testOnly&&row.email!=='admin-test@portailplus.invalid')||row.role!=='admin'||!row.active||row.must_change)throw fail(403,testOnly?'Administrateur TEST uniquement, mot de passe personnel requis.':'Administrateur actif uniquement, mot de passe personnel requis.');
  req.cleanupAdmin=row;next();
  }catch(e){next(e);}};}
+export const scalingoTestAdminAuth=db=>scalingoAdministratorAuth(db,true);
+export const scalingoAdminAuth=db=>scalingoAdministratorAuth(db,false);
 export function validateRights(body){
  if(!body||Object.keys(body).some(k=>!['rights','editRights'].includes(k)))throw fail(400,'Seuls les droits peuvent être modifiés ici. Utilisez Administration des droits Scalingo.');
  const {rights,editRights}=body;

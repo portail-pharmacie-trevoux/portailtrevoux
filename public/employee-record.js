@@ -12,6 +12,18 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   const tools=el('div','','employee-record-tools');tools.append(control('← Retour à l’annuaire',onClose));
   if(p.isSelf)tools.append(control('Mes bulletins mySilae',onPayroll));
   const jump=control('Droits des univers ↓',()=>permissions.scrollIntoView({behavior:'smooth',block:'center'}));tools.append(jump);
+  if(p.id&&restrictions?.lifecycleAllowed&&!isAdministrator){
+    const lifecycle=el('div','','employee-record-lifecycle'),lifecycleStatus=el('p');lifecycleStatus.setAttribute('role','status');
+    const state=control(p.active===false?'Réactiver le collaborateur':'Désactiver le collaborateur',async()=>{
+      if(!confirm((p.active===false?'Réactiver ':'Désactiver ')+[p.firstName,p.lastName].join(' ')+' ? Les informations et historiques seront conservés.'))return;
+      state.disabled=true;try{const result=await api('/api/users/'+p.id+(p.active===false?'/restore':''),p.active===false?'POST':'DELETE');await onSaved(result,p.active===false?'Collaborateur réactivé.':'Collaborateur désactivé.');}catch(e){lifecycleStatus.textContent=e.message;state.disabled=false;}
+    },'btn small');lifecycle.append(state);
+    if(p.active===false){const remove=control('Supprimer définitivement',async()=>{
+      const module=await import('/employee-delete-dialog.js');const word=await module.confirmEmployeeDeletion([p.firstName,p.lastName].join(' '));if(word===null)return;
+      remove.disabled=true;try{const result=await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id,confirmationText:word});await onSaved(result,'Collaborateur supprimé définitivement.');}catch(e){lifecycleStatus.textContent=e.message;remove.disabled=false;}
+    },'btn small danger');lifecycle.append(remove);}
+    lifecycle.append(lifecycleStatus);tools.append(lifecycle);
+  }
   root.append(heading,tools,el('p','Renseignez les champs utiles à votre situation. Les rubriques peuvent être complétées progressivement. Ces données ne sont pas affichées aux salariés.','field-note'));
   if(draft){const notice=el('div','','employee-import-review');notice.append(el('h4','Vérification de la fiche importée'),el('p','Les valeurs reconnues ont été préremplies. Vérifiez l’identité du salarié et chaque information avant d’enregistrer. Les champs absents du scan conservent leurs valeurs existantes.','field-note'));if(draft.sourceUrl){const source=el('a','Afficher la fiche importée ↗','btn');source.href=draft.sourceUrl;source.target='_blank';source.rel='noopener';notice.append(source);}for(const note of draft.notes)notice.append(el('p',note,'field-note'));for(const warning of draft.warnings)notice.append(el('p',warning.label+' : '+warning.message,'error'));root.append(notice);}
   const accordion=[];
@@ -33,9 +45,13 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     {key:'birthday',label:'Date de naissance',type:'date'},{key:'phone',label:'Téléphone affiché dans l’annuaire',type:'tel'},
     {key:'job',label:'Fonction prévue à la pharmacie',type:'select',options:['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste','Autres précisez']}
   ],p,basicInputs,true);
-  const job=basicInputs.get('job').input,otherJob=el('input'),otherLabel=el('label','Précisez la fonction');otherJob.id='employee-job-other';otherJob.maxLength=100;otherLabel.htmlFor=otherJob.id;job.after(otherLabel,otherJob);
-  const savedJob=p.job||'';if(savedJob&&!['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste'].includes(savedJob)){job.value='Autres précisez';otherJob.value=savedJob==='Autres précisez'?'':savedJob;}
-  const toggleJob=()=>{const other=job.value==='Autres précisez';otherJob.hidden=otherLabel.hidden=!other;otherJob.required=other;};job.onchange=toggleJob;toggleJob();
+  const job=basicInputs.get('job').input,otherGroup=el('div','','employee-job-other'),otherJob=el('input'),otherLabel=el('label','Précisez la fonction');otherJob.id='employee-job-other';otherJob.maxLength=100;otherLabel.htmlFor=otherJob.id;otherGroup.append(otherLabel,otherJob);job.after(otherGroup);
+  job.lastElementChild.textContent='Autre';
+  const savedJob=p.job||'',standardJobs=['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste'];
+  const custom=savedJob&&!standardJobs.includes(savedJob)&&!['Autre','Autres précisez'].includes(savedJob)?savedJob:'';
+  otherJob.value=custom||details.jobOther||'';
+  if(savedJob&&!standardJobs.includes(savedJob))job.value='Autres précisez';
+  const toggleJob=()=>{const other=job.value==='Autres précisez';otherGroup.hidden=!other;otherGroup.style.display=other?'':'none';otherJob.required=other;};job.onchange=toggleJob;toggleJob();
   employeeSections.forEach((s,index)=>section(s.title,s.fields,details,inputs,index===1));
   const account=section('Connexion personnelle au portail',[
     {key:'email',label:'Adresse e-mail de connexion',type:'email'},
@@ -80,7 +96,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     const value=({field,input})=>field.type==='checkbox'?input.checked:input.value;
     const data=Object.fromEntries([...basicInputs].filter(([,item])=>!item.input.disabled).map(([key,item])=>[key,value(item)]));
     if(data.job==='Autres précisez')data.job=otherJob.value.trim();
-    data.administratorRights=adminRights.checked;data.active=p.active!==false;data.details=Object.fromEntries([...inputs].map(([key,item])=>[key,value(item)]));data.detailsRevision=loaded.detailsRevision;
+    data.administratorRights=adminRights.checked;data.active=p.active!==false;data.details=Object.fromEntries([...inputs].map(([key,item])=>[key,value(item)]));data.detailsRevision=loaded.detailsRevision;if(otherJob.value.trim()||details.jobOther!==undefined)data.details.jobOther=otherJob.value.trim();
     if(!isAdministrator){data.rights=[...rights].filter(([,check])=>check.checked).map(([key])=>key);data.editRights=[...editRights].filter(([,check])=>check.checked).map(([key])=>key);}
     if(restrictions?.accountReadOnly){
       delete data.email;delete data.password;delete data.administratorRights;

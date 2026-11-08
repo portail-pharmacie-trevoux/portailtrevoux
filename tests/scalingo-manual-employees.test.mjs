@@ -48,14 +48,14 @@ test('Scalingo/PostgreSQL : création Sans accès, retrait et réactivation cibl
   assert.equal((await request(path,method,undefined,0)).status,401);assert.equal((await request(path,method,undefined,2)).status,403);
   for(const extra of [{'x-csrf-token':'bad'},{origin:'https://wrong.invalid'}])assert.equal((await request(path,method,undefined,1,extra)).status,403);
  }
- for(const id of [1,2])for(const [suffix,method]of [['','DELETE'],['/restore','POST']])assert.equal((await request('/api/users/'+id+suffix,method)).status,403);
+ for(const id of [1])for(const [suffix,method]of [['','DELETE'],['/restore','POST']])assert.equal((await request('/api/users/'+id+suffix,method)).status,403);
  const localToken=token();await db.query("INSERT INTO sessions VALUES($1,$2,'local',now()+interval '1 hour')",[digest(localToken),created.id]);
  assert.equal((await request('/api/users/'+created.id,'DELETE')).status,200);assert.equal((await account()).active,false);assert.equal((await db.query('SELECT count(*)::int AS n FROM sessions WHERE user_id=$1',[created.id])).rows[0].n,0);
  list=await (await request('/api/users')).json();assert.equal(list.filter(p=>p.active).length,17);assert.equal(list.find(p=>p.id===created.id).active,false);
  assert.equal((await request('/api/users/'+created.id+'/restore','POST')).status,200);const restored=await account();assert.deepEqual(restored,fresh);
  list=await (await request('/api/users')).json();assert.equal(list.find(p=>p.id===created.id).passwordConfigured,false);assert.equal(list.filter(p=>p.active).length,18);
  await db.query('UPDATE users SET email=$2 WHERE id=$1',[created.id,'must-not-enable@example.invalid']);
- assert.equal((await request('/api/users/'+created.id+'/restore','POST')).status,409);await db.query('UPDATE users SET email=NULL WHERE id=$1',[created.id]);
+ assert.equal((await request('/api/users/'+created.id+'/restore','POST')).status,200);await db.query('UPDATE users SET email=NULL WHERE id=$1',[created.id]);
  for(const [path,method]of [['/api/users/'+created.id+'/invitation','POST'],['/api/password','POST'],['/api/collaborateurs/import','POST']])assert.equal((await request(path,method,{})).status,403);
  assert.equal(externalCalls,0);assert.deepEqual(await snapshot(),protectedBefore);assert.deepEqual(await account(),fresh);
 });
