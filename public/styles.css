@@ -632,3 +632,13 @@ body>header .account-actions .btn:focus-visible,body>header #portal-home:focus-v
 .employee-record-admin-actions{position:absolute;z-index:20;right:0;top:calc(100% + 8px);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 48px);padding:14px;border:1px solid #d5c5e9;border-radius:12px;background:#f8f4fc;box-shadow:0 12px 35px #173c3326;display:flex;flex-direction:column;gap:8px}
 .employee-record-admin-actions>.btn{white-space:normal;text-align:left}
 .employee-record-admin-actions>[role=status]{margin:0;max-width:280px}
+
+/* Shared universe / parent navigation, independent of business toolbars. */
+.portal-navigation{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:8px;margin:0 0 16px;max-width:100%}
+.portal-navigation>.portal-navigation-tab{display:inline-flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;min-height:44px;margin:0;padding:10px 16px;border-radius:10px;font:600 14px/20px system-ui,sans-serif;max-width:100%;text-align:left}
+.portal-navigation>.portal-navigation-home{color:#fff;background:#6d429c;border-color:#593185}
+.portal-navigation>.portal-navigation-home:hover{background:#593185}
+.portal-navigation>.portal-navigation-tab:focus-visible{outline:3px solid #34204b;outline-offset:3px}
+.portal-navigation-arrow{display:inline-flex;align-items:center;justify-content:center;flex:0 0 18px;width:18px;height:20px;font-size:20px;line-height:1}
+.portal-navigation>[hidden],.portal-legacy-back{display:none!important}
+@media print{.portal-navigation{display:none!important}}

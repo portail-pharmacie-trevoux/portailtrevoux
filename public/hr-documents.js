@@ -44,12 +44,12 @@ export async function renderHRDocuments({container,heading,api,isAdmin,isCurrent
  function renameDocument(doc){
   administration.open=true;editor.replaceChildren();const form=el('form','','hr-form'),label=el('label','Nom affiché du document'),input=el('input');input.id='hr-rename';label.htmlFor=input.id;input.type='text';input.value=doc.title;input.maxLength=200;input.required=true;
   const error=el('p','','error'),save=el('button','Enregistrer le nom','btn primary');save.type='submit';
-  form.append(el('h3','Renommer le document'),label,input,error,button('Annuler',()=>editor.replaceChildren()),save);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});editor.scrollIntoView?.({behavior:'smooth',block:'center'});
+  form.dataset.portalSubpage='true';form.append(el('h3','Renommer le document'),label,input,error,button('Annuler',()=>editor.replaceChildren()),save);editor.append(form);input.focus();editor.scrollIntoView?.({behavior:'smooth',block:'center'});editor.scrollIntoView?.({behavior:'smooth',block:'center'});
   form.onsubmit=async e=>{e.preventDefault();if(saving||!isCurrent())return;saving=true;save.disabled=true;try{await api('/api/hr/documents/'+doc.id,'PATCH',{title:input.value});if(!isCurrent())return;editor.replaceChildren();await reload('Nom du document enregistré.');}catch(e){if(isCurrent())error.textContent=e.message;}finally{saving=false;save.disabled=false;}};
  }
 
  function importDocument(droppedFile=null){
-  if(!isCurrent())return;administration.open=true;editor.replaceChildren();const form=el('form','','hr-form'),title=el('h3','Importer un document RH');
+  if(!isCurrent())return;administration.open=true;editor.replaceChildren();const form=el('form','','hr-form'),title=el('h3','Importer un document RH');form.dataset.portalSubpage='true';
   const label=el('label','Titre du document');label.htmlFor='hr-title';const input=el('input');input.id='hr-title';input.type='text';input.required=true;input.maxLength=200;
   const fileLabel=el('label','Document PDF ou Word (.docx)');fileLabel.htmlFor='hr-file';const file=el('input');file.id='hr-file';file.type='file';file.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';file.required=!droppedFile;
   let selectedFile=droppedFile;if(selectedFile)input.value=selectedFile.name.replace(/\.(pdf|docx)$/i,'').slice(0,200);
