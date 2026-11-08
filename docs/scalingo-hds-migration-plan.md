@@ -120,3 +120,15 @@ Inspection de code effectuée, sans connexion à la base ni transfert de donnée
 - **Démarrage preview** : `serve-scalingo-ui-preview.mjs` effectue des adaptations de schéma au lancement, même si les trois scripts de précontrôle sont en lecture seule. Vérifier sauvegarde et procédure de restauration avant tout nouveau déploiement.
 - Les trois précontrôles corrigés et le script groupé existent sur la branche de préparation ; aucune exécution live n'a été observée, aucun statut GitHub Actions associé. Ne pas conclure à un GO sur la seule inspection de code.
 - Recommandation : pour l'ouverture quasi finale du 8 novembre, conserver l'URL technique Scalingo et le mode isolé, tant que le domaine, les origines, les accès réels, le MFA et la sauvegarde ne sont pas validés. Ne pas activer le domaine canonique pour l'instant.
+
+## Exigence du 8 novembre 2026 — continuité des identifiants des collaborateurs
+
+Le plan détaillé de référence est [render-scalingo-auth-continuity.md](render-scalingo-auth-continuity.md). Les 16 fiches Scalingo sont les fiches définitives des collaborateurs : les réutiliser, sans doublons, sans perte de relations et sans remplacer les mots de passe existants par des mots de passe provisoires. Conserver exactement les e-mails et les empreintes source compatibles, ainsi que les habilitations validées, sans réinitialisation ni renvoi d'invitation en masse. Les nouveaux administrateurs créés indépendamment sur Scalingo restent protégés contre un écrasement automatique.
+
+La compatibilité scrypt est confirmée entre le code main `aa6e9a2` et Scalingo `7501978` par un audit et des connexions sur comptes fictifs locaux. Elle ne prouve pas le transfert réel des comptes. Les écarts d'accès effectifs, notamment les anciens droits de modification implicites, doivent être arbitrés avant de garantir la continuité des habilitations.
+
+Cette exigence précise les consignes antérieures concernant Ente Auth : **aucun transfert automatique des facteurs ni de la clé APP_SECRET**. Tout transfert éventuel nécessite une validation spécifique ; sinon, activation indépendante. Render reste en lecture seule ; aucune modification de compte réel, migration ou action métier avant validation de la méthode et de l'aperçu. La recette réelle se fait dans la session privée de l'utilisateur, sans communication de son mot de passe à Codex.
+
+### Finalisation préparatoire du 8 novembre — principe validé, données non modifiées
+
+Le titulaire valide la migration sans réinitialisation générale. La suite opérationnelle est décrite dans [migration/collaborator-execution-plan.md](migration/collaborator-execution-plan.md), avec inventaire READ ONLY et outil de rapprochement de métadonnées hors ligne. Les [écarts de droits module par module](migration/collaborator-rights-differences.md) doivent être arbitrés avant toute correction réelle. Le tableau de 16 lignes est préparatoire : IDs/e-mails et conflits restent non vérifiés tant que les deux inventaires réels autorisés ne sont pas disponibles. Aucune correspondance de noms seule ne vaut validation, aucun transfert d'empreinte ou d'Ente Auth n'est réalisé à cette étape.
