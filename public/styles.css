@@ -624,3 +624,11 @@ body>header .account-actions .btn:focus-visible,body>header #portal-home:focus-v
 
 /* Scalingo only: the two remaining compact shortcuts share the final row. */
 @media(min-width:561px){#home .grid.scalingo-without-calculations>.tile.compact-space{grid-column:auto / span 6}}
+
+/* Employee record uses the shared Admin summary; only dropdown placement differs. */
+.employee-record-admin{position:relative;margin-left:auto;align-self:flex-start;flex:0 0 auto}
+.employee-record-admin[open]{padding:0;border:0;background:transparent}
+.employee-record-admin[open]>summary{margin-bottom:0}
+.employee-record-admin-actions{position:absolute;z-index:20;right:0;top:calc(100% + 8px);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 48px);padding:14px;border:1px solid #d5c5e9;border-radius:12px;background:#f8f4fc;box-shadow:0 12px 35px #173c3326;display:flex;flex-direction:column;gap:8px}
+.employee-record-admin-actions>.btn{white-space:normal;text-align:left}
+.employee-record-admin-actions>[role=status]{margin:0;max-width:280px}

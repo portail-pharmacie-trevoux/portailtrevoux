@@ -246,7 +246,7 @@ async function openEmployeeRecord(person){
   if(session?.user.role!=='admin')return;
   const request=++employeeRecordRequest,userId=session.user.id;const valid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
   setPeopleAddActions(false);q('#feedback').textContent='';q('#content').replaceChildren(node('p','Chargement de la fiche…','field-note'));
-  try{const module=await import('/employee-record.js');if(!valid())return;await module.renderEmployeeRecord({container:q('#content'),api,person,onClose:()=>reloadPeople(),onSaved:async(result,message)=>{await reloadPeople(message);},onPayroll:openMyPayroll,universes:[...initialTileOrder,'Procédures'],isCurrent:valid});}
+  try{const module=await import('/employee-record.js');if(!valid())return;await module.renderEmployeeRecord({isAdmin:session?.user.role==='admin',container:q('#content'),api,person,onClose:()=>reloadPeople(),onSaved:async(result,message)=>{await reloadPeople(message);},onPayroll:openMyPayroll,universes:[...initialTileOrder,'Procédures'],isCurrent:valid});}
   catch(e){if(valid()){q('#content').replaceChildren(node('p',e.message,'error'),button('Retour à l’annuaire',()=>reloadPeople()));}}
 }
 async function openMyPayroll(){
@@ -297,7 +297,7 @@ function renderEmployeeScan(content){
       const record=await import('/employee-record.js');if(!valid())return;
       const request=++employeeRecordRequest;const reviewValid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
       const cleanup=()=>URL.revokeObjectURL(draft.sourceUrl);setPeopleAddActions(false);
-      await record.renderEmployeeRecord({container:q('#content'),api,person,draft,universes:[...initialTileOrder,'Procédures'],isCurrent:reviewValid,onPayroll:openMyPayroll,onClose:()=>{cleanup();reloadPeople();},onSaved:async(result,message)=>{cleanup();await reloadPeople(message);}});
+      await record.renderEmployeeRecord({isAdmin:session?.user.role==='admin',container:q('#content'),api,person,draft,universes:[...initialTileOrder,'Procédures'],isCurrent:reviewValid,onPayroll:openMyPayroll,onClose:()=>{cleanup();reloadPeople();},onSaved:async(result,message)=>{cleanup();await reloadPeople(message);}});
     }});}catch(e){loaded=false;body.replaceChildren(node('p',e.message,'error'));}
   };
 }

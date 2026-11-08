@@ -1,5 +1,13 @@
 # Collaborateurs Scalingo : statut, suppression et fonction
 
+## Menu Admin de la fiche
+
+Les actions de la fiche sont regroupées en haut à droite dans le composant partagé `details.admin-menu` : « Gérer les droits », désactivation ou réactivation selon le statut, puis suppression pour une fiche inactive uniquement. Le rôle de l'administrateur connecté est fourni explicitement par l'interface ; aucun menu n'est rendu par défaut ou pour un utilisateur ordinaire. La fiche d'un administrateur ne propose aucune action de désactivation/suppression.
+
+Le menu se ferme au clic sur son titre, avec Échap, après choix d'une action ou clic ailleurs dans la fiche. « Gérer les droits » place le focus sur la configuration existante. Les confirmations et appels API sont conservés ; une erreur de dépendance rouvre le menu pour rendre l'explication visible. Retour à l'annuaire, informations, champs et boutons d'enregistrement restent à leur emplacement. Aucun mécanisme serveur n'est modifié par cette évolution ergonomique.
+
+Tests Chromium avec données fictives en 1920×1080 et 1024×768 : alignement en haut à droite, absence de débordement horizontal, ouverture/fermeture, droits, annulations, statut, suppression confirmée et refusée sur dépendance, utilisateur non administrateur, protection des comptes administrateurs et fonction personnalisée. Captures de contrôle conservées hors Git dans `scratch/employee-admin-menu`.
+
 ## Diagnostic et correctif
 
 Les groupes Actifs/Inactifs et les routes de retrait/réactivation existaient. La prévisualisation refusait ces actions pour les fiches importées et celles ayant un accès. L'interface masquait les boutons correspondants. Les routes de fiches étaient par ailleurs réservées à Administrateur Test.

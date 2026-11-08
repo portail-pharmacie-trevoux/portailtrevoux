@@ -1,7 +1,7 @@
 import {employeeSections} from './employee-fields.js';
 const el=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;};
 const control=(text,click,cls='btn small')=>{const b=el('button',text,cls);b.type='button';b.onclick=click;return b;};
-export async function renderEmployeeRecord({container,api,person,onClose,onSaved,onPayroll,universes,draft=null,isCurrent=()=>true}) {
+export async function renderEmployeeRecord({container,api,person,onClose,onSaved,onPayroll,universes,draft=null,isCurrent=()=>true,isAdmin=false}) {
   const loaded=person.id?await api('/api/users/'+person.id+'/details'):{person,details:{},detailsRevision:0,previewRestrictions:person.previewRestrictions};if(!isCurrent())return;
   const restrictions=loaded.previewRestrictions;
   const p={...loaded.person},details={...loaded.details},inputs=new Map(),basicInputs=new Map(),isAdministrator=p.role==='admin';
@@ -11,19 +11,30 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   heading.append(title,el('span','Fiche confidentielle · Administrateur','employee-confidential'));
   const tools=el('div','','employee-record-tools');tools.append(control('← Retour à l’annuaire',onClose));
   if(p.isSelf)tools.append(control('Mes bulletins mySilae',onPayroll));
-  const jump=control('Droits des univers ↓',()=>permissions.scrollIntoView({behavior:'smooth',block:'center'}));tools.append(jump);
-  if(p.id&&restrictions?.lifecycleAllowed&&!isAdministrator){
-    const lifecycle=el('div','','employee-record-lifecycle'),lifecycleStatus=el('p');lifecycleStatus.setAttribute('role','status');
-    const state=control(p.active===false?'Réactiver le collaborateur':'Désactiver le collaborateur',async()=>{
-      if(!confirm((p.active===false?'Réactiver ':'Désactiver ')+[p.firstName,p.lastName].join(' ')+' ? Les informations et historiques seront conservés.'))return;
-      state.disabled=true;try{const result=await api('/api/users/'+p.id+(p.active===false?'/restore':''),p.active===false?'POST':'DELETE');await onSaved(result,p.active===false?'Collaborateur réactivé.':'Collaborateur désactivé.');}catch(e){lifecycleStatus.textContent=e.message;state.disabled=false;}
-    },'btn small');lifecycle.append(state);
-    if(p.active===false){const remove=control('Supprimer définitivement',async()=>{
-      const module=await import('/employee-delete-dialog.js');const word=await module.confirmEmployeeDeletion([p.firstName,p.lastName].join(' '));if(word===null)return;
-      remove.disabled=true;try{const result=await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id,confirmationText:word});await onSaved(result,'Collaborateur supprimé définitivement.');}catch(e){lifecycleStatus.textContent=e.message;remove.disabled=false;}
-    },'btn small danger');lifecycle.append(remove);}
-    lifecycle.append(lifecycleStatus);tools.append(lifecycle);
+  let adminMenu,adminActions,adminStatus;
+  if(isAdmin){
+    adminMenu=el('details','','admin-menu employee-record-admin');
+    const summary=el('summary','Admin');summary.setAttribute('aria-label','Admin — fiche collaborateur');
+    adminActions=el('div','','employee-record-admin-actions');adminStatus=el('p');adminStatus.setAttribute('role','status');
+    const manage=control('Gérer les droits',()=>{adminMenu.open=false;permissions.tabIndex=-1;permissions.focus({preventScroll:true});permissions.scrollIntoView({behavior:'smooth',block:'center'});});
+    adminActions.append(manage);adminMenu.append(summary,adminActions);heading.append(adminMenu);
+    adminMenu.onkeydown=e=>{if(e.key==='Escape'){adminMenu.open=false;summary.focus();e.preventDefault();}};
+    root.addEventListener('click',e=>{if(adminMenu.open&&!adminMenu.contains(e.target))adminMenu.open=false;});
   }
+  if(p.id&&restrictions?.lifecycleAllowed&&!isAdministrator&&adminMenu){
+    const lifecycleStatus=adminStatus;
+    const state=control(p.active===false?'Réactiver le collaborateur':'Désactiver le collaborateur',async()=>{
+      adminMenu.open=false;
+      if(!confirm((p.active===false?'Réactiver ':'Désactiver ')+[p.firstName,p.lastName].join(' ')+' ? Les informations et historiques seront conservés.'))return;
+      state.disabled=true;try{const result=await api('/api/users/'+p.id+(p.active===false?'/restore':''),p.active===false?'POST':'DELETE');await onSaved(result,p.active===false?'Collaborateur réactivé.':'Collaborateur désactivé.');}catch(e){lifecycleStatus.textContent=e.message;adminMenu.open=true;state.disabled=false;}
+    },'btn small');adminActions.append(state);
+    if(p.active===false){const remove=control('Supprimer le collaborateur',async()=>{
+      adminMenu.open=false;
+      const module=await import('/employee-delete-dialog.js');const word=await module.confirmEmployeeDeletion([p.firstName,p.lastName].join(' '));if(word===null)return;
+      remove.disabled=true;try{const result=await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id,confirmationText:word});await onSaved(result,'Collaborateur supprimé définitivement.');}catch(e){lifecycleStatus.textContent=e.message;adminMenu.open=true;remove.disabled=false;}
+    },'btn small danger');adminActions.append(remove);}
+  }
+  if(adminActions)adminActions.append(adminStatus);
   root.append(heading,tools,el('p','Renseignez les champs utiles à votre situation. Les rubriques peuvent être complétées progressivement. Ces données ne sont pas affichées aux salariés.','field-note'));
   if(draft){const notice=el('div','','employee-import-review');notice.append(el('h4','Vérification de la fiche importée'),el('p','Les valeurs reconnues ont été préremplies. Vérifiez l’identité du salarié et chaque information avant d’enregistrer. Les champs absents du scan conservent leurs valeurs existantes.','field-note'));if(draft.sourceUrl){const source=el('a','Afficher la fiche importée ↗','btn');source.href=draft.sourceUrl;source.target='_blank';source.rel='noopener';notice.append(source);}for(const note of draft.notes)notice.append(el('p',note,'field-note'));for(const warning of draft.warnings)notice.append(el('p',warning.label+' : '+warning.message,'error'));root.append(notice);}
   const accordion=[];

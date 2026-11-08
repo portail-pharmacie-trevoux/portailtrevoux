@@ -22,7 +22,7 @@ test('Navigateur fiches : données et droits transmis, permissions spécifiques 
    if(method==='GET')return {person:{...person,role:administrator?'admin':'employee'},details:{...details},detailsRevision:revision,...(preview?{previewRestrictions:{accountReadOnly:true,profileReadOnly:administrator}}:{})};
    check(method==='PUT','Unexpected write');writes.push(body);Object.assign(person,Object.fromEntries(['firstName','lastName','phone','birthday','job'].map(k=>[k,body[k]])));details={...body.details};revision++;if(body.rights){person.rights=body.rights;person.editRights=body.editRights;person.permissionsConfigured=true;}return {...person};
   };
-  const root=document.querySelector('#root'),render=()=>renderEmployeeRecord({container:root,api,person,onClose(){},onSaved(){saves++;},onPayroll(){},universes});
+  const root=document.querySelector('#root'),render=()=>renderEmployeeRecord({isAdmin:true,container:root,api,person,onClose(){},onSaved(){saves++;},onPayroll(){},universes});
   await render();check(root.querySelector('#employee-email').disabled&&root.querySelector('#employee-password').disabled,'Connection controls editable');check(root.querySelector('#employee-administrator-rights').disabled,'Privilege escalation control enabled');
   check(root.querySelector('input[aria-label="Modifier Laboratoires"]').checked,'Existing specific permission disappeared');
   root.querySelector('#employee-phone').value='0612345678';root.querySelector('#employee-address').value='Adresse modifiée';
