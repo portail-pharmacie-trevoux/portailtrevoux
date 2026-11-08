@@ -177,7 +177,7 @@ function renderPeople(){
       const first=node('td'),last=node('td',p.lastName.toLocaleUpperCase('fr-FR')),phone=node('td',p.phone||'À renseigner','person-phone');
       if(isAdmin){const open=button(p.firstName,()=>openEmployeeRecord(p),'person-open');open.setAttribute('aria-label','Ouvrir la fiche de '+personName(p));first.append(open);const surname=button(p.lastName.toLocaleUpperCase('fr-FR'),()=>openEmployeeRecord(p),'person-open');surname.setAttribute('aria-label','Consulter la fiche de '+personName(p));last.replaceChildren(surname);}
       else if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
-      tr.append(first,last,phone);if(isAdmin){const state=!p.active?'Sans accès':p.passwordConfigured?'Accès activé':p.invitationSentAt?'Invitation envoyée':'Sans accès';const cell=node('td'),badge=node('span',state,'access-state '+(state==='Accès activé'?'active':state==='Invitation envoyée'?'pending':''));cell.append(badge);if(p.active&&!p.passwordConfigured&&p.invitationSentAt&&Date.now()-new Date(p.invitationSentAt).getTime()>72*3600000)cell.append(node('small','Lien expiré · renvoyer une invitation','field-note'));tr.append(cell);}
+      tr.append(first,last,phone);if(isAdmin){const state=!p.active?'Sans accès':p.passwordConfigured?'Accès activé':p.temporaryPasswordRequired?'Mot de passe provisoire':p.invitationSentAt?'Invitation envoyée':'Sans accès';const cell=node('td'),badge=node('span',state,'access-state '+(state==='Accès activé'?'active':state==='Invitation envoyée'?'pending':''));cell.append(badge);if(p.active&&!p.passwordConfigured&&p.invitationSentAt&&Date.now()-new Date(p.invitationSentAt).getTime()>72*3600000)cell.append(node('small','Lien expiré · renvoyer une invitation','field-note'));tr.append(cell);}
       if(isAdmin){
         const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));actions.append(edit);
         if(active&&!p.passwordConfigured){
@@ -256,13 +256,16 @@ async function openMyPayroll(){
     const link=node('a','Accéder à mes bulletins sur mySilae','btn primary payroll-link');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';text.after(link,node('p','La consultation des bulletins dans le portail pourra être activée avec votre prestataire de paie.','field-note'));
   }catch(e){text.textContent=e.message;}
 }
+function canCreateScalingoAccount(){return editId===null&&session?.features?.scalingoAccountCreation===true&&session.user.role==='admin'&&session.user.email==='admin-test@portailplus.invalid'&&!session.user.mustChange;}
 function openEditor(id=null){
   if(session.user.role!=='admin')return;editId=id;q('#form').reset();q('#editor-error').textContent='';q('#dialogtitle').textContent=id===null?'Ajouter un collaborateur':'Modifier le collaborateur';
   const p=people.find(p=>p.id===id);q('#first-name').value=p?.firstName||'';q('#last-name').value=p?.lastName||'';q('#phone').value=p?.phone||'';q('#birthday').value=p?.birthday||'';q('#job').value=p?.job||'';q('#email').value=p?.email||'';
   q('#account-options').classList.toggle('hidden',p?.role==='admin');q('#account-options').open=!!p?.email&&p?.role!=='admin';
   q('#email').required=false;q('#temporary-password').required=false;
-  const accountLocked=session.features?.employeeAccountsReadOnly===true;q('#email').disabled=accountLocked;q('#temporary-password').disabled=accountLocked;
+  const accountCreation=canCreateScalingoAccount();const accountLocked=session.features?.employeeAccountsReadOnly===true&&!accountCreation;q('#email').disabled=accountLocked;q('#temporary-password').disabled=accountLocked;
   q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'Renseignez un e-mail, puis envoyez une demande de connexion depuis l’annuaire. Le salarié choisira son mot de passe. Le mot de passe provisoire est facultatif.';
+  q('#scalingo-admin-option')?.remove();
+  if(accountCreation){const label=node('label','Droits administrateur — accès à tous les modules');label.id='scalingo-admin-option';const checkbox=node('input');checkbox.type='checkbox';checkbox.id='scalingo-new-administrator';label.prepend(checkbox);q('#account-options').append(label);q('#account-options').open=true;q('#password-help').textContent='Pour créer un accès : e-mail et mot de passe provisoire de 12 caractères minimum. Changement obligatoire à la première connexion. Sans ces champs, seule une fiche sans accès est créée. Aucun e-mail ne sera envoyé.';}
   if(accountLocked)q('#password-help').textContent='La fiche sera créée sans accès personnel. Aucune invitation ne sera envoyée.';
   document.querySelectorAll('[name=right]').forEach(c=>c.checked=p?.rights?.includes(c.value)||false);
   q('#editor').showModal();q('#first-name').focus();
@@ -271,7 +274,8 @@ q('#add').onclick=()=>openEditor();q('#cancel').onclick=()=>q('#editor').close()
 q('#form').onsubmit=async e=>{
   e.preventDefault();const btn=e.submitter;btn.disabled=true;
   const existing=people.find(p=>p.id===editId),data={firstName:q('#first-name').value,lastName:q('#last-name').value,phone:q('#phone').value,birthday:q('#birthday').value,job:q('#job').value,active:existing?.active!==false};
-  if(existing?.role!=='admin')Object.assign(data,{...(session.features?.employeeAccountsReadOnly?{}:{email:q('#email').value,password:q('#temporary-password').value}),rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
+  if(existing?.role!=='admin')Object.assign(data,{...(session.features?.employeeAccountsReadOnly&&!canCreateScalingoAccount()?{}:{email:q('#email').value,password:q('#temporary-password').value}),rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
+  if(canCreateScalingoAccount())data.administratorRights=q('#scalingo-new-administrator')?.checked===true;
   try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',data);q('#form').reset();q('#editor').close();await reloadPeople('Fiche enregistrée.');}
   catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}
 };

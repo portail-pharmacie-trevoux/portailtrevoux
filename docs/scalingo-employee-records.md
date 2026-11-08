@@ -1,5 +1,7 @@
 # Fiches collaborateurs dans la prévisualisation Scalingo
 
+La création de nouveaux accès personnels (sans modification des fiches existantes) est désormais décrite dans [scalingo-account-creation.md](scalingo-account-creation.md). Les restrictions de modification ci-dessous restent applicables.
+
 ## Diagnostic
 
 Le filtre limitait `GET /api/users/:id/details` aux cinq anciens e-mails fictifs et

@@ -50,13 +50,13 @@ export function createFeastCalendar({fetchImpl=fetch,now=()=>new Date()}={}) {
     })().finally(()=>{pending=null;});return pending;
   };
 }
-export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar()}) {
+export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar(),scalingoAccountCreation=false}) {
   app.get('/api/collaborateurs/registration-form',auth,ready,admin,async(req,res)=>{
     const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
     res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
   });
   const all=async()=>(await db.query('SELECT * FROM users ORDER BY active DESC,last_name,first_name')).rows;
-  const view=(person,req)=>publicPerson(person,req.auth.role==='admin',req.auth.id);
+  const view=(person,req)=>({...publicPerson(person,req.auth.role==='admin',req.auth.id),...(scalingoAccountCreation&&req.auth.role==='admin'?{temporaryPasswordRequired:!!person.password_hash&&person.must_change===true}:{})});
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
   app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all();if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
   app.get('/api/collaborateurs/celebrations',auth,ready,directoryAccess,async(req,res)=>{
