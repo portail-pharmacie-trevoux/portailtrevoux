@@ -37,14 +37,16 @@ export function userMapping(source,target){
  }
  return {map,issues};
 }
-export function makePlan(source,target){
+export function makePlan(source,target,decisions={}){
  const issues=[],warnings=[],u=userMapping(source.users,target.users),maps={users:Object.fromEntries(u.map)},previous=target.ledger||{version:1,rows:{},maps:{}};
+ if(!decisions||typeof decisions!=='object'||Array.isArray(decisions)||Object.keys(decisions).some(k=>!['publicationConflicts','readHistory'].includes(k)))throw fail('INVALID_HUMAN_DECISIONS');
+ if(decisions.publicationConflicts!==undefined&&decisions.publicationConflicts!=='preserve-both'||decisions.readHistory!==undefined&&decisions.readHistory!=='preserve-target-archive-source')throw fail('INVALID_HUMAN_DECISIONS');
  if(previous.version!==1)throw fail('UNSUPPORTED_LEDGER');
  for(const [sourceId]of fixed.filter(([sourceId])=>sourceId!==1))if(!u.map.has(sourceId))issues.push({code:'VALIDATED_STAFF_MAPPING_NOT_CONFIRMED',sourceId});
  for(const [sourceId,targetId]of u.map){const a=source.users.find(u=>u.id===sourceId),b=target.users.find(u=>u.id===targetId),fields=['job','schedule_position','active'].filter(k=>canonical(a[k])!==canonical(b[k]));if(fields.length)warnings.push({code:'PROFILE_DIFFERENCE_PRESERVED',sourceId,targetId,fields});}
  const use=(type,v)=>{if(v===null)return null;const result=maps[type]?.[v];if(result===undefined)throw fail('UNMAPPED_REFERENCE',{type,sourceId:v});return result;};
  const note=(e,table,row)=>issues.push({code:e.code||'INVALID_SOURCE_RECORD',table,sourceKey:key(table,row),...e.details});
- const records={},operations=[],nextLedger={version:1,rows:{},maps:{},sourceDigest:source.digest};
+ const publicationSources={...(previous.publicationSources||{})},publicationResolution={},publicationConflicts=[],records={},operations=[],nextLedger={version:1,rows:{},maps:{},sourceDigest:source.digest,publicationSources};
  const rows=t=>target.tables[t]||[];
  // Allocate all numeric keys before transforming any JSON or parent references.
  for(const table of Object.keys(tables).filter(t=>pk[t].length===1&&pk[t][0]==='id'&&t!=='message_automations')){
@@ -55,7 +57,21 @@ export function makePlan(source,target){
    let exact=[];
    if(['schedule_posts','schedule_templates'].includes(table)){const row=source.tables[table].find(r=>r.id===sid);exact=rows(table).filter(r=>r.name===row.name);if(exact.length>1){issues.push({code:'AMBIGUOUS_NATURAL_KEY',table,sourceId:sid});continue;}if(exact.length===1){maps[table][sid]=id(exact[0].id);continue;}}
    if(table==='message_automation_runs'){const row=source.tables[table].find(r=>id(r.id)===sid);exact=rows(table).filter(r=>r.automation_id===row.automation_id&&r.occurrence===row.occurrence);if(exact.length===1){maps[table][sid]=id(exact[0].id);continue;}}
-   if(table==='publications'){const row=source.tables[table].find(r=>id(r.id)===sid);if(row.source_key!==null)exact=rows(table).filter(r=>r.source_key===row.source_key);if(exact.length===1){maps[table][sid]=id(exact[0].id);continue;}}
+   if(table==='publications'){
+    const row=source.tables[table].find(r=>id(r.id)===sid);
+    if(row.source_key!==null)exact=rows(table).filter(r=>r.source_key===row.source_key);
+    if(exact.length===1){
+     const old=exact[0],sameContent=old.universe===row.universe&&old.title===row.title;
+     const differences=['universe','title','created_at'].filter(k=>canonical(row[k])!==canonical(old[k]));
+     publicationConflicts.push({sourceId:sid,targetId:old.id,differences,resolution:sameContent?'reuse_target_archive_source':'preserve_both_requires_approval'});
+     if(sameContent){maps[table][sid]=id(old.id);publicationResolution[sid]={kind:'reuse',old};continue;}
+     const scoped='migration:render:publication:'+sid+':'+hash(row.source_key).slice(0,16);
+     publicationResolution[sid]={kind:'fork',sourceKey:scoped};
+     const already=rows(table).find(r=>r.source_key===scoped);
+     if(already){maps[table][sid]=id(already.id);continue;}
+     if(decisions.publicationConflicts!=='preserve-both')issues.push({code:'PUBLICATION_FORK_DECISION_REQUIRED',table,sourceId:sid,targetId:old.id,differences});
+    }
+   }
    maps[table][sid]=++max;if(max>2147483647)throw fail('IDENTIFIERS_EXHAUSTED');
   }}
  }
@@ -67,7 +83,8 @@ export function makePlan(source,target){
   if(table==='publication_reads')continue;
   records[table]=[];nextLedger.rows[table]={...(previous.rows[table]||{})};
   for(const raw of sourceRows){try{
-   const r=structuredClone(raw);if(pk[table].length===1&&pk[table][0]==='id')r.id=typeof raw.id==='string'?String(use(table,raw.id)):use(table,raw.id);
+   let r=structuredClone(raw);
+   if(table==='publications'){const resolution=publicationResolution[Number(raw.id)];if(resolution){publicationSources[raw.id]=structuredClone(raw);if(resolution.kind==='reuse')r=structuredClone(resolution.old);else r.source_key=resolution.sourceKey;}else if(previous.publicationSources?.[raw.id]){const prior=previous.maps.publications?.[raw.id],old=rows(table).find(x=>Number(x.id)===Number(prior));if(old&&old.source_key!==raw.source_key)r.source_key=old.source_key;}}if(pk[table].length===1&&pk[table][0]==='id')r.id=typeof raw.id==='string'?String(use(table,raw.id)):use(table,raw.id);
    for(const f of ['sender_id','user_id','reviewed_by','cancelled_by','actor_id','created_by','updated_by'])if(Object.hasOwn(r,f))r[f]=use('users',r[f]);
    if(table==='team_messages'){r.reply_to_id=use('team_messages',r.reply_to_id);r.thread_id=use('team_messages',r.thread_id);}
    if(table==='team_message_recipients')r.message_id=use('team_messages',r.message_id);
@@ -86,14 +103,25 @@ export function makePlan(source,target){
    if(tracked){owned=tracked.owned;if(!old)throw fail('IMPORTED_ROW_REMOVED');if(tracked.targetKey!==tk)throw fail('MAPPING_CHANGED');if(sourceHash===tracked.sourceHash){action='keep';if(currentHash!==tracked.targetHash)warnings.push({code:'LOCAL_CHANGE_PRESERVED',table,sourceKey:sk});}else if(currentHash===targetHash)action='keep';else if(owned&&currentHash===tracked.targetHash)action='update';else throw fail('SOURCE_TARGET_DIVERGED');}
    else if(old){if(currentHash!==targetHash)throw fail('EXISTING_TARGET_CONFLICT');action='keep';}
    // Do not rewrite the provenance baseline when preserving an independent local edit.
-   const keepBaseline=tracked&&action==='keep'&&sourceHash===tracked.sourceHash&&currentHash!==tracked.targetHash;
+   const keepBaseline=tracked&&action==='keep'&&sourceHash===tracked.sourceHash;
    nextLedger.rows[table][sk]=keepBaseline?tracked:{sourceHash,targetHash,targetKey:tk,owned};
    operations.push({table,action,row:r,sourceKey:sk,targetKey:tk});
   }catch(e){note(e,table,raw);}}
  }
- // Single-watermark publication_reads must preserve old read/unread states too.
+ // Legacy single-watermark mode remains default. Conservative archival requires explicit decision.
+ nextLedger.readArchives={...(previous.readArchives||{})};
  records.publication_reads=[];nextLedger.rows.publication_reads={...(previous.rows.publication_reads||{})};
  for(const raw of source.tables.publication_reads){try{
+  if(decisions.readHistory==='preserve-target-archive-source'){
+   const user=use('users',raw.user_id),old=rows('publication_reads').find(x=>x.user_id===user&&x.universe===raw.universe);
+   const ownedPublications=new Set(Object.values(previous.rows.publications||{}).filter(r=>r.owned).map(r=>String(JSON.parse(r.targetKey)[0])));
+   const archive={sourceUserId:raw.user_id,targetUserId:user,universe:raw.universe,sourceLastId:String(raw.last_id),targetLastIdAtDecision:String(old?.last_id||0),targetPublications:rows('publications').filter(p=>p.universe===raw.universe&&!ownedPublications.has(String(p.id))).map(p=>({id:String(p.id),read:Number(p.id)<=Number(old?.last_id||0)})),publications:source.tables.publications.filter(p=>p.universe===raw.universe).map(p=>({sourceId:String(p.id),targetId:String(use('publications',p.id)),read:Number(p.id)<=Number(raw.last_id)}))};
+   nextLedger.readArchives[hash(archive)]=archive;
+   const r={...raw,user_id:user,last_id:String(old?.last_id||0)},action=old?'keep':'insert';
+   operations.push({table:'publication_reads',action,row:r,sourceKey:key('publication_reads',raw),targetKey:key('publication_reads',r)});records.publication_reads.push(r);
+   nextLedger.rows.publication_reads[key('publication_reads',raw)]={sourceHash:hash(raw),targetHash:hash(r),targetKey:key('publication_reads',r),owned:previous.rows.publication_reads?.[key('publication_reads',raw)]?.owned??!old};
+   warnings.push({code:'SOURCE_READ_HISTORY_ARCHIVED_LIVE_TARGET_UNCHANGED',table:'publication_reads',sourceUserId:raw.user_id,targetUserId:user});continue;
+  }
   const user=use('users',raw.user_id),old=rows('publication_reads').find(x=>x.user_id===user&&x.universe===raw.universe),mapped=source.tables.publications.filter(p=>p.universe===raw.universe&&Number(p.id)<=Number(raw.last_id)).map(p=>Number(use('publications',p.id)));
   const importedRead=Math.max(0,...mapped),watermark=Math.max(Number(old?.last_id||0),importedRead);
   const existing=rows('publications').filter(p=>p.universe===raw.universe);
@@ -117,5 +145,5 @@ export function makePlan(source,target){
  for(const table of Object.keys(tables)){const current=new Set(source.tables[table].map(r=>key(table,r)));for(const sourceKey of Object.keys(previous.rows[table]||{}))if(!current.has(sourceKey))warnings.push({code:'SOURCE_REMOVAL_RETAINED',table,sourceKey});}
  nextLedger.maps=maps;
  const count=Object.fromEntries(Object.keys(tables).map(t=>[t,{source:source.tables[t].length,existing:rows(t).length,insert:operations.filter(o=>o.table===t&&o.action==='insert').length,update:operations.filter(o=>o.table===t&&o.action==='update').length,keep:operations.filter(o=>o.table===t&&o.action==='keep').length}]));
- return {issues,warnings,count,maps,operations,records,nextLedger,ready:issues.length===0,sourceDigest:source.digest,targetDigest:target.digest};
+ return {issues,warnings,count,maps,operations,records,nextLedger,publicationConflicts,decisionsDigest:hash(decisions),ready:issues.length===0,sourceDigest:source.digest,targetDigest:target.digest};
 }

@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import pg from 'pg';import {readFile} from 'node:fs/promises';
 import {automationDDL,sourceSnapshot,targetSnapshot,auditGrouped,applyGrouped} from '../scripts/migration/grouped/database.mjs';
+import {previousAttempt,identityDiagnostics} from '../scripts/migration/grouped/diagnostics.mjs';
 import {hash,makePlan,ledgerKey} from '../scripts/migration/grouped/model.mjs';
 const connection=process.env.PORTAIL_GROUPED_FIXTURE_URL;
 test('Grouped communication/planning transaction on two isolated TLS fixture databases',{skip:!connection,timeout:60000},async t=>{
@@ -35,6 +36,10 @@ test('Grouped communication/planning transaction on two isolated TLS fixture dat
  let snapshot=await sourceSnapshot(source),audit=await auditGrouped(snapshot,target);
  const approve=a=>({approved:true,reference:'SYNTHETIC TEST ONLY',backupReference:'SYNTHETIC BACKUP',sourceDigest:snapshot.digest,targetDigest:a.targetDigest});
  await t.test('Read-only source export and cross-module audit produce no writes',async()=>{assert.equal(audit.ready,true,JSON.stringify(audit.issues));assert.equal(audit.usersMapped,17);assert.equal(audit.tables.team_messages.insert,3);assert.equal((await targetSnapshot(target)).ledger,null);});
+ await t.test('Complete audit works with both connections forced read-only and leaves the target unchanged',async()=>{
+  const readOptions={ssl,options:'-c default_transaction_read_only=on'},a=new pg.Pool({...readOptions,connectionString:'postgres://postgres@127.0.0.1:55445/portailtrevoux_db'}),b=new pg.Pool({...readOptions,connectionString:'postgres://postgres@127.0.0.1:55445/portailplus_7495'});
+  try{const before=(await targetSnapshot(target)).digest,src=await sourceSnapshot(a),result=await auditGrouped(src,b,{includePrivate:true});assert.equal(result.ready,true);assert.equal(result.previousAttempt.state,'NO_COMMIT_RECEIPT');assert.equal((await b.query("SELECT current_setting('transaction_read_only') AS value")).rows[0].value,'on');assert.equal((await targetSnapshot(target)).digest,before);assert.equal(result.issueSummary.total,0);}finally{await a.end();await b.end();}
+ });
  await t.test('Missing optional communication schema is declared and created transactionally',async()=>{
   await target.query('DROP TABLE message_automation_changes,message_automation_runs,message_automations');await target.query('ALTER TABLE team_messages DROP COLUMN reminder_kind; ALTER TABLE team_messages DROP COLUMN automation_text');
   audit=await auditGrouped(snapshot,target);assert.equal(audit.ready,true,JSON.stringify(audit.issues));assert.deepEqual(new Set(audit.ddl),new Set(['message_automations','message_automation_runs','message_automation_changes','team_messages.reminder_kind','team_messages.automation_text']));
@@ -65,4 +70,33 @@ test('Grouped communication/planning transaction on two isolated TLS fixture dat
   await target.query("UPDATE team_messages SET text='Local preserved reply' WHERE text='Synthetic reply'");let p=makePlan(snapshot,await targetSnapshot(target));assert.equal(p.ready,true);assert(p.warnings.some(w=>w.code==='LOCAL_CHANGE_PRESERVED'));
   await source.query("UPDATE team_messages SET text='Different Render reply' WHERE text='Synthetic reply'");const newer=await sourceSnapshot(source);p=makePlan(newer,await targetSnapshot(target));assert(p.issues.some(i=>i.code==='SOURCE_TARGET_DIVERGED'));
  });
+ await t.test('Read-only diagnosis distinguishes a commit receipt from a missing receipt',async()=>{
+  const current=await targetSnapshot(target);assert.equal(previousAttempt({...current,ledger:null}).state,'NO_COMMIT_RECEIPT');const status=previousAttempt(current);assert.equal(status.commitRecorded,true);assert.equal(status.state,'COMMIT_RECORDED_WITH_LATER_DIFFERENCES');
+ });
+ await source.query("UPDATE team_messages SET text='Synthetic reply' WHERE id=2");await target.query("UPDATE team_messages SET text='Synthetic reply' WHERE text='Local preserved reply'");
+ await t.test('IDs 14/15 are diagnosed as orphan JSON vs a source administrator without a target',async()=>{
+  const copy=structuredClone(await sourceSnapshot(source)),dest=await targetSnapshot(target);copy.users.push({id:15,first_name:'Synthetic second',last_name:'Administrator',name:'Fixture',role:'admin',active:true,email:'fixture-second@example.invalid',directory_key:null});copy.tables.schedule_templates[0].content['14:0']={userId:14,postIds:[1]};copy.tables.team_messages[0].sender_id=15;
+  const p=makePlan(copy,dest),details=identityDiagnostics(copy,dest,p);assert.equal(details.find(r=>r.sourceId===14).state,'SOURCE_USER_ABSENT_ORPHAN_REFERENCES');assert.equal(details.find(r=>r.sourceId===15).sourceRole,'admin');assert.equal(details.find(r=>r.sourceId===15).sourceActive,true);assert.equal(details.find(r=>r.sourceId===15).state,'SOURCE_USER_EXISTS_TARGET_UNRESOLVED');assert.equal(p.ready,false);
+ });
+ await source.query("INSERT INTO publications(id,universe,title,source_key,created_at) VALUES(282,'Actualités','Protected publication','fixture-target','2020-01-01T00:00:00Z')");
+ await source.query("INSERT INTO publication_reads VALUES(3,'Actualités',282)");
+ snapshot=await sourceSnapshot(source);
+ await t.test('Metadata-only publication collision reuses Scalingo unchanged and archives exact source metadata',async()=>{
+  const before=await targetSnapshot(target),old=before.tables.publications.find(p=>p.id==='1');audit=await auditGrouped(snapshot,target,{includePrivate:true});assert.equal(audit.ready,true,JSON.stringify(audit.issues));assert.equal(audit.publicationConflicts[0].resolution,'reuse_target_archive_source');assert.deepEqual(audit.publicationConflicts[0].differences,['created_at']);
+  await applyGrouped({source:snapshot,pool:target,approval:approve(audit)});const after=await targetSnapshot(target);assert.equal(hash(after.tables.publications.find(p=>p.id==='1')),hash(old));assert.equal(after.ledger.publicationSources['282'].created_at,'2020-01-01T00:00:00+00:00');
+  const again=await auditGrouped(snapshot,target);assert.equal(again.ready,true,JSON.stringify(again.issues));const saved=after.digest;await applyGrouped({source:snapshot,pool:target,approval:approve(again)});assert.equal((await targetSnapshot(target)).digest,saved);
+ });
+ await target.query("INSERT INTO publications(id,universe,title,source_key) VALUES(11,'Actualités','Target variant','fixture-conflict')");await source.query("INSERT INTO publications(id,universe,title,source_key) VALUES(284,'Actualités','Source variant','fixture-conflict')");snapshot=await sourceSnapshot(source);
+ await t.test('Content collision requires explicit preserve-both decision and never overwrites the target',async()=>{
+  const a=await auditGrouped(snapshot,target);assert(a.issues.some(i=>i.code==='PUBLICATION_FORK_DECISION_REQUIRED'));const decisions={publicationConflicts:'preserve-both'},review=await auditGrouped(snapshot,target,{decisions});assert.equal(review.ready,true,JSON.stringify(review.issues));
+  await assert.rejects(applyGrouped({source:snapshot,pool:target,approval:approve(review),decisions}),/EXPLICIT_DECISION_AUTHORIZATION_REQUIRED/);
+  await applyGrouped({source:snapshot,pool:target,approval:{...approve(review),decisionsDigest:review.decisionsDigest},decisions});const after=await targetSnapshot(target);assert.equal(after.tables.publications.find(p=>p.id==='11').title,'Target variant');const fork=after.tables.publications.find(p=>p.title==='Source variant');assert.match(fork.source_key,/^migration:render:publication:284:/);assert.equal(after.ledger.publicationSources['284'].source_key,'fixture-conflict');const rerun=await auditGrouped(snapshot,target,{decisions});assert.equal(rerun.tables.publications.insert,0);assert.equal(rerun.tables.publications.update,0);
+ });
+ await source.query("INSERT INTO publications(id,universe,title,source_key) VALUES(286,'Actualités','New source already read','fixture-read-conflict')");await source.query("UPDATE publication_reads SET last_id=286 WHERE user_id=3 AND universe='Actualités'");snapshot=await sourceSnapshot(source);
+ await t.test('Conservative reading policy is opt-in, archives both histories and never marks local unread rows as read',async()=>{
+  const review=await auditGrouped(snapshot,target);assert(review.issues.some(i=>i.code==='READ_WATERMARK_WOULD_MARK_LOCAL_UNREAD_AS_READ'));const decisions={publicationConflicts:'preserve-both',readHistory:'preserve-target-archive-source'},a=await auditGrouped(snapshot,target,{decisions});assert.equal(a.ready,true,JSON.stringify(a.issues));
+  const before=await targetSnapshot(target),read=before.tables.publication_reads.find(r=>r.user_id===7&&r.universe==='Actualités');await applyGrouped({source:snapshot,pool:target,approval:{...approve(a),decisionsDigest:a.decisionsDigest},decisions});const after=await targetSnapshot(target);assert.equal(hash(after.tables.publication_reads.find(r=>r.user_id===7&&r.universe==='Actualités')),hash(read));const archived=Object.values(after.ledger.readArchives).find(a=>a.universe==='Actualités');assert.equal(archived.sourceLastId,'286');assert(archived.publications.find(p=>p.sourceId==='286').read);assert.equal(archived.targetPublications.find(p=>p.id==='11').read,false);
+  const again=await auditGrouped(snapshot,target,{decisions});assert.equal(again.ready,true);const digest=after.digest;await applyGrouped({source:snapshot,pool:target,approval:{...approve(again),decisionsDigest:again.decisionsDigest},decisions});assert.equal((await targetSnapshot(target)).digest,digest);
+ });
+
 });

@@ -1,147 +1,154 @@
-# Migration groupée Communication et Planning — Render → Scalingo
+# Communication + Planning : audit corrigé, version du 9 novembre 2026
 
-Programme ponctuel lancé depuis Windows PowerShell et Scalingo CLI déjà authentifié.
-Les données réelles ne sont ni exportées dans Git ni transmises dans une conversation.
-Les deux connexions PostgreSQL utilisent TLS avec validation des certificats.
-Scalingo reste accessible uniquement depuis le conteneur temporaire interne : aucun
-accès Internet de la base cible, aucun tunnel public, aucune modification réseau.
+**Cette version est strictement en lecture seule.** Le lanceur n'a plus de paramètre
+Execute et le programme distant refuse tout mode autre que audit. Les deux pools
+PostgreSQL imposent `default_transaction_read_only=on` et chaque instantané utilise
+`REPEATABLE READ READ ONLY`. Aucun serveur, initialize, schema.sql, moteur de
+programmation ou mailer n'est lancé. Aucun changement de flag de sécurité.
 
-## Livraison et lancement
+Les tables et relations du lot initial restent identiques. Les autres modules,
+les comptes, les droits et l'authentification ne sont pas modifiés.
 
-Le code est livré par `raw.githubusercontent.com`, avec version Git figée dans la
-commande de lancement et empreintes SHA-256 des quatre fichiers exécutés. Le lanceur
-Windows télécharge seulement du code dans `%LOCALAPPDATA%\PortailPlus`. Il ne dépend
-pas d'un lien `/workspace`, de Python, Node, psql, Git ou d'une archive de données sur
-le PC. Node et `pg` sont réutilisés dans le conteneur applicatif Scalingo.
+## Livraison Windows et saisie sécurisée
 
-`Start-Migration.ps1` sans option fait exclusivement l'audit. Le mode `-Execute` doit
-être autorisé par l'utilisateur avant lancement, puis demande encore la confirmation
-exacte `MIGRER MESSAGERIE ET PLANNING` après l'audit automatique sans conflit.
+Le lanceur est livré via une URL GitHub au commit figé, dont le téléchargement est
+vérifié avant communication de la commande. Il télécharge seulement les six fichiers
+techniques du programme, vérifiés par SHA-256. Aucun export métier dans GitHub.
+Windows PowerShell 5.1 et Scalingo CLI déjà authentifié suffisent sur le PC.
+Aucun lien /workspace, archive métier à reconstruire, Python/Node/psql local requis.
+Node et pg restent ceux du conteneur temporaire interne Scalingo.
 
-Le seul secret demandé est l'URL **externe** PostgreSQL Render terminant par
-`.render.com`, base `portailtrevoux_db`. La saisir uniquement dans l'invite masquée
-locale de la CLI, jamais dans ChatGPT. Elle n'est ni un argument de processus, ni un
-fichier, ni une variable permanente Scalingo. Elle passe par l'entrée interactive
-chiffrée officielle de la CLI et reste en mémoire dans le processus temporaire.
-Un rôle SQL dédié en lecture seule est recommandé. Toutes les requêtes source du
-programme sont de lecture, dans une transaction `REPEATABLE READ READ ONLY`, avec
-`default_transaction_read_only=on`, identité de base et TLS vérifiés.
-Le connecteur ChatGPT `query_render_postgres` ne fournit pas cette URL à Codex.
-Si aucune URL PostgreSQL externe autorisée n'est disponible, l'exécution directe
-reste bloquée : ne pas contourner les protections ni exposer la base Scalingo.
+L'URL externe Render est désormais saisie **localement avec Read-Host -AsSecureString**.
+Elle n'est plus collée dans une console distante via le pipeline Tee-Object : cette
+ancienne combinaison pouvait mal transmettre une saisie depuis PowerShell Windows.
+Le client attend `PORTAIL_SECRET_READY_V2`, émis seulement après désactivation de
+l'écho du terminal distant. Il transmet ensuite une ligne cadrée et encodée via
+l'entrée standard du processus CLI. L'encodage n'est pas le chiffrement : la liaison
+est celle, chiffrée, de la CLI Scalingo officielle. Aucune URL secrète dans un argument,
+un fichier, une variable permanente d'application ou un journal. Pas de commande
+shell construite avec l'URL. Les espaces et guillemets enveloppants du presse-papiers
+sont traités ; les caractères de contrôle sont refusés. Les mots de passe URL-encodés
+restent intacts. Les sorties inconnues et stderr bruts ne sont pas journalisés.
 
-## Sauvegarde et absence d'envois
+Le mécanisme attend une URL PostgreSQL EXTERNE Render en `.render.com` pour
+`portailtrevoux_db`. Ne jamais la copier dans ChatGPT. PostgreSQL Scalingo reste
+inaccessible publiquement ; la cible est jointe en TLS depuis son conteneur interne.
 
-Le lanceur utilise uniquement `scalingo backups --addon ...`, vérifie un statut
-`done` et une date de moins de 36 heures. Il réutilise la sauvegarde existante la
-plus récente ; aucune sauvegarde n'est créée ou téléchargée. Si la liste est
-inaccessible ou son format ne permet pas cette vérification, l'import est bloqué.
-La restauration réelle de cette sauvegarde n'est pas attestée par ces contrôles.
+## Résultat de la tentative précédente
 
-Le conteneur ne lance jamais le serveur, initialize, schema.sql, le moteur des
-programmations, les approbations de congés, la publication de planning ou un mailer.
-Il exige `SCALINGO_PREVIEW_SAFE_MODE=true` et `SCALINGO_PREVIEW_UI_ENABLED=true`, qui
-correspondent au serveur de prévisualisation sans tâches planifiées. Aucun flag de
-sécurité n'est changé par le programme. Si les tâches ne sont plus confirmées
-inactives, arrêt avant import : leur suspension réclamerait une décision séparée.
-Les publications et messages historiques sont des données reprises ; aucun nouvel
-avis de migration ou de publication n'est généré.
+Le premier contrôle SQL cible recherche la provenance atomique du lot :
 
-## Périmètre exact
+- `NO_COMMIT_RECEIPT` : aucune validation de ce programme n'est attestée. Cela ne
+  prouve pas qu'un ROLLBACK a eu lieu ; le statut reste non confirmé.
+- `COMMIT_RECORDED_ROWS_VERIFIED` : provenance trouvée et lignes suivies identiques.
+- `COMMIT_RECORDED_WITH_LATER_DIFFERENCES` : provenance trouvée, mais des lignes ont
+  changé ou disparu depuis (par exemple lecture ou expiration applicative).
 
-- Communication : team_messages (pièces jointes comprises), team_message_recipients,
-  message_automations, message_automation_runs, message_automation_changes,
-  publications et publication_reads.
-- Planning : schedule_weeks, schedule_templates, schedule_posts, leave_requests,
-  leave_schedule_changes.
-- Paramètre métier autorisé : uniquement `schedule_accountant_email`, ajouté si
-  absent, refusé si une valeur cible différente existe. Aucune copie globale de settings.
-- Lecture de soutien : users, sans mot de passe/MFA/session, et seulement l'identité
-  du service/référent de quality_services pour résoudre les audiences `serviceIds`.
-  Aucun compte, profil, droit ou service qualité n'est modifié.
-- Provenance technique : une seule clé settings dédiée,
-  `migration:render:communication-planning:v1`, contenant mappings et empreintes,
-  jamais le contenu des messages ou les données d'authentification.
-- Si le schéma Communication optionnel manque : les trois tables de programmation
-  et les colonnes texte optionnelles manquantes sont annoncées dans l'audit et
-  créées dans la même transaction uniquement après autorisation. Aucun schéma des
-  autres modules n'est modifié. Toute autre différence de schéma bloque l'import.
+La provenance initiale est enregistrée dans la même transaction que les données.
+Un audit d323137 dont ready=false n'appelait pas la transaction d'import ; il ne
+constitue toutefois pas un journal exhaustif d'éventuelles autres tentatives.
+Dans tous les cas cette livraison reste en audit, sans possibilité de reprise
+implicite d'une écriture. Elle ne crée, ne télécharge et ne renouvelle aucune
+sauvegarde. La sauvegarde récente sera revérifiée avant une future écriture autorisée.
 
-Les tables Commandes, Merchandising, Challenges, Fun, RH, Procédures et Laboratoires
-ne sont ni lues ni écrites. Les bilans de commandes/challenges déjà contenus dans
-les messages restent des instantanés historiques : aucun rapprochement de leurs
-numéros de lignes avec les futurs imports manuels n'est inventé.
+## Collaborateurs et références orphelines
 
-## Précontrôles automatiques
+Les 16 correspondances approuvées sont toujours contrôlées sur les identités complètes
+uniques et rôles. Les autres références utilisent des identités complètes avec
+vérification des e-mails/clés complets disponibles. Le Test cible 1 est toujours exclu.
 
-Les 16 correspondances approuvées sont revérifiées avec les identités complètes
-uniques, les rôles et les IDs attendus. Une égalité de numéro n'est jamais utilisée
-comme rapprochement. Les autres auteurs/destinataires doivent être rapprochés par
-identité complète unique, avec vérification des signaux e-mail/clé annuaire quand
-ils existent. Le compte Test cible 1 ne peut être une destination source. Tout auteur,
-destinataire, acteur ou verrou sans correspondance bloque. Aucun compte absent
-(notamment un administrateur non encore activé) n'est créé automatiquement.
-Les fonctions, positions planning et statuts différents sont signalés et conservés
-côté Scalingo ; la migration ne touche pas aux corrections manuelles des fiches.
+L'audit regroupe toutes les références de chaque ID non rapproché (et contrôle
+explicitement les IDs source 14/15), même si une ligne comporte plusieurs IDs inconnus.
+Il distingue compte source existant actif/inactif et compte source absent. Il expose
+les tables concernées, le rôle/statut et les candidats cible. L'identité complète est
+réservée au rapport privé local. Aucun rapprochement arbitraire, aucun compte créé.
+Si une référence JSON est orpheline d'un compte supprimé, l'identité historique doit
+être établie par une preuve fiable avant une décision de reprise. Pas de substitution
+vers une autre personne, pas de suppression silencieuse des cellules.
 
-Les clés JSON `userId:date`, `userId:weekday`, champs userId/by, tableaux postIds,
-leaveRequestId et audiences userIds/serviceIds sont convertis. Les fils supprimés
-restant référencés par thread_id reçoivent des IDs réservés sans inventer de message
-racine. Les pièces jointes, microsecondes, archives, lectures, statuts de congés,
-révisions et l'état NULL de published_revision restent conservés. SQL NULL et
-la valeur JSON `null` sont distingués et préservés dans les historiques de congés.
+## Publications : analyse des conflits de clé source
 
-Les conflits bloquent tout le lot avant écriture : semaine existante différente,
-poste/modèle homonyme incompatible, programmation de même identifiant différente,
-paramètre incompatible, demande pending en double, correspondance ambiguë ou
-copie de message déjà présente sans provenance.
+L'ancienne version réutilisait l'ID cible d'une publication de même source_key puis
+exigeait l'égalité de toute la ligne, ce qui bloquait notamment une date différente.
 
-**Limite du modèle de lecture** : publication_reads possède un seul last_id par
-univers. Quand avancer ce compteur pour restaurer les lectures Render marquerait
-comme lues des publications Scalingo encore non lues, les deux états ne sont pas
-représentables simultanément. Le programme signale ce conflit et attend une décision
-au lieu de changer silencieusement les lectures. Aucune fonctionnalité n'est ajoutée
-pour contourner ce modèle.
+La nouvelle règle distingue :
 
-## Transaction, intégrité et reprise
+1. Même source_key, univers et titre ; date différente : réutiliser la ligne cible
+   **intégralement inchangée**. Lors d'une future transaction approuvée, conserver
+   l'enregistrement source original exact dans la provenance `publicationSources`.
+2. Même source_key mais contenu différent : signaler les champs différents et
+   `PUBLICATION_FORK_DECISION_REQUIRED`. La proposition est de conserver les deux :
+   la cible reste intacte, la source reçoit un ID libre et une clé technique
+   `migration:render:publication:<sourceId>:<empreinte>`. La source_key originale et
+   toutes les métadonnées originales restent dans la provenance. Pas de remplacement.
 
-Une transaction unique cible couvre les douze tables, le seul paramètre autorisé,
-la provenance et les éventuels ajouts de schéma déclarés. Des verrous bornés et le
-digest de l'audit empêchent une écriture sur une cible modifiée entre-temps. Parents
-et réponses sont ordonnés selon leurs dépendances. Aucune suppression ni CASCADE.
-Les séquences sont uniquement avancées par `ALTER SEQUENCE RESTART`, transactionnel,
-et réservent aussi les IDs de fils dont la racine a été supprimée.
+La règle 2 n'est simulée sans blocage qu'avec la décision explicite
+`publicationConflicts: preserve-both`. Elle ne change aucune donnée dans cette
+livraison d'audit. Le mapping et la provenance évitent la duplication lors des
+relances ; les changements indépendants Scalingo restent prioritaires.
+Le rapport liste chaque conflit (y compris les six IDs signalés si encore présents),
+les champs divergents et la solution proposée. Aucune prétention de connaître les
+valeurs actuelles réelles sans lecture du nouvel audit.
 
-Avant COMMIT : comparaison de chaque ligne écrite, de toutes les lignes cibles
-préservées, des volumes, des référents et des pièces jointes (empreintes sur leur
-représentation hexadécimale exacte avec toutes les autres colonnes). Les contraintes
-FK/check/unique PostgreSQL restent actives. Toute erreur annule données, séquences,
-DDL et provenance pour les deux modules ensemble. Après COMMIT : nouvel audit
-indépendant, qui doit ne demander aucune insertion/mise à jour restante.
+## Lectures : décision indispensable quand le compteur ne suffit pas
 
-La provenance rend les relances idempotentes. Une évolution seulement sur Render
-peut être reprise sur une ligne créée par le programme si la ligne cible est restée
-identique à sa version importée. Une évolution indépendante Scalingo est conservée ;
-une évolution divergente des deux côtés bloque. Une disparition source n'entraîne
-jamais de suppression automatique cible. Un enregistrement préexistant Scalingo
-réutilisé n'est jamais écrasé par une évolution ultérieure source.
+Les états seen/seen_at/archived des messages sont distincts de publication_reads.
+Leur migration garde les états individuels et ne rejoue aucun envoi.
+publication_reads ne stocke qu'un last_id par personne et univers. Deux historiques
+intercalés ou contradictoires ne peuvent pas toujours être représentés par ce seul
+compteur. Les blocages historiques restent donc actifs par défaut.
 
-Cela permet une reprise après gel Render : même programme, nouvel instantané cohérent,
-contrôle à trois états et nouvelle autorisation du lot. Le programme n'effectue pas
-lui-même le gel Render. Après COMMIT, aucun retour arrière destructif automatique :
-le reçu/provenance permet de préparer une correction ciblée après validation.
+Proposition sans perte silencieuse : décision `readHistory:
+preserve-target-archive-source`. La simulation conserve chaque compteur Scalingo
+exactement ; elle ne marque aucune publication cible supplémentaire comme lue.
+Pour une personne sans compteur cible, la valeur conservatrice est zéro. Les états
+Render exacts par publication ET l'état cible au moment de la décision sont conservés
+dans une archive de provenance immuable, identifiée par empreinte (`readArchives`).
+Aucun historique n'est jeté et aucun état lu Render n'est faussement revendiqué comme
+fusionné dans l'interface : certaines publications déjà lues sur Render pourraient
+apparaître non lues sur Scalingo. Ce compromis exige un accord explicite.
 
-## Rapport et limites vérifiées
+Si une restitution fidèle des deux historiques directement dans l'interface est
+exigée, il faut un modèle de lecture par publication et adapter les routes de
+consultation/marquage. Ce serait un changement séparé à approuver : il n'est pas
+introduit ni déployé ici. Le modèle actuel n'est pas assoupli pour forcer le passage.
 
-`rapport.txt` local ne contient que volumes, codes de conflits, IDs techniques et
-empreintes. Aucun message, horaire, commentaire de congé, pièce jointe, secret ou
-empreinte de mot de passe n'est affiché. Les 965 lignes Communication et 77 lignes
-Planning fournies par l'utilisateur sont des références du 8 novembre ; les volumes
-réels seront relus automatiquement au lancement. Ils ne sont pas déclarés vérifiés
-contre les bases réelles par Codex.
+## Décisions et rapports
 
-Les tests automatisés utilisent deux PostgreSQL isolés avec données synthétiques et
-TLS vérifié. Le réseau réel Render→conteneur Scalingo, la saisie interactive Windows
-et les conflits réels ne sont pas réputés testés avant le lancement autorisé sur PC.
-Un échec après retour COMMIT ne doit jamais être traité comme une absence d'import :
-lancer l'audit pour relire la provenance, ne jamais réessayer automatiquement.
+Un fichier de décisions LOCAL facultatif peut simuler les deux politiques :
+
+```json
+{
+  "publicationConflicts": "preserve-both",
+  "readHistory": "preserve-target-archive-source"
+}
+```
+
+Le paramètre DecisionsPath accepte ce fichier pour un audit uniquement. Sans fichier,
+aucune décision n'est supposée. Toute future fonction d'import devra recevoir une
+approbation du lot et l'empreinte exacte des décisions ; un changement de politique
+invalide l'autorisation. Aucun mapping utilisateur inconnu n'est accepté dans ce fichier.
+
+Le rapport terminal présente les volumes, catégories/nombre de conflits, décisions
+nécessaires et état de la tentative précédente. `rapport.txt` et `audit.json` contiennent
+les informations techniques sans noms ni contenus métier. Les noms et le comparatif
+détaillé des publications sont envoyés chiffrés (RSA-OAEP + AES-CBC authentifié par
+HMAC-SHA256), puis déchiffrés uniquement par la clé privée éphémère du PC dans
+`audit-prive.json`. La clé privée n'est jamais envoyée ni enregistrée. Le dossier Windows
+est limité par ACL à l'utilisateur courant. Ces fichiers privés ne doivent pas être
+publiés dans GitHub. Les journaux Scalingo ne reçoivent pas ces identités en clair.
+
+## Vérifications et limites
+
+Les tests se font sur deux PostgreSQL isolés avec TLS et données synthétiques :
+relations, rollback incluant séquences/DDL, idempotence, publication conservée/forkée,
+archivage fidèle des lectures, refus des décisions implicites, diagnostic de commit.
+Le protocole stdin est testé avec un pseudo-terminal et vérification réelle du bit
+ECHO avant transfert. Les primitives PowerShell/.NET déchiffrent un rapport Node et
+refusent un HMAC altéré ; le parseur PowerShell contrôle aussi le lanceur.
+
+Le poste Windows réel, les dernières identités Render/Scalingo, les six comparatifs
+réels et le nombre actuel de conflits restent à lire par la commande sécurisée sur
+le PC autorisé. Les accès SQL du PC ne sont pas automatiquement ceux de Codex.
+Aucune migration réelle, modification Render/main, notification ou mise à jour
+applicative n'est exécutée par cette préparation.

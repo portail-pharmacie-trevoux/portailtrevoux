@@ -1,5 +1,6 @@
 // SQL only. No server, initialize, application handlers, jobs or external mail clients.
 import {tables,pk,ledgerKey,hash,canonical,key,fail,makePlan} from './model.mjs';
+import {previousAttempt,identityDiagnostics,publicationDiagnostics,issueSummary} from './diagnostics.mjs';
 export const quote=s=>'"'+s.replaceAll('"','""')+'"';
 const optional={team_messages:['title','reminder_kind','automation_text']};
 export const automationDDL=`CREATE TABLE IF NOT EXISTS public.message_automations(id TEXT PRIMARY KEY,kind TEXT NOT NULL,name TEXT NOT NULL,enabled BOOLEAN NOT NULL DEFAULT TRUE,config JSONB NOT NULL,revision INTEGER NOT NULL DEFAULT 1,activation_at TIMESTAMPTZ NOT NULL DEFAULT now(),created_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,updated_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),deleted_at TIMESTAMPTZ);
@@ -36,8 +37,16 @@ export async function readSnapshot(c,{source=false}={}){
 export async function sourceSnapshot(pool){const c=await pool.connect();try{await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await c.query("SET LOCAL statement_timeout='30s'");await guard(c,'portailtrevoux_db',true);const result=await readSnapshot(c,{source:true});await c.query('ROLLBACK');return result;}catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c.release();}}
 export async function targetSnapshot(pool){const c=await pool.connect();try{await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await guard(c,'portailplus_7495',true);return await readSnapshot(c);}finally{await c.query('ROLLBACK').catch(()=>{});c.release();}}
 export function reviewSchema(source,target){const issues=[];for(const a of source.schema){const b=target.schema.find(b=>b.table_name===a.table_name&&b.column_name===a.column_name);if(b&&(a.udt_name!==b.udt_name||a.is_nullable!==b.is_nullable))issues.push({code:'SCHEMA_TYPE_OR_NULLABILITY_DIFFERS',table:a.table_name,column:a.column_name});}return issues;}
-export const summarize=p=>({ready:p.ready,sourceDigest:p.sourceDigest,targetDigest:p.targetDigest,tables:p.count,issues:p.issues,warnings:p.warnings,usersMapped:Object.keys(p.maps.users).length,outboundNotifications:0,accountsUpdated:0});
-export async function auditGrouped(source,pool){const target=await targetSnapshot(pool),plan=makePlan(source,target);plan.issues.push(...reviewSchema(source,target));plan.ready=plan.issues.length===0;return {...summarize(plan),ddl:target.ddl};}
+export const summarize=p=>({ready:p.ready,sourceDigest:p.sourceDigest,targetDigest:p.targetDigest,tables:p.count,decisionsDigest:p.decisionsDigest,issues:p.issues,issueSummary:issueSummary(p.issues),warnings:p.warnings,publicationConflicts:p.publicationConflicts,usersMapped:Object.keys(p.maps.users).length,outboundNotifications:0,accountsUpdated:0});
+export async function auditGrouped(source,pool,{decisions={},includePrivate=false}={}){
+ const target=await targetSnapshot(pool),plan=makePlan(source,target,decisions);plan.issues.push(...reviewSchema(source,target));plan.ready=plan.issues.length===0;
+ const identities=identityDiagnostics(source,target,plan);
+ const publicationReview=publicationDiagnostics(source,target,plan);
+ const report={...summarize(plan),previousAttempt:previousAttempt(target),ddl:target.ddl,publicationReview:publicationReview.map(({source,target,...rest})=>rest),identityReferences:identities.map(({sourceIdentity,...rest})=>rest)};
+ report.issueSummary.unresolvedUserIds=identities.filter(r=>r.state!=='MATCHED').map(r=>r.sourceId).sort((a,b)=>a-b);
+ if(includePrivate)report.privateDetails={identities,publications:publicationReview,decisionsRequired:plan.issues.filter(i=>['PUBLICATION_FORK_DECISION_REQUIRED','READ_WATERMARK_CANNOT_REPRESENT_BOTH_HISTORIES','READ_WATERMARK_WOULD_MARK_LOCAL_UNREAD_AS_READ','UNMAPPED_REFERENCE'].includes(i.code)),proposedReadPolicy:{value:'preserve-target-archive-source',requiresExplicitApproval:true,liveSourceReadStateMayAppearUnread:true,originalHistoriesPreserved:true,alternative:'Per-publication read-state model and application adaptation require a separate approved change.'}};
+ return report;
+}
 async function materialize(c,op,schema){
  const columns=schema.filter(x=>x.table_name===op.table),names=columns.map(x=>x.column_name),assign=col=>['json','jsonb'].includes(col.udt_name)?'CASE WHEN $2::text[] @> ARRAY[\''+col.column_name+'\'] THEN NULL::'+col.udt_name+' ELSE COALESCE(r.'+quote(col.column_name)+",'null'::"+col.udt_name+') END':'r.'+quote(col.column_name);
  const values=columns.some(col=>['json','jsonb'].includes(col.udt_name))?[JSON.stringify(op.row),op.row.__sqlNulls||[]]:[JSON.stringify(op.row)],record='json_populate_record(NULL::public.'+quote(op.table)+',$1::json) r';
@@ -49,8 +58,9 @@ async function materialize(c,op,schema){
  }
 }
 const order=['schedule_posts','schedule_templates','leave_requests','schedule_weeks','leave_schedule_changes','message_automations','team_messages','team_message_recipients','message_automation_runs','message_automation_changes','publications','publication_reads'];
-export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{}}){
+export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{},decisions={}}){
  if(approval?.approved!==true||!approval.reference||!approval.backupReference||approval.sourceDigest!==source.digest||!approval.targetDigest)throw fail('EXPLICIT_BATCH_AUTHORIZATION_REQUIRED');
+ if(Object.keys(decisions).length&&approval.decisionsDigest!==hash(decisions))throw fail('EXPLICIT_DECISION_AUTHORIZATION_REQUIRED');
  const c=await pool.connect();try{
   await c.query('BEGIN');await guard(c,'portailplus_7495');await c.query("SET LOCAL lock_timeout='3s'");await c.query("SET LOCAL statement_timeout='30s'");await c.query("SET LOCAL idle_in_transaction_session_timeout='30s'");
   await c.query("SELECT pg_advisory_xact_lock(hashtext('portailplus-grouped-render-migration'))");
@@ -59,7 +69,8 @@ export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{
   // Lock only the referent lookup if it exists; no quality data is written.
   if((await c.query("SELECT to_regclass('public.quality_services') AS name")).rows[0].name)await c.query('LOCK TABLE public.quality_services IN SHARE MODE');
   const before=await readSnapshot(c);if(before.digest!==approval.targetDigest)throw fail('DESTINATION_CHANGED_SINCE_AUDIT');
-  const plan=makePlan(source,before);plan.issues.push(...reviewSchema(source,before));if(plan.issues.length)throw fail('GROUPED_CONFLICTS',{issues:plan.issues});
+  if(approval.decisionsDigest!==undefined&&approval.decisionsDigest!==hash(decisions))throw fail('DECISIONS_CHANGED');
+  const plan=makePlan(source,before,decisions);plan.issues.push(...reviewSchema(source,before));if(plan.issues.length)throw fail('GROUPED_CONFLICTS',{issues:plan.issues});
   if(before.ddl.some(t=>!t.includes('.')))await c.query(automationDDL);
   for(const item of before.ddl.filter(t=>t.includes('.'))){const [table,col]=item.split('.');await c.query('ALTER TABLE public.'+quote(table)+' ADD COLUMN '+quote(col)+' TEXT');}
   const schema=(await c.query("SELECT table_name,column_name,udt_name FROM information_schema.columns WHERE table_schema='public' AND table_name=ANY($1::text[]) ORDER BY table_name,ordinal_position",[Object.keys(tables)])).rows;
