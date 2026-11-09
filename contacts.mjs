@@ -10,6 +10,7 @@ export function registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail
   res.set('Cache-Control','no-store').type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment('PortailPlus-contacts-utiles.xlsx').send(exportContacts(rows));
  });
  app.post('/api/contacts',...guard,async(req,res)=>{const row=await insert(db,validate(req.body));await publish('Contacts utiles','Un contact a été ajouté : '+row.name);res.status(201).json(row);});
+ app.post('/api/contacts/parse-xlsx',...guard,async(req,res)=>{const {parseContactsWorkbook}=await import('./contacts-xlsx.mjs');const b=req.body?.fileData;if(typeof b!=='string'||b.length>1400000||!/^[A-Za-z0-9+/]+={0,2}$/.test(b))throw fail(400,'Fichier Excel invalide ou trop volumineux.');try{res.set('Cache-Control','no-store').json({rows:parseContactsWorkbook(Buffer.from(b,'base64'))});}catch(e){throw fail(400,'Lecture Excel impossible : '+e.message);}});
  app.post('/api/contacts/import',...guard,async(req,res)=>{
   if(!Array.isArray(req.body.contacts)||!req.body.contacts.length||req.body.contacts.length>100)throw fail(400,'Liste de contacts invalide.');
   const list=req.body.contacts.map((c,i)=>({...validate(c),key:typeof c.sourceKey==='string'&&/^[\w-]{1,100}$/.test(c.sourceKey)?c.sourceKey:null}));if(list.some(c=>!c.key))throw fail(400,'Identifiant d’import manquant.');
