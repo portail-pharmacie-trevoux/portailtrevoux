@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Revision='chore/scalingo-hds-preparation-2026-10',[string]$DecisionsPath='',[switch]$ValidatedMergeDecisions)
+param([string]$Revision='chore/scalingo-hds-preparation-2026-10',[string]$DecisionsPath='',[switch]$ValidatedMergeDecisions,[switch]$ValidatedPlanningArchiveDecisions)
 $ErrorActionPreference = 'Stop'
 Get-Command scalingo -ErrorAction Stop | Out-Null
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -65,6 +65,7 @@ $rsa.PersistKeyInCsp = $false
 $public = $rsa.ExportParameters($false)
 $decisions = @{}
 if ($ValidatedMergeDecisions) { $decisions=@{publicationConflicts='preserve-both';readHistory='preserve-target-archive-source'};Write-Host 'Decisions appliquees : publications conservees des deux cotes ; lectures Scalingo conservees, historique Render archive.' }
+if ($ValidatedPlanningArchiveDecisions) { if (-not $ValidatedMergeDecisions) { throw 'La validation des archives de planning exige -ValidatedMergeDecisions.' }; $decisions.planningConflicts='preserve-target-archive-source'; $decisions.orphanTemplates='archive-source-unmapped'; Write-Host 'Decisions planning : semaine Scalingo conservee ; semaine Render et modeles orphelins archives dans le registre de migration (pas actifs).' }
 if ($ValidatedMergeDecisions -and $DecisionsPath) { throw 'Choisir les decisions validees OU un fichier de decisions.' }
 if ($DecisionsPath) { $decisions=Get-Content -LiteralPath $DecisionsPath -Raw | ConvertFrom-Json }
 $runtime = @{mode='audit';decisions=$decisions;reportPublicKey=@{kty='RSA';n=(To-Base64Url $public.Modulus);e=(To-Base64Url $public.Exponent)}} | ConvertTo-Json -Depth 10
