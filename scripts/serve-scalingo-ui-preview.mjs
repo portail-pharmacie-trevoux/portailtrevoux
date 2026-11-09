@@ -83,7 +83,8 @@ try{
  registerScalingoTemperaturePreview(gate,{db,origin,isAllowedOrigin:isScalingoOrigin});
  const smallJson=express.json({limit:'64kb'});
  const contactsExcelJson=express.json({limit:'2mb'});
- gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req)||isScalingoLaboratoryUpload(req)||isScalingoMusicImport(req))?next():(req.path==='/api/contacts/parse-xlsx'&&req.method==='POST'?contactsExcelJson(req,res,next):smallJson(req,res,next)));
+ const isContactDocumentUpload=req=>req.method==='POST'&&/^\/api\/contacts\/[1-9]\d*\/documents$/.test(req.path);
+ gate.use((req,res,next)=>(isTemperatureImport(req)||isScalingoProcedureImport(req)||isScalingoHRImport(req)||isScalingoTrainingImport(req)||isScalingoEmployeeScan(req)||isScalingoPromotionDocumentImport(req)||isScalingoLaboratoryUpload(req)||isScalingoMusicImport(req)||isContactDocumentUpload(req))?next():(req.path==='/api/contacts/parse-xlsx'&&req.method==='POST'?contactsExcelJson(req,res,next):smallJson(req,res,next)));
  // One-time cleanup control: restricted to the exact staging admin and origin.
  // The purge subprocess independently checks the database, account roster and TLS.
  const cleanupAuth=scalingoTestAdminAuth(db);
@@ -157,6 +158,8 @@ try{
    }
    // Profile and permission-only PUTs are handled above; account operations stay blocked.
    if(req.method==='GET'&&['/api/music','/api/contacts','/api/training/documents'].includes(req.path))return next();
+   // Admin-only contact document uploads retain the 15 MB app parser and 10 MB file validation.
+   if(isContactDocumentUpload(req))return next();
    // Contacts utiles: app middleware enforces admin, session, CSRF and validation.
    if((req.method==='POST'&&['/api/contacts','/api/contacts/import','/api/contacts/parse-xlsx'].includes(req.path))||(req.method==='PUT'&&/^\/api\/contacts\/\d+$/.test(req.path))||(req.method==='DELETE'&&/^\/api\/contacts\/\d+$/.test(req.path))||(req.method==='POST'&&/^\/api\/contacts\/\d+\/restore$/.test(req.path)))return next();
    if(req.method==='GET'&&/^\/api\/(?:hr\/documents|training\/documents)\/\d+\/(?:file|print)$/.test(req.path))return next();
