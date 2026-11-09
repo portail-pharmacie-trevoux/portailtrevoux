@@ -41,14 +41,15 @@ export function userMapping(source,target){
 }
 export function makePlan(source,target,decisions={}){
  const issues=[],warnings=[],u=userMapping(source.users,target.users),maps={users:Object.fromEntries(u.map)},previous=target.ledger||{version:1,rows:{},maps:{}};
- if(!decisions||typeof decisions!=='object'||Array.isArray(decisions)||Object.keys(decisions).some(k=>!['publicationConflicts','readHistory'].includes(k)))throw fail('INVALID_HUMAN_DECISIONS');
+ if(!decisions||typeof decisions!=='object'||Array.isArray(decisions)||Object.keys(decisions).some(k=>!['publicationConflicts','readHistory','planningConflicts','orphanTemplates'].includes(k)))throw fail('INVALID_HUMAN_DECISIONS');
  if(decisions.publicationConflicts!==undefined&&decisions.publicationConflicts!=='preserve-both'||decisions.readHistory!==undefined&&decisions.readHistory!=='preserve-target-archive-source')throw fail('INVALID_HUMAN_DECISIONS');
+ if(decisions.planningConflicts!==undefined&&decisions.planningConflicts!=='preserve-target-archive-source'||decisions.orphanTemplates!==undefined&&decisions.orphanTemplates!=='archive-source-unmapped')throw fail('INVALID_HUMAN_DECISIONS');
  if(previous.version!==1)throw fail('UNSUPPORTED_LEDGER');
  for(const [sourceId]of fixed.filter(([sourceId])=>sourceId!==1))if(!u.map.has(sourceId))issues.push({code:'VALIDATED_STAFF_MAPPING_NOT_CONFIRMED',sourceId});
  for(const [sourceId,targetId]of u.map){const a=source.users.find(u=>u.id===sourceId),b=target.users.find(u=>u.id===targetId),fields=['job','schedule_position','active'].filter(k=>canonical(a[k])!==canonical(b[k]));if(fields.length)warnings.push({code:'PROFILE_DIFFERENCE_PRESERVED',sourceId,targetId,fields});}
  const use=(type,v)=>{if(v===null)return null;const result=maps[type]?.[v];if(result===undefined)throw fail('UNMAPPED_REFERENCE',{type,sourceId:v});return result;};
  const note=(e,table,row)=>issues.push({code:e.code||'INVALID_SOURCE_RECORD',table,sourceKey:key(table,row),...e.details});
- const publicationSources={...(previous.publicationSources||{})},publicationResolution={},publicationConflicts=[],records={},operations=[],nextLedger={version:1,rows:{},maps:{},sourceDigest:source.digest,publicationSources};
+ const publicationSources={...(previous.publicationSources||{})},publicationResolution={},publicationConflicts=[],records={},operations=[],nextLedger={version:1,rows:{},maps:{},sourceDigest:source.digest,publicationSources,planningArchives:{...(previous.planningArchives||{})}};
  const rows=t=>target.tables[t]||[];
  // Allocate all numeric keys before transforming any JSON or parent references.
  for(const table of Object.keys(tables).filter(t=>pk[t].length===1&&pk[t][0]==='id'&&t!=='message_automations')){
@@ -103,12 +104,21 @@ export function makePlan(source,target,decisions={}){
     if(rows(table).some(x=>fields.every(k=>canonical(x[k])===canonical(r[k]))))throw fail('POSSIBLE_UNTRACKED_DUPLICATE');
    }
    if(tracked){owned=tracked.owned;if(!old)throw fail('IMPORTED_ROW_REMOVED');if(tracked.targetKey!==tk)throw fail('MAPPING_CHANGED');if(sourceHash===tracked.sourceHash){action='keep';if(currentHash!==tracked.targetHash)warnings.push({code:'LOCAL_CHANGE_PRESERVED',table,sourceKey:sk});}else if(currentHash===targetHash)action='keep';else if(owned&&currentHash===tracked.targetHash)action='update';else throw fail('SOURCE_TARGET_DIVERGED');}
-   else if(old){if(currentHash!==targetHash)throw fail('EXISTING_TARGET_CONFLICT');action='keep';}
+   else if(old){if(currentHash!==targetHash){
+    if(table==='schedule_weeks'&&decisions.planningConflicts==='preserve-target-archive-source'){
+     nextLedger.planningArchives['schedule_weeks:'+sk]={table,sourceKey:sk,source:structuredClone(raw),sourceHash,activeTargetHash:currentHash,policy:'preserve-target-archive-source'};
+     records[table].pop();warnings.push({code:'SOURCE_WEEK_ARCHIVED_TARGET_PRESERVED',table,sourceKey:sk});continue;
+    }
+    throw fail('EXISTING_TARGET_CONFLICT');
+   }action='keep';}
    // Do not rewrite the provenance baseline when preserving an independent local edit.
    const keepBaseline=tracked&&action==='keep'&&sourceHash===tracked.sourceHash;
    nextLedger.rows[table][sk]=keepBaseline?tracked:{sourceHash,targetHash,targetKey:tk,owned};
    operations.push({table,action,row:r,sourceKey:sk,targetKey:tk});
-  }catch(e){note(e,table,raw);}}
+  }catch(e){if(table==='schedule_templates'&&e.code==='UNMAPPED_REFERENCE'&&e.details?.type==='users'&&decisions.orphanTemplates==='archive-source-unmapped'){
+    nextLedger.planningArchives['schedule_templates:'+key(table,raw)]={table,sourceKey:key(table,raw),source:structuredClone(raw),sourceHash:hash(raw),unmappedSourceUserId:e.details.sourceId,policy:'archive-source-unmapped'};
+    warnings.push({code:'ORPHAN_TEMPLATE_ARCHIVED_NOT_ACTIVATED',table,sourceKey:key(table,raw),sourceId:e.details.sourceId});continue;
+   }note(e,table,raw);}}
  }
  // Legacy single-watermark mode remains default. Conservative archival requires explicit decision.
  nextLedger.readArchives={...(previous.readArchives||{})};
