@@ -160,6 +160,10 @@ try{
    if(req.method==='GET'&&['/api/music','/api/contacts','/api/training/documents'].includes(req.path))return next();
    // Admin-only contact document uploads retain the 15 MB app parser and 10 MB file validation.
    if(isContactDocumentUpload(req))return next();
+   // Contact document listing and file downloads use the existing universe-view guard.
+   if(req.method==='GET'&&/^\/api\/contacts\/[1-9]\d*\/documents(?:\/[1-9]\d*\/file)?$/.test(req.path))return next();
+   // Contact document removal remains protected by the app's admin and CSRF guards.
+   if(req.method==='DELETE'&&/^\/api\/contacts\/[1-9]\d*\/documents\/[1-9]\d*$/.test(req.path))return next();
    // Contacts utiles: app middleware enforces admin, session, CSRF and validation.
    if((req.method==='POST'&&['/api/contacts','/api/contacts/import','/api/contacts/parse-xlsx'].includes(req.path))||(req.method==='PUT'&&/^\/api\/contacts\/\d+$/.test(req.path))||(req.method==='DELETE'&&/^\/api\/contacts\/\d+$/.test(req.path))||(req.method==='POST'&&/^\/api\/contacts\/\d+\/restore$/.test(req.path)))return next();
    if(req.method==='GET'&&/^\/api\/(?:hr\/documents|training\/documents)\/\d+\/(?:file|print)$/.test(req.path))return next();
