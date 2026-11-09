@@ -42,7 +42,8 @@ export async function auditGrouped(source,pool,{decisions={},includePrivate=fals
  const target=await targetSnapshot(pool),plan=makePlan(source,target,decisions);plan.issues.push(...reviewSchema(source,target));plan.ready=plan.issues.length===0;
  const identities=identityDiagnostics(source,target,plan);
  const publicationReview=publicationDiagnostics(source,target,plan);
- const report={...summarize(plan),previousAttempt:previousAttempt(target),ddl:target.ddl,publicationReview:publicationReview.map(({source,target,...rest})=>rest),identityReferences:identities.map(({sourceIdentity,...rest})=>rest)};
+ const baseline=makePlan(source,target);baseline.issues.push(...reviewSchema(source,target));
+ const report={...summarize(plan),decisionReview:{applied:decisions,withoutDecisions:issueSummary(baseline.issues),withDecisions:issueSummary(plan.issues)},previousAttempt:previousAttempt(target),ddl:target.ddl,publicationReview:publicationReview.map(({source,target,...rest})=>rest),identityReferences:identities.map(({sourceIdentity,accountCorrectionProposal,...rest})=>rest)};
  report.issueSummary.unresolvedUserIds=identities.filter(r=>r.state!=='MATCHED').map(r=>r.sourceId).sort((a,b)=>a-b);
  if(includePrivate)report.privateDetails={identities,publications:publicationReview,decisionsRequired:plan.issues.filter(i=>['PUBLICATION_FORK_DECISION_REQUIRED','READ_WATERMARK_CANNOT_REPRESENT_BOTH_HISTORIES','READ_WATERMARK_WOULD_MARK_LOCAL_UNREAD_AS_READ','UNMAPPED_REFERENCE'].includes(i.code)),proposedReadPolicy:{value:'preserve-target-archive-source',requiresExplicitApproval:true,liveSourceReadStateMayAppearUnread:true,originalHistoriesPreserved:true,alternative:'Per-publication read-state model and application adaptation require a separate approved change.'}};
  return report;

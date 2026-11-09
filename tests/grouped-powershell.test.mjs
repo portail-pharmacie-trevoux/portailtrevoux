@@ -10,6 +10,14 @@ $ast=[System.Management.Automation.Language.Parser]::ParseFile($args[0],[ref]$to
 if($errors.Count){throw 'PARSE_FAILED'}
 $functions=$ast.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]},$true)
 foreach($f in $functions){. ([scriptblock]::Create($f.Extent.Text))}
+$audit=@{dataWrites=0;executionLocked=$true;issueSummary=@{total=4};previousAttempt=@{state='NO_COMMIT_RECEIPT'}}
+$terminal=@{dataWrites=0;executionLocked=$true;conflicts=4}
+$previous=@{state='NO_COMMIT_RECEIPT'}
+foreach($code in @(0,1,2)) { if(@(Get-AuditCompletionErrors $true $audit @{identities=@()} $terminal $previous $code $false).Count) { throw 'COMPLETE_AUDIT_REJECTED' } }
+if(-not @(Get-AuditCompletionErrors $true $audit $null $terminal $previous 1 $false).Count) { throw 'MISSING_PRIVATE_ACCEPTED' }
+if(-not @(Get-AuditCompletionErrors $true $audit @{} $terminal $previous 1 $true).Count) { throw 'BLOCKED_AUDIT_ACCEPTED' }
+$terminal.conflicts=5
+if(-not @(Get-AuditCompletionErrors $true $audit @{identities=@()} $terminal $previous 0 $false).Count) { throw 'INCOHERENT_AUDIT_ACCEPTED' }
 $rsa=New-Object Security.Cryptography.RSACryptoServiceProvider(2048)
 $rsa.PersistKeyInCsp=$false
 try {

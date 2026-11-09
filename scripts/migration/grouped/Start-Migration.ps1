@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Revision='chore/scalingo-hds-preparation-2026-10',[string]$DecisionsPath='')
+param([string]$Revision='chore/scalingo-hds-preparation-2026-10',[string]$DecisionsPath='',[switch]$ValidatedMergeDecisions)
 $ErrorActionPreference = 'Stop'
 Get-Command scalingo -ErrorAction Stop | Out-Null
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -20,6 +20,23 @@ foreach ($name in $names) {
     $path = Join-Path $work $name
     Invoke-WebRequest -UseBasicParsing -Uri ($base+$name) -OutFile $path
     if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $checks.$name) { throw ('Integrite incorrecte : '+$name) }
+}
+function Get-AuditCompletionErrors($Sent,$Audit,$PrivateReport,$Terminal,$Previous,$ExitCode,$Blocked) {
+    $missing = @()
+    if (-not $Sent) { $missing += 'canal secret non confirme' }
+    if (-not $Audit) { $missing += 'evenement audit absent' }
+    if (-not $PrivateReport) { $missing += 'rapport prive absent' }
+    if (-not $Terminal) { $missing += 'evenement audit_only absent' }
+    if (-not $Previous) { $missing += 'controle de transaction precedente absent' }
+    if ($Blocked) { $missing += 'evenement blocked recu' }
+    if ($Audit -and $Terminal) {
+        if ($Audit.dataWrites -ne 0 -or $Terminal.dataWrites -ne 0 -or $Audit.executionLocked -ne $true -or $Terminal.executionLocked -ne $true -or $Terminal.conflicts -ne $Audit.issueSummary.total) { $missing += 'evenements finaux incoherents' }
+    }
+    if ($Audit -and $Previous -and $Audit.previousAttempt.state -ne $Previous.state) { $missing += 'statut transaction precedente incoherent' }
+    # Scalingo CLI may translate the remote audit-conflicts exit code 2 to 1.
+    # Complete, coherent protocol events remain mandatory; never trust exit code alone.
+    if ($ExitCode -notin @(0,1,2)) { $missing += ('code CLI inattendu : '+$ExitCode) }
+    return $missing
 }
 function To-Base64Url([byte[]]$Bytes) { return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+','-').Replace('/','_') }
 function Open-PrivateReport($Envelope,$Rsa) {
@@ -47,6 +64,8 @@ $rsa = New-Object Security.Cryptography.RSACryptoServiceProvider(2048)
 $rsa.PersistKeyInCsp = $false
 $public = $rsa.ExportParameters($false)
 $decisions = @{}
+if ($ValidatedMergeDecisions) { $decisions=@{publicationConflicts='preserve-both';readHistory='preserve-target-archive-source'};Write-Host 'Decisions appliquees : publications conservees des deux cotes ; lectures Scalingo conservees, historique Render archive.' }
+if ($ValidatedMergeDecisions -and $DecisionsPath) { throw 'Choisir les decisions validees OU un fichier de decisions.' }
 if ($DecisionsPath) { $decisions=Get-Content -LiteralPath $DecisionsPath -Raw | ConvertFrom-Json }
 $runtime = @{mode='audit';decisions=$decisions;reportPublicKey=@{kty='RSA';n=(To-Base64Url $public.Modulus);e=(To-Base64Url $public.Exponent)}} | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText((Join-Path $work 'runtime.json'),$runtime,$utf8)
@@ -67,7 +86,7 @@ $process.StartInfo.RedirectStandardError=$true
 $process.StartInfo.StandardOutputEncoding=$utf8
 $process.StartInfo.StandardErrorEncoding=$utf8
 $log = New-Object IO.StreamWriter((Join-Path $work 'rapport.txt'),$false,$utf8)
-$sent=$false; $audit=$null; $private=$null; $started=$false; $completed=$false
+$terminal=$null; $previous=$null; $blocked=$false; $sent=$false; $audit=$null; $private=$null; $started=$false; $completed=$false
 try {
     $started=$process.Start(); if (-not $started) { throw 'Demarrage CLI impossible.' }
     $errorsTask=$process.StandardError.ReadToEndAsync()
@@ -99,21 +118,26 @@ try {
                 $private=$text | ConvertFrom-Json; $text=$null
             } else {
                 $log.WriteLine($clean);$log.Flush()
-                if ($event.event -eq 'audit_only') { $completed=$true }
+                if ($event.event -eq 'audit_only') { $completed=$true; $terminal=$event }
                 if ($event.event -eq 'audit') { $audit=$event; $event | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath (Join-Path $work 'audit.json') -Encoding UTF8 }
-                if ($event.event -eq 'previous_attempt') { Write-Host ('Tentative precedente : '+$event.state) }
-                if ($event.event -eq 'blocked') { Write-Host ('AUDIT BLOQUE : '+$event.code+' / '+$event.phase) }
+                if ($event.event -eq 'previous_attempt') { $previous=$event; Write-Host ('Tentative precedente : '+$event.state) }
+                if ($event.event -eq 'blocked') { $blocked=$true; Write-Host ('AUDIT BLOQUE : '+$event.code+' / '+$event.phase) }
             }
         }
         # Unrecognized CLI text and stderr are not logged, to avoid accidental secret echo.
         $lineTask=$process.StandardOutput.ReadLineAsync()
     }
     $process.WaitForExit();$errorsTask.Wait()
-    if (-not $sent -or -not $audit -or -not $private -or -not $completed -or $process.ExitCode -notin @(0,2)) { throw 'Audit incomplet : aucun resultat fiable, aucune ecriture.' }
+    $completionErrors = @(Get-AuditCompletionErrors $sent $audit $private $terminal $previous $process.ExitCode $blocked)
+    if ($completionErrors.Count) { throw ('Audit incomplet : '+($completionErrors -join ' ; ')+'. Aucune ecriture.') }
+    Write-Host ('AUDIT COMPLET / code CLI : '+$process.ExitCode+' / execution toujours verrouillee')
+    Write-Host ('Conflits avant decisions : '+$audit.decisionReview.withoutDecisions.total+' / apres decisions : '+$audit.decisionReview.withDecisions.total)
+    Write-Host ('Transaction precedente : '+$previous.state+' / aucune autorisation d execution')
     Write-Host ('CONFLITS RESIDUELS : '+$audit.issueSummary.total)
     $audit.tables.PSObject.Properties | ForEach-Object { [PSCustomObject]@{Table=$_.Name;Render=$_.Value.source;Scalingo=$_.Value.existing;Creer=$_.Value.insert;MettreAJour=$_.Value.update;Conserver=$_.Value.keep} } | Format-Table -AutoSize
     $audit.issueSummary.categories.PSObject.Properties | ForEach-Object { Write-Host ($_.Name+' : '+$_.Value) }
     foreach ($person in $private.identities) { $name=if($person.sourceIdentity){$person.sourceIdentity.firstName+' '+$person.sourceIdentity.lastName}else{'[identite source absente]'};Write-Host ('Render #'+$person.sourceId+' : '+$name+' / '+$person.state);if($person.accountCorrespondence){Write-Host ('Correspondance Render #'+$person.sourceId+' -> Scalingo #'+$person.accountCorrespondence.targetId+' : '+$person.accountCorrespondence.status+' / actif : '+$person.accountCorrespondence.targetActive)} }
+    foreach ($person in $private.identities) { if ($person.accountCorrectionProposal) { $proposal=$person.accountCorrectionProposal;foreach ($change in $proposal.changes) { Write-Host ('PROPOSITION UNIQUEMENT Render #'+$person.sourceId+' -> Scalingo #'+$proposal.targetId+' / '+$change.field+' : ['+$change.before+'] -> ['+$change.proposed+']') };Write-Host ('Conflit e-mail : '+$proposal.emailConflict+' / validation humaine requise, aucun compte modifie') } }
     foreach ($publication in $audit.publicationReview) { Write-Host ('Publication Render #'+$publication.sourceId+' -> Scalingo #'+$publication.targetId+' : '+($publication.differences -join ',')+' / '+$publication.resolution) }
     Write-Host 'Audit termine sans ecriture. Les details d identite et de publication restent dans audit-prive.json sur ce PC.'
 } finally {

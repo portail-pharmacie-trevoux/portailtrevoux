@@ -26,6 +26,8 @@ const fixed=[[3,7],[2,8],[16,9],[17,10],[4,11],[12,12],[13,13],[10,14],[6,15],[8
 export function userMapping(source,target){
  const map=new Map(),issues=[],claimed=new Set();
  for(const u of source){
+  // Historical orphan 14 requires explicit identity evidence, never a name-only inference.
+  if(u.id===14){issues.push({code:'HISTORICAL_IDENTITY_REQUIRES_APPROVAL',sourceId:14});continue;}
   const approved=fixed.find(p=>p[0]===u.id);let matches;
   if(approved){const t=target.find(t=>t.id===approved[1]);matches=t&&u.first_name&&u.last_name&&identity(u)===identity(t)&&source.filter(x=>identity(x)===identity(u)).length===1&&target.filter(x=>identity(x)===identity(u)).length===1?[t]:[];}
   else{
@@ -33,7 +35,7 @@ export function userMapping(source,target){
    const signals=[u.email?target.filter(t=>t.id!==1&&t.email===u.email):[],u.directory_key?target.filter(t=>t.id!==1&&t.directory_key===u.directory_key):[]].filter(a=>a.length);
    matches=exact.length===1&&signals.every(a=>a.length===1&&a[0].id===exact[0].id)?exact:[];
   }
-  if(matches.length===1&&matches[0].role===u.role&&!claimed.has(matches[0].id)){map.set(u.id,matches[0].id);claimed.add(matches[0].id);}else issues.push({code:'UNMATCHED_OR_AMBIGUOUS_USER',sourceId:u.id});
+  if(matches.length===1&&matches[0].role===u.role&&(u.id!==15||(u.email&&String(u.email).trim().toLowerCase()===String(matches[0].email||'').trim().toLowerCase()))&&!claimed.has(matches[0].id)){map.set(u.id,matches[0].id);claimed.add(matches[0].id);}else issues.push({code:'UNMATCHED_OR_AMBIGUOUS_USER',sourceId:u.id});
  }
  return {map,issues};
 }

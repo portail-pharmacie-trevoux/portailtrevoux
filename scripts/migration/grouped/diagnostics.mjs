@@ -9,6 +9,13 @@ export function previousAttempt(target){
  }
  return {state:missing.length||changed.length?'COMMIT_RECORDED_WITH_LATER_DIFFERENCES':'COMMIT_RECORDED_ROWS_VERIFIED',commitRecorded:true,executionAllowed:false,verified,missing,changed,ledgerDigest:hash(ledger)};
 }
+export function accountCorrectionProposal(sourceUsers,targetUsers,sourceId){
+ const check=verifyAccountCorrespondence(sourceUsers,targetUsers,sourceId);
+ if(!check.identityMatches)return {sourceId,status:check.status,changes:[],executionAllowed:false};
+ const source=sourceUsers.find(u=>u.id===sourceId),target=targetUsers.find(u=>u.id===check.targetId);
+ const emailConflict=!!source.email&&targetUsers.some(u=>u.id!==target.id&&String(u.email||'').trim().toLowerCase()===String(source.email).trim().toLowerCase());
+ return {sourceId,targetId:target.id,status:check.status,source:{email:source.email,role:source.role,active:source.active},target:{email:target.email,role:target.role,active:target.active},changes:['email','role'].filter(k=>source[k]!==target[k]).map(field=>({field,before:target[field],proposed:source[field]})),emailConflict,requiresIdentityAndEmailApproval:true,requiresAdministratorRoleApproval:!check.roleMatches,executionAllowed:false,preserve:['id','directory_key','password','sessions','MFA','permissions','relations']};
+}
 // Metadata-only identity check. No password, session or MFA fields are read or written.
 export function verifyAccountCorrespondence(sourceUsers,targetUsers,sourceId){
  const source=sourceUsers.find(u=>u.id===sourceId);if(!source)return {sourceId,status:'SOURCE_USER_ABSENT',targetId:null};
@@ -27,7 +34,7 @@ export function identityDiagnostics(source,target,plan){
   const user=source.users.find(u=>u.id===id);
   const candidates=user?target.users.filter(t=>(user.directory_key&&t.directory_key===user.directory_key)||(user.email&&t.email===user.email)||(user.first_name&&user.last_name&&t.first_name===user.first_name&&t.last_name===user.last_name)):[];
   const state=plan.maps.users[id]!==undefined?'MATCHED':user?'SOURCE_USER_EXISTS_TARGET_UNRESOLVED':'SOURCE_USER_ABSENT_ORPHAN_REFERENCES';
-  return {sourceId:id,state,accountCorrespondence:verifyAccountCorrespondence(source.users,target.users,id),sourcePresent:!!user,sourceActive:user?.active??null,sourceRole:user?.role??null,sourceIdentity:user?{firstName:user.first_name,lastName:user.last_name}:null,targetCandidates:candidates.map(t=>({id:t.id,role:t.role,active:t.active})),references,decision:state==='MATCHED'?null:user?'Activate/confirm the same real identity on Scalingo; do not create or reassign automatically.':'Find reliable historical identity evidence; never infer a person from the numeric ID.'};
+  return {sourceId:id,state,accountCorrespondence:verifyAccountCorrespondence(source.users,target.users,id),accountCorrectionProposal:accountCorrectionProposal(source.users,target.users,id),sourcePresent:!!user,sourceActive:user?.active??null,sourceRole:user?.role??null,sourceIdentity:user?{firstName:user.first_name,lastName:user.last_name}:null,targetCandidates:candidates.map(t=>({id:t.id,role:t.role,active:t.active})),references,decision:state==='MATCHED'?null:user?'Activate/confirm the same real identity on Scalingo; do not create or reassign automatically.':'Find reliable historical identity evidence; never infer a person from the numeric ID.'};
  });
 }
 export function publicationDiagnostics(source,target,plan){
