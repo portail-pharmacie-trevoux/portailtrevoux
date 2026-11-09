@@ -38,6 +38,38 @@ export async function sourceSnapshot(pool){const c=await pool.connect();try{awai
 export async function targetSnapshot(pool){const c=await pool.connect();try{await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await guard(c,'portailplus_7495',true);return await readSnapshot(c);}finally{await c.query('ROLLBACK').catch(()=>{});c.release();}}
 export function reviewSchema(source,target){const issues=[];for(const a of source.schema){const b=target.schema.find(b=>b.table_name===a.table_name&&b.column_name===a.column_name);if(b&&(a.udt_name!==b.udt_name||a.is_nullable!==b.is_nullable))issues.push({code:'SCHEMA_TYPE_OR_NULLABILITY_DIFFERS',table:a.table_name,column:a.column_name});}return issues;}
 export const summarize=p=>({ready:p.ready,sourceDigest:p.sourceDigest,targetDigest:p.targetDigest,tables:p.count,decisionsDigest:p.decisionsDigest,issues:p.issues,issueSummary:issueSummary(p.issues),warnings:p.warnings,publicationConflicts:p.publicationConflicts,usersMapped:Object.keys(p.maps.users).length,outboundNotifications:0,accountsUpdated:0});
+// Read-only structural diagnostics. Do not export planning contents or employee identities.
+function planningConflictDiagnostics(source,target,issues){
+ const weeks=issues.filter(i=>i.code==='EXISTING_TARGET_CONFLICT'&&i.table==='schedule_weeks').map(i=>{
+  const sourceWeek=source.tables.schedule_weeks.find(r=>key('schedule_weeks',r)===i.sourceKey);
+  const targetWeek=target.tables.schedule_weeks.find(r=>key('schedule_weeks',r)===i.sourceKey);
+  const fields=sourceWeek&&targetWeek?Object.keys(sourceWeek).filter(f=>hash(sourceWeek[f])!==hash(targetWeek[f])):[];
+  return {sourceKey:i.sourceKey,sourcePresent:!!sourceWeek,targetPresent:!!targetWeek,
+   differingFields:fields,sourceRevision:sourceWeek?.revision??null,targetRevision:targetWeek?.revision??null,
+   sourcePublishedRevision:sourceWeek?.published_revision??null,targetPublishedRevision:targetWeek?.published_revision??null,
+   sourcePublishedAt:sourceWeek?.published_at??null,targetPublishedAt:targetWeek?.published_at??null,
+   sourceFieldDigests:Object.fromEntries(fields.map(f=>[f,hash(sourceWeek[f])])),
+   targetFieldDigests:Object.fromEntries(fields.map(f=>[f,hash(targetWeek[f])])),
+   recommendation:'Manual comparison required; preserve existing Scalingo week. No automatic overwrite.'};
+ });
+ const orphanTemplates=issues.filter(i=>i.code==='UNMAPPED_REFERENCE'&&i.table==='schedule_templates').map(i=>{
+  const template=source.tables.schedule_templates.find(r=>key('schedule_templates',r)===i.sourceKey);
+  const paths=[];
+  function scan(v,path){
+   if(paths.length>=100||v===null||typeof v!=='object')return;
+   for(const [k,x]of Object.entries(v)){
+    const next=path.concat(k);
+    if(/^14:(?:\\d{4}-\\d{2}-\\d{2}|[0-6])$/.test(k)||(['userId','by'].includes(k)&&String(x)==='14'))paths.push(next.join('.'));
+    scan(x,next);
+   }
+  }
+  if(template)scan(template.content,['content']);
+  return {sourceKey:i.sourceKey,sourceId:i.sourceId,sourcePresent:!!template,
+   templateName:template?.name??null,referencePaths:paths,referencePathsTruncated:paths.length>=100,
+   recommendation:'Historical identity evidence required. Do not assign to another employee or discard original template.'};
+ });
+ return {weeks,orphanTemplates,readOnly:true,automaticMergeAuthorized:false};
+}
 export async function auditGrouped(source,pool,{decisions={},includePrivate=false}={}){
  const target=await targetSnapshot(pool),plan=makePlan(source,target,decisions);plan.issues.push(...reviewSchema(source,target));plan.ready=plan.issues.length===0;
  const identities=identityDiagnostics(source,target,plan);
@@ -45,7 +77,7 @@ export async function auditGrouped(source,pool,{decisions={},includePrivate=fals
  const baseline=makePlan(source,target);baseline.issues.push(...reviewSchema(source,target));
  const report={...summarize(plan),decisionReview:{applied:decisions,withoutDecisions:issueSummary(baseline.issues),withDecisions:issueSummary(plan.issues)},previousAttempt:previousAttempt(target),ddl:target.ddl,publicationReview:publicationReview.map(({source,target,...rest})=>rest),identityReferences:identities.map(({sourceIdentity,accountCorrectionProposal,...rest})=>rest)};
  report.issueSummary.unresolvedUserIds=identities.filter(r=>r.state!=='MATCHED').map(r=>r.sourceId).sort((a,b)=>a-b);
- if(includePrivate)report.privateDetails={identities,publications:publicationReview,decisionsRequired:plan.issues.filter(i=>['PUBLICATION_FORK_DECISION_REQUIRED','READ_WATERMARK_CANNOT_REPRESENT_BOTH_HISTORIES','READ_WATERMARK_WOULD_MARK_LOCAL_UNREAD_AS_READ','UNMAPPED_REFERENCE'].includes(i.code)),proposedReadPolicy:{value:'preserve-target-archive-source',requiresExplicitApproval:true,liveSourceReadStateMayAppearUnread:true,originalHistoriesPreserved:true,alternative:'Per-publication read-state model and application adaptation require a separate approved change.'}};
+ if(includePrivate)report.privateDetails={planningConflicts:planningConflictDiagnostics(source,target,plan.issues),identities,publications:publicationReview,decisionsRequired:plan.issues.filter(i=>['PUBLICATION_FORK_DECISION_REQUIRED','READ_WATERMARK_CANNOT_REPRESENT_BOTH_HISTORIES','READ_WATERMARK_WOULD_MARK_LOCAL_UNREAD_AS_READ','UNMAPPED_REFERENCE'].includes(i.code)),proposedReadPolicy:{value:'preserve-target-archive-source',requiresExplicitApproval:true,liveSourceReadStateMayAppearUnread:true,originalHistoriesPreserved:true,alternative:'Per-publication read-state model and application adaptation require a separate approved change.'}};
  return report;
 }
 async function materialize(c,op,schema){
