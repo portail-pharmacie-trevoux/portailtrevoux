@@ -127,7 +127,9 @@ export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{
   for(const [table,rows]of Object.entries(before.tables)){const inserted=plan.operations.filter(o=>o.table===table&&o.action==='insert').length;if(after.tables[table].length!==rows.length+inserted)throw fail('ROW_COUNT_MISMATCH',{table});}
   const changed=hash(plan.nextLedger)!==hash(before.ledger);
   if(changed)await c.query('INSERT INTO public.settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[ledgerKey,JSON.stringify(plan.nextLedger)]);
-  const result={...summarize(plan),committed:true,sourceDigest:source.digest,ledgerDigest:hash(plan.nextLedger),targetAfterDigest:after.digest,totalInserted:plan.operations.filter(o=>o.action==='insert').length,totalUpdated:plan.operations.filter(o=>o.action==='update').length,attachmentsVerified:source.tables.team_messages.filter(r=>r.attachment_content!==null).length};
+  // The final receipt must include the ledger written above, not its pre-write value.
+  const committedSnapshot={...after,ledger:plan.nextLedger};delete committedSnapshot.digest;
+  const result={...summarize(plan),committed:true,sourceDigest:source.digest,ledgerDigest:hash(plan.nextLedger),targetAfterDigest:hash(committedSnapshot),totalInserted:plan.operations.filter(o=>o.action==='insert').length,totalUpdated:plan.operations.filter(o=>o.action==='update').length,attachmentsVerified:source.tables.team_messages.filter(r=>r.attachment_content!==null).length};
   await beforeCommit(result);await c.query('COMMIT');return result;
  }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c.release();}
 }

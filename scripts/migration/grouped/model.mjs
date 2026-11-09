@@ -39,7 +39,20 @@ export function userMapping(source,target){
  }
  return {map,issues};
 }
+// Validate stored archives BEFORE planning can replace any current-source entry.
+export function verifyPlanningArchives(ledger){
+ const archives=ledger?.planningArchives;
+ if(archives===undefined)return;
+ if(!archives||typeof archives!=='object'||Array.isArray(archives))throw fail('ARCHIVE_INTEGRITY_FAILED');
+ for(const archive of Object.values(archives)){
+  if(!archive||!['schedule_weeks','schedule_templates'].includes(archive.table)||!archive.source||
+     archive.sourceHash!==hash(archive.source)||archive.sourceKey!==key(archive.table,archive.source)||
+     archive.policy!==(archive.table==='schedule_weeks'?'preserve-target-archive-source':'archive-source-unmapped'))
+   throw fail('ARCHIVE_INTEGRITY_FAILED');
+ }
+}
 export function makePlan(source,target,decisions={}){
+ verifyPlanningArchives(target.ledger);
  const issues=[],warnings=[],u=userMapping(source.users,target.users),maps={users:Object.fromEntries(u.map)},previous=target.ledger||{version:1,rows:{},maps:{}};
  if(!decisions||typeof decisions!=='object'||Array.isArray(decisions)||Object.keys(decisions).some(k=>!['publicationConflicts','readHistory','planningConflicts','orphanTemplates'].includes(k)))throw fail('INVALID_HUMAN_DECISIONS');
  if(decisions.publicationConflicts!==undefined&&decisions.publicationConflicts!=='preserve-both'||decisions.readHistory!==undefined&&decisions.readHistory!=='preserve-target-archive-source')throw fail('INVALID_HUMAN_DECISIONS');
@@ -50,6 +63,12 @@ export function makePlan(source,target,decisions={}){
  const use=(type,v)=>{if(v===null)return null;const result=maps[type]?.[v];if(result===undefined)throw fail('UNMAPPED_REFERENCE',{type,sourceId:v});return result;};
  const note=(e,table,row)=>issues.push({code:e.code||'INVALID_SOURCE_RECORD',table,sourceKey:key(table,row),...e.details});
  const publicationSources={...(previous.publicationSources||{})},publicationResolution={},publicationConflicts=[],records={},operations=[],nextLedger={version:1,rows:{},maps:{},sourceDigest:source.digest,publicationSources,planningArchives:{...(previous.planningArchives||{})}};
+ // Keep every prior source version, including after a source delta or a later local edit.
+ const archivePlanning=(archive)=>{
+  const archives=nextLedger.planningArchives,base=archive.table+':'+archive.sourceKey;
+  if(Object.values(archives).some(old=>old.table===archive.table&&old.sourceKey===archive.sourceKey&&old.sourceHash===archive.sourceHash))return;
+  archives[archives[base]?base+':'+archive.sourceHash:base]=archive;
+ };
  const rows=t=>target.tables[t]||[];
  // Allocate all numeric keys before transforming any JSON or parent references.
  for(const table of Object.keys(tables).filter(t=>pk[t].length===1&&pk[t][0]==='id'&&t!=='message_automations')){
@@ -106,7 +125,7 @@ export function makePlan(source,target,decisions={}){
    if(tracked){owned=tracked.owned;if(!old)throw fail('IMPORTED_ROW_REMOVED');if(tracked.targetKey!==tk)throw fail('MAPPING_CHANGED');if(sourceHash===tracked.sourceHash){action='keep';if(currentHash!==tracked.targetHash)warnings.push({code:'LOCAL_CHANGE_PRESERVED',table,sourceKey:sk});}else if(currentHash===targetHash)action='keep';else if(owned&&currentHash===tracked.targetHash)action='update';else throw fail('SOURCE_TARGET_DIVERGED');}
    else if(old){if(currentHash!==targetHash){
     if(table==='schedule_weeks'&&decisions.planningConflicts==='preserve-target-archive-source'){
-     nextLedger.planningArchives['schedule_weeks:'+sk]={table,sourceKey:sk,source:structuredClone(raw),sourceHash,activeTargetHash:currentHash,policy:'preserve-target-archive-source'};
+     archivePlanning({table,sourceKey:sk,source:structuredClone(raw),sourceHash,activeTargetHash:currentHash,policy:'preserve-target-archive-source'});
      records[table].pop();warnings.push({code:'SOURCE_WEEK_ARCHIVED_TARGET_PRESERVED',table,sourceKey:sk});continue;
     }
     throw fail('EXISTING_TARGET_CONFLICT');
@@ -116,7 +135,7 @@ export function makePlan(source,target,decisions={}){
    nextLedger.rows[table][sk]=keepBaseline?tracked:{sourceHash,targetHash,targetKey:tk,owned};
    operations.push({table,action,row:r,sourceKey:sk,targetKey:tk});
   }catch(e){if(table==='schedule_templates'&&e.code==='UNMAPPED_REFERENCE'&&e.details?.type==='users'&&decisions.orphanTemplates==='archive-source-unmapped'){
-    nextLedger.planningArchives['schedule_templates:'+key(table,raw)]={table,sourceKey:key(table,raw),source:structuredClone(raw),sourceHash:hash(raw),unmappedSourceUserId:e.details.sourceId,policy:'archive-source-unmapped'};
+    archivePlanning({table,sourceKey:key(table,raw),source:structuredClone(raw),sourceHash:hash(raw),unmappedSourceUserId:e.details.sourceId,policy:'archive-source-unmapped'});
     warnings.push({code:'ORPHAN_TEMPLATE_ARCHIVED_NOT_ACTIVATED',table,sourceKey:key(table,raw),sourceId:e.details.sourceId});continue;
    }note(e,table,raw);}}
  }

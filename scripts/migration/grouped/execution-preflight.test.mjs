@@ -14,6 +14,8 @@ function blocked(changes,expected){
 }
 test('fail closed without verified backup',()=>{
  blocked({backupReceipt:null},'VERIFIED_TARGET_BACKUP_REQUIRED');
+ blocked({backupReceipt:{...base.backupReceipt,reference:'   '}},'VERIFIED_TARGET_BACKUP_REQUIRED');
+ blocked({backupReceipt:{...base.backupReceipt,verified:'true'}},'VERIFIED_TARGET_BACKUP_REQUIRED');
  blocked({backupReceipt:{...base.backupReceipt,verified:false}},'VERIFIED_TARGET_BACKUP_REQUIRED');
  blocked({backupReceipt:{...base.backupReceipt,completedAt:'invalid'}},'VERIFIED_TARGET_BACKUP_REQUIRED');
 });
