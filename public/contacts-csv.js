@@ -8,19 +8,19 @@ function hash(s){let h=2166136261;for(const ch of s){h^=ch.charCodeAt(0);h=Math.
 const element=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
 export function mountCsvImport({container,toolbar,api,getContacts,refresh}){
  const actions=toolbar.querySelector('.universe-actions');if(!actions)return;
- const button=element('button','Importer un CSV');button.type='button';button.className='btn small';
+ const button=element('button','Importer CSV / Excel');button.type='button';button.className='btn small';
  const panel=element('section');panel.hidden=true;panel.className='people-import';
- const title=element('h3','Importer des contacts depuis un CSV');
- const help=element('p','Colonnes obligatoires : Périmètre et Nom du contact. Séparateur ; ou , · UTF-8 · 100 contacts maximum par lot.');
+ const title=element('h3','Importer des contacts depuis CSV ou Excel');
+ const help=element('p','Colonnes obligatoires : Périmètre et Nom du contact. CSV : séparateur ; ou , · Excel : première feuille .xlsx · 100 contacts maximum par lot.');
  const template=element('button','Télécharger un modèle CSV');template.type='button';template.className='btn small';
  template.onclick=()=>{const sample=HEADERS.join(';')+'\r\n';const blob=new Blob(['\uFEFF'+sample],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=element('a');a.href=url;a.download='PortailPlus-contacts-modele.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
- const input=element('input');input.type='file';input.accept='.csv,text/csv';input.setAttribute('aria-label','Fichier CSV de contacts');
+ const input=element('input');input.type='file';input.accept='.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';input.setAttribute('aria-label','Fichier CSV ou Excel de contacts');
  const status=element('p');status.setAttribute('role','status');
  const preview=element('div');const commit=element('button','Confirmer l’import');commit.type='button';commit.className='btn primary';commit.hidden=true;
  let pending=[];
  button.onclick=()=>{panel.hidden=!panel.hidden;if(!panel.hidden)input.focus();};
  input.onchange=async()=>{pending=[];commit.hidden=true;preview.replaceChildren();status.textContent='';const file=input.files?.[0];if(!file)return;
- try{if(file.size>1024*1024)throw Error('Fichier trop volumineux (1 Mo maximum).');const raw=(await file.text()).replace(/^\uFEFF/,'');const first=raw.split(/\r?\n/,1)[0];const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';const rows=parseCsv(raw,sep);if(rows.length<2)throw Error('Le fichier ne contient aucun contact.');
+ try{if(file.size>1024*1024)throw Error('Fichier trop volumineux (1 Mo maximum).');let rows;if(/\.xlsx$/i.test(file.name)){const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('Lecture Excel impossible'));reader.readAsDataURL(file);});const result=await api('/api/contacts/parse-xlsx','POST',{fileData:data});rows=result.rows;}else{const raw=(await file.text()).replace(/^\uFEFF/,'');const first=raw.split(/\r?\n/,1)[0];const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';rows=parseCsv(raw,sep);}if(rows.length<2)throw Error('Le fichier ne contient aucun contact.');
  const header=rows.shift().map(normalize);const mapping=FIELDS.map(f=>header.findIndex(h=>aliases[f].includes(h)));if(mapping[0]<0||mapping[1]<0)throw Error('Colonnes Périmètre et Nom du contact introuvables.');if(rows.length>100)throw Error('Limite de 100 contacts par import.');
  const existing=getContacts();const keyOf=c=>normalize(c.scope)+'|'+normalize(c.name);const known=new Set(existing.map(keyOf));const seen=new Set();const problems=[];
  for(let i=0;i<rows.length;i++){const cells=rows[i];const c=Object.fromEntries(FIELDS.map((f,j)=>[f,mapping[j]>=0?(cells[mapping[j]]||''):'']));const key=keyOf(c);if(!c.scope||!c.name){problems.push('Ligne '+(i+2)+' : périmètre ou nom manquant');continue;}if(known.has(key)||seen.has(key)){problems.push('Ligne '+(i+2)+' : doublon ignoré ('+c.name+')');continue;}seen.add(key);const limits={scope:80,name:160,person:160,phone:80,email:254,url:500,notes:1500};if(FIELDS.some(f=>c[f].length>limits[f])){problems.push('Ligne '+(i+2)+' : champ trop long');continue;}if(c.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)){problems.push('Ligne '+(i+2)+' : e-mail invalide');continue;}if(c.url){try{const u=new URL(c.url);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw Error();}catch{problems.push('Ligne '+(i+2)+' : lien invalide');continue;}}
