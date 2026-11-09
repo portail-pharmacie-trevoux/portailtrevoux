@@ -156,6 +156,8 @@ try{
    }
    // Profile and permission-only PUTs are handled above; account operations stay blocked.
    if(req.method==='GET'&&['/api/music','/api/contacts','/api/training/documents'].includes(req.path))return next();
+   // Contacts utiles: app middleware enforces admin, session, CSRF and validation.
+   if((req.method==='POST'&&['/api/contacts','/api/contacts/import'].includes(req.path))||(req.method==='PUT'&&/^\/api\/contacts\/\d+$/.test(req.path))||(req.method==='DELETE'&&/^\/api\/contacts\/\d+$/.test(req.path))||(req.method==='POST'&&/^\/api\/contacts\/\d+\/restore$/.test(req.path)))return next();
    if(req.method==='GET'&&/^\/api\/(?:hr\/documents|training\/documents)\/\d+\/(?:file|print)$/.test(req.path))return next();
    if(req.method==='POST'&&req.path==='/api/music')return next();
    // Allow administrators to create fictional work posts (e.g. Comptoir) in isolated staging.
