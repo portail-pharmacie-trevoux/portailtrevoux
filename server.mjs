@@ -52,6 +52,7 @@ const cleanUser=u=>({id:u.id,name:u.name,job:u.job,phone:u.phone||'',email:u.ema
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function createApp(db,config) {
   const sessionFeatures=config.employeeAccountsReadOnly===true?{features:{employeeAccountsReadOnly:true,...(config.scalingoEmployeeLifecycle===true?{scalingoEmployeeLifecycle:true}:{}),...(config.scalingoAccountCreation===true?{scalingoAccountCreation:true}:{})}}:{};
+  if(config.scalingoAccountManagement===true)Object.assign(sessionFeatures.features??={}, {scalingoAccountManagement:true,invitationPreview:true,invitationSendingEnabled:config.invitationSendingEnabled===true});
   const app=express(), secret=config.secret, origin=new URL(config.origin).origin;
   const allowedOrigins=new Set([origin,...(config.allowedOrigins||[])]);
   const secure=origin.startsWith('https:');
@@ -147,7 +148,7 @@ export function createApp(db,config) {
     res.cookie('trevoux_session',raw,cookieOptions);
     return {user:cleanUser(user),csrf:csrfToken,...sessionFeatures};
   }
-  registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession});
+  registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession,sendEnabled:config.scalingoAccountManagement===true?config.invitationSendingEnabled===true:config.invitationSendingEnabled!==false,previewEnabled:config.scalingoAccountManagement===true});
   app.get('/health',async(req,res)=>{await db.query('SELECT 1');res.json({ok:true});});
   app.post('/api/login',async(req,res)=>{
     const email=typeof req.body.email==='string'?req.body.email.trim().toLowerCase():'';
@@ -174,8 +175,8 @@ export function createApp(db,config) {
     await db.query('DELETE FROM sessions WHERE user_id=$1',[req.auth.id]);
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
-  registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeImportFetch??config.employeeScanFetch,requireConsent:config.employeeImportConsentRequired===true,previewRestrictions:config.employeeAccountsReadOnly?{accountReadOnly:true}:undefined,uploadParser:express.json({limit:'15mb'})});
-  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true});
+  registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeImportFetch??config.employeeScanFetch,requireConsent:config.employeeImportConsentRequired===true,previewRestrictions:config.employeeAccountsReadOnly?{accountReadOnly:config.scalingoAccountManagement!==true}:undefined,uploadParser:express.json({limit:'15mb'})});
+  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true,scalingoAccountManagement:config.scalingoAccountManagement===true});
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');
     let tokens=decrypt(stored,secret);

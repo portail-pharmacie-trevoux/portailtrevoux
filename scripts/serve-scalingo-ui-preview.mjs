@@ -2,6 +2,7 @@
 // Explicit opt-in only after a security review; Render's server.mjs is unchanged.
 import express from 'express';
 import {inventoryHomepage,registerScalingoAccountInventory} from './scalingo-account-inventory.mjs';
+import {registerScalingoAccountManagement} from './scalingo-accounts-preview.mjs';
 import {registerScalingoAccountCreation,registerScalingoPasswordChange} from './scalingo-account-creation.mjs';
 import {registerScalingoWwwRedirect} from './scalingo-www-redirect.mjs';
 import {diagnosticHomepage,registerScalingoPersonalAdminDiagnostic} from './scalingo-personal-admin-diagnostic.mjs';
@@ -72,7 +73,7 @@ try{
  await ensureScalingoEmployeeDeletionAudit(db);
  const registrationPDF=await verifyScalingoRegistrationFormAsset();
  console.log('Scalingo employee registration PDF verified: '+JSON.stringify(registrationPDF));
- const {app}=createApp(db,{origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:inventoryHomepage(diagnosticHomepage(scalingoHomepage())),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,scalingoAccountCreation:true,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
+ const {app}=createApp(db,{origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:inventoryHomepage(diagnosticHomepage(scalingoHomepage())),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,scalingoAccountCreation:true,scalingoAccountManagement:true,invitationSendingEnabled:false,employeeImportConsentRequired:true,employeeImportFetch:createScalingoEmployeeImportFetch(),dummyHash:await hashPassword(token()),mailEmail:'',googleId:googleCalendar.googleId,googleSecret:googleCalendar.googleSecret,googleEmail:googleCalendar.googleEmail,youtrustClient:{},mailFetch:async()=>{throw Error('Mail disabled');},employeeScanFetch:async()=>{throw Error('External calls disabled');}});
  const gate=express();
  gate.disable('x-powered-by');
  registerScalingoWwwRedirect(gate);
@@ -101,9 +102,10 @@ try{
      res.set('Cache-Control','no-store').type('text/plain').send(result.stdout+'\\n'+result.stderr);
    }catch(e){res.status(409).type('text/plain').send('Opération refusée ou annulée : '+(e.stdout||'')+' '+(e.stderr||e.message));}
  });
+ registerScalingoAccountManagement(gate,app);
  registerScalingoAccountCreation({gate,db,adminAuth:cleanupAuth,secret:env.APP_SECRET});
  registerScalingoPasswordChange(gate,app);
- registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db),origin,secret:env.APP_SECRET,isAllowedOrigin:isScalingoOrigin});
+ registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db),origin,secret:env.APP_SECRET,isAllowedOrigin:isScalingoOrigin,accountManagement:true});
  registerScalingoRights({gate,db,adminAuth:cleanupAuth,origin,env,isAllowedOrigin:isScalingoOrigin});
  gate.use(scalingoUniverseBoundary(db));
  // POST /api/quality/tiers-payant/import: real app auth, CSRF, referent rights and validation.

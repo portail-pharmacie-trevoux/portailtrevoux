@@ -9,6 +9,15 @@ export function previousAttempt(target){
  }
  return {state:missing.length||changed.length?'COMMIT_RECORDED_WITH_LATER_DIFFERENCES':'COMMIT_RECORDED_ROWS_VERIFIED',commitRecorded:true,executionAllowed:false,verified,missing,changed,ledgerDigest:hash(ledger)};
 }
+// Metadata-only identity check. No password, session or MFA fields are read or written.
+export function verifyAccountCorrespondence(sourceUsers,targetUsers,sourceId){
+ const source=sourceUsers.find(u=>u.id===sourceId);if(!source)return {sourceId,status:'SOURCE_USER_ABSENT',targetId:null};
+ const normalize=v=>String(v||'').normalize('NFC').trim().toLocaleLowerCase('fr'),full=u=>normalize(u.first_name)+'\0'+normalize(u.last_name);
+ const matches=targetUsers.filter(u=>u.id!==1&&source.first_name&&source.last_name&&full(u)===full(source));
+ if(matches.length!==1)return {sourceId,status:matches.length?'AMBIGUOUS_IDENTITY':'NO_TARGET_IDENTITY',targetId:null,candidateIds:matches.map(u=>u.id)};
+ const target=matches[0],emailMatches=!!source.email&&normalize(source.email)===normalize(target.email),roleMatches=source.role===target.role;
+ return {sourceId,targetId:target.id,status:!source.email?'SOURCE_EMAIL_NOT_AVAILABLE':!emailMatches?'EMAIL_DIFFERS_REVIEW_REQUIRED':!roleMatches?'ROLE_DIFFERS_REVIEW_REQUIRED':'VERIFIED_CORRESPONDENCE',identityMatches:true,emailMatches,roleMatches,sourceActive:source.active,targetActive:target.active};
+}
 export function identityDiagnostics(source,target,plan){
  const counts=new Map();
  const add=(v,table)=>{if(v==null)return;const id=Number(v);if(!Number.isSafeInteger(id)||id<1)return;if(!counts.has(id))counts.set(id,{});const by=counts.get(id);by[table]=(by[table]||0)+1;};
@@ -18,7 +27,7 @@ export function identityDiagnostics(source,target,plan){
   const user=source.users.find(u=>u.id===id);
   const candidates=user?target.users.filter(t=>(user.directory_key&&t.directory_key===user.directory_key)||(user.email&&t.email===user.email)||(user.first_name&&user.last_name&&t.first_name===user.first_name&&t.last_name===user.last_name)):[];
   const state=plan.maps.users[id]!==undefined?'MATCHED':user?'SOURCE_USER_EXISTS_TARGET_UNRESOLVED':'SOURCE_USER_ABSENT_ORPHAN_REFERENCES';
-  return {sourceId:id,state,sourcePresent:!!user,sourceActive:user?.active??null,sourceRole:user?.role??null,sourceIdentity:user?{firstName:user.first_name,lastName:user.last_name}:null,targetCandidates:candidates.map(t=>({id:t.id,role:t.role,active:t.active})),references,decision:state==='MATCHED'?null:user?'Activate/confirm the same real identity on Scalingo; do not create or reassign automatically.':'Find reliable historical identity evidence; never infer a person from the numeric ID.'};
+  return {sourceId:id,state,accountCorrespondence:verifyAccountCorrespondence(source.users,target.users,id),sourcePresent:!!user,sourceActive:user?.active??null,sourceRole:user?.role??null,sourceIdentity:user?{firstName:user.first_name,lastName:user.last_name}:null,targetCandidates:candidates.map(t=>({id:t.id,role:t.role,active:t.active})),references,decision:state==='MATCHED'?null:user?'Activate/confirm the same real identity on Scalingo; do not create or reassign automatically.':'Find reliable historical identity evidence; never infer a person from the numeric ID.'};
  });
 }
 export function publicationDiagnostics(source,target,plan){

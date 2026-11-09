@@ -74,7 +74,7 @@ export function createInvitationMailer({getSetting,setSetting,secret,clientId,cl
   }
  };
 }
-export function registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession}){
+export function registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession,sendEnabled=true,previewEnabled=false}){
  const bad=()=>fail(400,'Ce lien est invalide, expiré ou déjà utilisé. Demandez une nouvelle invitation à la pharmacie.');
  async function transaction(work){const client=db.connect?await db.connect():db;try{await client.query('BEGIN');const result=await work(client);await client.query('COMMIT');return result;}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}}
  const checkedToken=raw=>{if(typeof raw!=='string'||!/^[-\w]{43}$/.test(raw))throw bad();return digest(raw);};
@@ -82,7 +82,16 @@ export function registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,or
   WHERE i.token_hash=$1 AND i.sent_at IS NOT NULL AND i.used_at IS NULL AND i.expires_at>now() AND u.active=TRUE AND u.email=i.email AND (u.password_hash IS NULL OR u.must_change=TRUE)${lock?' FOR UPDATE OF i,u':''}`,[hash])).rows[0];
  async function limit(req,kind,max){const row=(await db.query("INSERT INTO login_attempts(key,count,until_at) VALUES($1,1,now()+interval '15 minutes') ON CONFLICT(key) DO UPDATE SET count=CASE WHEN login_attempts.until_at<now() THEN 1 ELSE login_attempts.count+1 END,until_at=CASE WHEN login_attempts.until_at<now() THEN EXCLUDED.until_at ELSE login_attempts.until_at END RETURNING count",[digest(kind+':'+req.ip)])).rows[0];if(row.count>max)throw fail(429,'Trop de tentatives. Réessayez dans 15 minutes.');}
  app.get('/api/mail/status',auth,ready,admin,async(req,res)=>res.json(await mailer.status()));
+ if(previewEnabled)app.post('/api/users/:id/invitation-preview',auth,ready,admin,csrf,async(req,res)=>{
+  const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Collaborateur invalide.');
+  const person=(await db.query('SELECT * FROM users WHERE id=$1',[id])).rows[0];if(!person)throw fail(404,'Collaborateur introuvable.');
+  const email=(await invitationAddress(db,person,secret)).trim().toLowerCase();
+  if(req.body?.email!==undefined&&(typeof req.body.email!=='string'||req.body.email.trim().toLowerCase()!==email))throw fail(409,'L’adresse e-mail a changé. Actualisez l’annuaire.');
+  const eligible=person.active&&emailValid(email)&&(!person.password_hash||person.must_change);
+  res.set('Cache-Control','no-store').json({personId:id,email,eligible:!!eligible,deliveryEnabled:sendEnabled,reason:!person.active?'Collaborateur inactif.':!emailValid(email)?'Renseignez une adresse e-mail valide.':person.password_hash&&!person.must_change?'Ce compte est déjà activé.':null,tokenCreated:false,emailSent:false,authorizationRequired:!sendEnabled});
+ });
  app.post('/api/users/:id/invitation',auth,ready,admin,csrf,async(req,res)=>{
+  if(!sendEnabled)return res.status(409).json({code:'INVITATIONS_NOT_AUTHORIZED',error:'L’envoi réel des invitations attend une autorisation explicite. Utilisez la prévisualisation.'});
   const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Collaborateur invalide.');
   if(!(await mailer.status()).connected)throw fail(409,'Connectez d’abord la messagerie des invitations dans la page Collaborateurs.');
   const result=await transaction(async client=>{

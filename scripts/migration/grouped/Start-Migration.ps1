@@ -113,7 +113,7 @@ try {
     Write-Host ('CONFLITS RESIDUELS : '+$audit.issueSummary.total)
     $audit.tables.PSObject.Properties | ForEach-Object { [PSCustomObject]@{Table=$_.Name;Render=$_.Value.source;Scalingo=$_.Value.existing;Creer=$_.Value.insert;MettreAJour=$_.Value.update;Conserver=$_.Value.keep} } | Format-Table -AutoSize
     $audit.issueSummary.categories.PSObject.Properties | ForEach-Object { Write-Host ($_.Name+' : '+$_.Value) }
-    foreach ($person in $private.identities) { $name=if($person.sourceIdentity){$person.sourceIdentity.firstName+' '+$person.sourceIdentity.lastName}else{'[identite source absente]'};Write-Host ('Render #'+$person.sourceId+' : '+$name+' / '+$person.state) }
+    foreach ($person in $private.identities) { $name=if($person.sourceIdentity){$person.sourceIdentity.firstName+' '+$person.sourceIdentity.lastName}else{'[identite source absente]'};Write-Host ('Render #'+$person.sourceId+' : '+$name+' / '+$person.state);if($person.accountCorrespondence){Write-Host ('Correspondance Render #'+$person.sourceId+' -> Scalingo #'+$person.accountCorrespondence.targetId+' : '+$person.accountCorrespondence.status+' / actif : '+$person.accountCorrespondence.targetActive)} }
     foreach ($publication in $audit.publicationReview) { Write-Host ('Publication Render #'+$publication.sourceId+' -> Scalingo #'+$publication.targetId+' : '+($publication.differences -join ',')+' / '+$publication.resolution) }
     Write-Host 'Audit termine sans ecriture. Les details d identite et de publication restent dans audit-prive.json sur ce PC.'
 } finally {

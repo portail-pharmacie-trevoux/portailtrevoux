@@ -9,7 +9,7 @@ const fail=(status,message)=>Object.assign(Error(message),{status});
 const fields=new Set(['firstName','lastName','phone','birthday','job','active','email','password','administratorRights','rights','editRights','details','detailsRevision']);
 const equal=(a,b)=>JSON.stringify([...new Set(a||[])].sort())===JSON.stringify([...new Set(b||[])].sort());
 const idOf=req=>{const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1||id>2147483647)throw fail(400,'Profil invalide.');return id;};
-export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret,isAllowedOrigin=value=>value===origin}){
+export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret,isAllowedOrigin=value=>value===origin,accountManagement=false}){
  const privacy=(req,res,next)=>{res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});next();};
  const write=(req,res,next)=>isAllowedOrigin(req.get('origin'))&&req.get('x-csrf-token')===req.cleanupAdmin.csrf?next():next(fail(403,'Origine ou CSRF invalide.'));
  gate.post('/api/users',privacy,adminAuth,write,async(req,res,next)=>{let client;try{
@@ -44,7 +44,7 @@ export function registerScalingoEmployeeRecords({gate,db,adminAuth,origin,secret
  gate.post('/api/users/:id/restore',privacy,adminAuth,write,lifecycle(true));
  gate.get('/api/users/:id/details',privacy,adminAuth,async(req,res,next)=>{try{
   const id=idOf(req),person=(await db.query('SELECT * FROM users WHERE id=$1',[id])).rows[0];if(!person)throw fail(404,'Collaborateur introuvable.');
-  res.json({person:publicPerson(person,true,req.cleanupAdmin.id),...await readEmployeeDetails(db,id,secret),previewRestrictions:{accountReadOnly:true,profileReadOnly:person.role==='admin',lifecycleAllowed:person.role==='employee'}});
+  res.json({person:publicPerson(person,true,req.cleanupAdmin.id),...await readEmployeeDetails(db,id,secret),previewRestrictions:{accountReadOnly:!accountManagement,profileReadOnly:person.role==='admin',lifecycleAllowed:person.role==='employee'}});
  }catch(e){next(e);}});
  gate.put('/api/users/:id',privacy,(req,res,next)=>{
   // Retain the existing backup-gated permission-only interface for its callers.

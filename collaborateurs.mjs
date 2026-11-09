@@ -1,3 +1,4 @@
+import {randomUUID} from 'node:crypto';
 import {invitationAddress} from './invitations.mjs';
 import { readFile } from 'node:fs/promises';
 import { readEmployeeDetails, saveEmployeeDetails, validateEmployeeDetails } from './employee-details.mjs';
@@ -50,7 +51,7 @@ export function createFeastCalendar({fetchImpl=fetch,now=()=>new Date()}={}) {
     })().finally(()=>{pending=null;});return pending;
   };
 }
-export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar(),scalingoAccountCreation=false}) {
+export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar(),scalingoAccountCreation=false,scalingoAccountManagement=false}) {
   app.get('/api/collaborateurs/registration-form',auth,ready,admin,async(req,res)=>{
     const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
     res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
@@ -67,54 +68,78 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
   });
   // The employee session decides whose payroll access this is. No arbitrary person ID or document is accepted.
   app.get('/api/collaborateurs/me/payroll',auth,ready,(req,res)=>res.json({name:req.auth.name,url:'https://my.silae.fr/',mode:'external',integrated:false}));
+  const managedFields=new Set(['firstName','lastName','phone','birthday','job','active','email','password','administratorRights','rights','editRights','details','detailsRevision']);
+  function managedBody(body){if(!scalingoAccountManagement)return;if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!managedFields.has(k))||body.password!==undefined&&typeof body.password!=='string')throw fail(400,'Champs de compte invalides.');}
   async function account(data,existing=null) {
     const email=data.email===undefined?(existing?.email||''):data.email;
     const rights=data.rights===undefined?(existing?.rights||[]):data.rights;
     const editRights=data.editRights===undefined?(existing?.edit_rights||[]):data.editRights;
     const configured=data.editRights!==undefined||existing?.permissions_configured===true;
+    if(scalingoAccountManagement&&typeof email==='string'&&email&&!/^[^\s<>"\r\n]+@[^\s<>"\r\n]+\.[^\s<>"\r\n]+$/.test(email.trim()))throw fail(400,'Adresse e-mail invalide.');
     if(typeof email!=='string'||email.length>254||(email&&!/^\S+@\S+\.\S+$/.test(email.trim())))throw fail(400,'Adresse e-mail invalide.');
     if(!Array.isArray(rights)||rights.some(r=>!universes.includes(r)))throw fail(400,'Droits invalides.');
     if(!Array.isArray(editRights)||editRights.some(r=>!universes.includes(r)||['Collaborateurs','Ressources humaines'].includes(r)||!rights.includes(r)))throw fail(400,'La modification nécessite un droit de consultation. La gestion des collaborateurs et des documents RH reste réservée à l’administrateur.');
     if(existing?.email&&!email)throw fail(400,'Archivez le collaborateur pour désactiver son accès.');
     if(data.password){if(!passwordValid(data.password))throw fail(400,'Le mot de passe provisoire doit comporter au moins 12 caractères.');}
     if(!email&&data.password)throw fail(400,'Renseignez une adresse e-mail pour créer un accès.');
-    return {email:email.trim().toLowerCase()||null,rights:[...new Set([...rights,'Actualités','Agenda'])],editRights:[...new Set([...editRights.filter(r=>r!=='Emplois du temps'),'Actualités'])],configured,hash:data.password?await hashPassword(data.password):existing?.password_hash||null};
+    return {email:email.trim().toLowerCase()||null,rights:scalingoAccountManagement&&existing&&data.rights===undefined?existing.rights:[...new Set([...rights,'Actualités','Agenda'])],editRights:scalingoAccountManagement&&existing&&data.editRights===undefined?existing.edit_rights:[...new Set([...editRights.filter(r=>r!=='Emplois du temps'),'Actualités'])],configured:scalingoAccountManagement&&(!existing||data.administratorRights===true)?true:configured,hash:data.password?await hashPassword(data.password):existing?.password_hash||null};
   }
   app.get('/api/users/:id/details',auth,ready,admin,async(req,res)=>{
     const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Profil invalide.');
     const person=(await db.query('SELECT * FROM users WHERE id=$1',[id])).rows[0];if(!person)throw fail(404,'Collaborateur introuvable.');
     res.json({person:view(person,req),...await readEmployeeDetails(db,id,secret)});
   });
+  async function checkAccountDuplicates(client,profile,email,excludedId=null){
+    await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
+    const rows=(await client.query('SELECT id,email,first_name,last_name,name FROM users')).rows;
+    if(email&&rows.some(p=>p.id!==excludedId&&p.email?.trim().toLowerCase()===email))throw fail(409,'Un compte utilise déjà cette adresse e-mail.');
+    if(rows.some(p=>p.id!==excludedId&&normalizeName(p.first_name&&p.last_name?p.first_name+' '+p.last_name:p.name)===normalizeName(profile.name)))throw fail(409,'Une fiche existe déjà pour cette identité. Aucun doublon créé.');
+  }
   async function transaction(work){
     const client=db.connect?await db.connect():db;
     try{await client.query('BEGIN');const result=await work(client);await client.query('COMMIT');return result;}
     catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}
   }
   app.post('/api/users',auth,ready,admin,csrf,async(req,res)=>{
+    managedBody(req.body);
     const d=validatePerson(req.body,fail),a=await account(req.body),role=requestedEmployeeRole(req.body,null,fail),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);
     if(role==='admin'&&(!d.active||!a.email))throw fail(400,'Pour donner les droits administrateur, renseignez une adresse de connexion et gardez le collaborateur actif.');
     const person=await transaction(async client=>{
-      const {rows}=await client.query(`INSERT INTO users(name,first_name,last_name,phone,birthday,job,active,email,password_hash,rights,edit_rights,permissions_configured,role)
-        VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured,role]);
+      if(scalingoAccountManagement)await checkAccountDuplicates(client,d,a.email);
+      const {rows}=await client.query(`INSERT INTO users(name,first_name,last_name,phone,birthday,job,active,email,password_hash,rights,edit_rights,permissions_configured,role${scalingoAccountManagement?',directory_key':''})
+        VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13${scalingoAccountManagement?',$14':''}) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.rights),JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.editRights),a.configured,role,...(scalingoAccountManagement?['scalingo-manual:'+randomUUID()]:[])]);
       if(details!==undefined)await saveEmployeeDetails(client,rows[0].id,details,0,secret,req.auth.id,fail);
       return rows[0];
     });res.status(201).json(view(person,req));
   });
   app.put('/api/users/:id',auth,ready,admin,csrf,async(req,res)=>{
+    managedBody(req.body);
     const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Profil invalide.');
+    if(scalingoAccountManagement&&req.body&&Object.keys(req.body).length&&Object.keys(req.body).every(k=>['rights','editRights'].includes(k))){
+      const result=await transaction(async client=>{
+        await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
+        const existing=(await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!existing)throw fail(404,'Collaborateur introuvable.');if(existing.role==='admin')throw fail(403,'Compte administrateur protégé.');
+        const a=await account(req.body,existing);
+        const row=(await client.query('UPDATE users SET rights=$2::jsonb,edit_rights=$3::jsonb,permissions_configured=TRUE WHERE id=$1 RETURNING *',[id,JSON.stringify(a.rights),JSON.stringify(a.editRights)])).rows[0];await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);return row;
+      });return res.json(view(result,req));
+    }
     const d=validatePerson(req.body,fail),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);
     const person=await transaction(async client=>{
+      if(scalingoAccountManagement)await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
       const existing=(await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!existing)throw fail(404,'Collaborateur introuvable.');
+      if(scalingoAccountManagement){if(req.body.active===undefined)d.active=existing.active;if(!d.job&&existing.job)d.job=existing.job;if(req.body.phone===undefined)d.phone=existing.phone||'';if(req.body.birthday===undefined)d.birthday=dateText(existing.birthday);}
       const role=requestedEmployeeRole(req.body,existing,fail);
       // Save the private record and public contact fields atomically, with conflict protection.
-      if(details!==undefined)await saveEmployeeDetails(client,id,details,req.body.detailsRevision,secret,req.auth.id,fail);
+      if(details!==undefined){const stored=scalingoAccountManagement?(await readEmployeeDetails(client,id,secret)).details:{};await saveEmployeeDetails(client,id,{...stored,...details},req.body.detailsRevision,secret,req.auth.id,fail);}
       if(existing.role==='admin'){
         return (await client.query('UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6 WHERE id=$7 RETURNING *',[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,id])).rows[0];
       }
       const a=await account(req.body,existing);
+      if(scalingoAccountManagement){if(req.body.active!==undefined&&d.active!==existing.active)throw fail(400,'Utilisez Désactiver ou Réactiver pour changer le statut.');await checkAccountDuplicates(client,d,a.email,id);}
       if(role==='admin'&&(!d.active||!a.email))throw fail(400,'Pour donner les droits administrateur, renseignez une adresse de connexion et gardez le collaborateur actif.');
       const {rows}=await client.query(`UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6,active=$7,email=$8,password_hash=$9,rights=$10::jsonb,
-        edit_rights=$11::jsonb,permissions_configured=$12,must_change=CASE WHEN $13 THEN TRUE ELSE must_change END,role=$15 WHERE id=$14 RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(a.rights),JSON.stringify(a.editRights),a.configured,!!req.body.password,id,role]);
+        edit_rights=$11::jsonb,permissions_configured=$12,must_change=CASE WHEN $13 THEN TRUE ELSE must_change END,role=$15 WHERE id=$14 RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.rights),JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.editRights),a.configured,!!req.body.password,id,role]);
+      if(scalingoAccountManagement&&(a.email!==existing.email||!!req.body.password))await client.query('DELETE FROM employee_invitations WHERE user_id=$1 AND used_at IS NULL',[id]);
       if(role!==existing.role||!d.active||a.email!==existing.email||a.hash!==existing.password_hash||JSON.stringify(a.rights)!==JSON.stringify(existing.rights)||JSON.stringify(a.editRights)!==JSON.stringify(existing.edit_rights)||a.configured!==existing.permissions_configured)await client.query('DELETE FROM sessions WHERE user_id=$1',[id]);
       return rows[0];
     });res.json(view(person,req));

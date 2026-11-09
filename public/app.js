@@ -184,6 +184,10 @@ function renderPeople(){
         if(active&&!p.passwordConfigured){
           const sendStatus=node('small','','invitation-status');sendStatus.setAttribute('role','status');sendStatus.setAttribute('aria-live','polite');
           const invite=button('Envoyer demande de connexion',async()=>{
+            if(session.features?.invitationPreview&&session.features?.invitationSendingEnabled!==true){
+              invite.disabled=true;sendStatus.textContent='Vérification de la demande…';
+              try{const result=await api('/api/users/'+p.id+'/invitation-preview','POST',{email:p.invitationEmail});sendStatus.textContent=result.eligible?'Demande prête pour '+result.email+'. Aucun e-mail envoyé ; autorisation d’envoi requise.':result.reason;q('#feedback').textContent=sendStatus.textContent;}catch(e){sendStatus.textContent=e.message;}finally{invite.disabled=false;}return;
+            }
             if(!confirm('Envoyer le mail de bienvenue à '+personName(p)+' sur '+p.invitationEmail+' ? Le salarié choisira lui-même son mot de passe.'))return;
             invite.disabled=true;invite.textContent='Envoi en cours…';sendStatus.className='invitation-status';sendStatus.textContent='Envoi de l’invitation…';q('#feedback').textContent=sendStatus.textContent;
             try{
@@ -195,7 +199,7 @@ function renderPeople(){
             catch(e){if(currentUniverse==='Collaborateurs'){q('#feedback').textContent=e.message;sendStatus.className='invitation-status error';sendStatus.textContent=e.message;const panel=q('#invitation-mail');if(panel)panel.open=true;invite.disabled=false;invite.textContent='Envoyer demande de connexion';}}
           },'btn small primary');
           invite.setAttribute('aria-label','Envoyer demande de connexion à '+personName(p));
-          invite.disabled=!!session.features?.employeeAccountsReadOnly||!p.invitationEmail;invite.title=session.features?.employeeAccountsReadOnly?'Les invitations restent désactivées.':p.invitationEmail?'Envoyer à '+p.invitationEmail:'Renseignez une adresse e-mail dans la fiche du collaborateur.';
+          invite.disabled=!!session.features?.employeeAccountsReadOnly&&!session.features?.invitationPreview||!p.invitationEmail;if(session.features?.invitationPreview&&session.features?.invitationSendingEnabled!==true)invite.textContent='Prévisualiser la demande d’activation';invite.title=session.features?.invitationPreview?'Vérifier la demande sans envoyer de courriel.':session.features?.employeeAccountsReadOnly?'Les invitations restent désactivées.':p.invitationEmail?'Envoyer à '+p.invitationEmail:'Renseignez une adresse e-mail dans la fiche du collaborateur.';
           const invitation=node('div','','person-invitation');invitation.dataset.invitationUser=p.id;invitation.append(invite,node('small',p.invitationEmail||'E-mail à renseigner','field-note'),sendStatus);
           if(p.invitationSentAt)invitation.append(node('small','Dernière invitation : '+new Date(p.invitationSentAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'}),'field-note'));
           actions.append(invitation);
@@ -227,6 +231,7 @@ function renderPeople(){
 function renderInvitationMail(content){
   const panel=node('details','','invitation-mail');panel.id='invitation-mail';panel.append(node('summary','Messagerie des invitations'),node('p','Expéditeur : pharmacie.trevoux@gmail.com','field-note'));
   const state=node('p','Vérification de la connexion Gmail…','field-note'),controls=node('div','','news-selection-actions');panel.append(state,controls);content.append(panel);
+  if(session.features?.invitationPreview&&session.features?.invitationSendingEnabled!==true){state.textContent='L’envoi réel attend votre autorisation. La prévisualisation des demandes est disponible dans l’annuaire, sans créer de lien d’activation ni envoyer de courriel.';return;}
   const userId=session.user.id;
   api('/api/integrations/google-health').then(({mail:status})=>{
     if(session?.user.id!==userId||!panel.isConnected)return;
@@ -257,16 +262,17 @@ async function openMyPayroll(){
     const link=node('a','Accéder à mes bulletins sur mySilae','btn primary payroll-link');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';text.after(link,node('p','La consultation des bulletins dans le portail pourra être activée avec votre prestataire de paie.','field-note'));
   }catch(e){text.textContent=e.message;}
 }
-function canCreateScalingoAccount(){return editId===null&&session?.features?.scalingoAccountCreation===true&&session.user.role==='admin'&&session.user.email==='admin-test@portailplus.invalid'&&!session.user.mustChange;}
+function canManageScalingoAccounts(){return session?.features?.scalingoAccountManagement===true&&session.user.role==='admin'&&!session.user.mustChange;}
+function canCreateScalingoAccount(){if(canManageScalingoAccounts())return editId===null;return editId===null&&session?.features?.scalingoAccountCreation===true&&session.user.role==='admin'&&session.user.email==='admin-test@portailplus.invalid'&&!session.user.mustChange;}
 function openEditor(id=null){
   if(session.user.role!=='admin')return;editId=id;q('#form').reset();q('#editor-error').textContent='';q('#dialogtitle').textContent=id===null?'Ajouter un collaborateur':'Modifier le collaborateur';
   const p=people.find(p=>p.id===id);q('#first-name').value=p?.firstName||'';q('#last-name').value=p?.lastName||'';q('#phone').value=p?.phone||'';q('#birthday').value=p?.birthday||'';q('#job').value=p?.job||'';q('#email').value=p?.email||'';
   q('#account-options').classList.toggle('hidden',p?.role==='admin');q('#account-options').open=!!p?.email&&p?.role!=='admin';
   q('#email').required=false;q('#temporary-password').required=false;
-  const accountCreation=canCreateScalingoAccount();const accountLocked=session.features?.employeeAccountsReadOnly===true&&!accountCreation;q('#email').disabled=accountLocked;q('#temporary-password').disabled=accountLocked;
+  const accountCreation=canCreateScalingoAccount();const accountLocked=session.features?.employeeAccountsReadOnly===true&&!accountCreation&&!canManageScalingoAccounts();q('#email').disabled=accountLocked;q('#temporary-password').disabled=accountLocked;
   q('#password-help').textContent=p?.email?'Laissez vide pour conserver le mot de passe actuel. Un nouveau mot de passe provisoire doit comporter 12 caractères minimum.':'Renseignez un e-mail, puis envoyez une demande de connexion depuis l’annuaire. Le salarié choisira son mot de passe. Le mot de passe provisoire est facultatif.';
   q('#scalingo-admin-option')?.remove();
-  if(accountCreation){const label=node('label','Droits administrateur — accès à tous les modules');label.id='scalingo-admin-option';const checkbox=node('input');checkbox.type='checkbox';checkbox.id='scalingo-new-administrator';label.prepend(checkbox);q('#account-options').append(label);q('#account-options').open=true;q('#password-help').textContent='Pour créer un accès : e-mail et mot de passe provisoire de 12 caractères minimum. Changement obligatoire à la première connexion. Sans ces champs, seule une fiche sans accès est créée. Aucun e-mail ne sera envoyé.';}
+  if(accountCreation||canManageScalingoAccounts()&&p?.role!=='admin'){const label=node('label','Droits administrateur — accès à tous les modules');label.id='scalingo-admin-option';const checkbox=node('input');checkbox.type='checkbox';checkbox.id='scalingo-new-administrator';label.prepend(checkbox);q('#account-options').append(label);q('#account-options').open=true;q('#password-help').textContent='Renseignez l’e-mail de connexion. Le mot de passe provisoire est facultatif (12 caractères minimum, changement obligatoire à la première connexion). Les droits administrateur nécessitent un compte actif avec e-mail. L’envoi réel d’invitations attend une autorisation.';}
   if(accountLocked)q('#password-help').textContent='La fiche sera créée sans accès personnel. Aucune invitation ne sera envoyée.';
   document.querySelectorAll('[name=right]').forEach(c=>c.checked=p?.rights?.includes(c.value)||false);
   q('#editor').showModal();q('#first-name').focus();
@@ -275,8 +281,8 @@ q('#add').onclick=()=>openEditor();q('#cancel').onclick=()=>q('#editor').close()
 q('#form').onsubmit=async e=>{
   e.preventDefault();const btn=e.submitter;btn.disabled=true;
   const existing=people.find(p=>p.id===editId),data={firstName:q('#first-name').value,lastName:q('#last-name').value,phone:q('#phone').value,birthday:q('#birthday').value,job:q('#job').value,active:existing?.active!==false};
-  if(existing?.role!=='admin')Object.assign(data,{...(session.features?.employeeAccountsReadOnly&&!canCreateScalingoAccount()?{}:{email:q('#email').value,password:q('#temporary-password').value}),rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
-  if(canCreateScalingoAccount())data.administratorRights=q('#scalingo-new-administrator')?.checked===true;
+  if(existing?.role!=='admin')Object.assign(data,{...(session.features?.employeeAccountsReadOnly&&!canCreateScalingoAccount()&&!canManageScalingoAccounts()?{}:{email:q('#email').value,password:q('#temporary-password').value}),rights:[...document.querySelectorAll('[name=right]:checked')].map(c=>c.value)});
+  if(canCreateScalingoAccount()||canManageScalingoAccounts()&&existing?.role!=='admin')data.administratorRights=q('#scalingo-new-administrator')?.checked===true;
   try{await api('/api/users'+(editId===null?'':'/'+editId),editId===null?'POST':'PUT',data);q('#form').reset();q('#editor').close();await reloadPeople('Fiche enregistrée.');}
   catch(e){q('#editor-error').textContent=e.message;}finally{btn.disabled=false;}
 };

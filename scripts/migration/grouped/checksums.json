@@ -1,7 +1,7 @@
 {
   "model.mjs": "43d7b9c2fcbb055dee4c7c9f7cf795c41b94fabc11168ca57dd335b5633cddb9",
   "database.mjs": "5cd0112603ca2e680ffaa4226434e69cc69c66859e57e9a0594e3379846746bc",
-  "diagnostics.mjs": "54631954c966ada8303ecd2272d601da1175220bbb606f0d4dca2a5853897832",
+  "diagnostics.mjs": "17b6febcf9671c40592d40d7e89f30af86ad06a6083951777d8ecdddc3fd6f24",
   "secure-channel.mjs": "15e834deb2dfd16014fb154975021cd5e7fc9bdca05d160a413a97eed7c47276",
   "run.mjs": "683d7e7f0f8d5591a8e5f1a396dfdaeda84a3ba65346f5790cb40f5544587ecf",
   "bootstrap.sh": "3a39c7aa2de63614cbe65509f063f95509af92a3f74106ec538a2fbd6a7c2214"
