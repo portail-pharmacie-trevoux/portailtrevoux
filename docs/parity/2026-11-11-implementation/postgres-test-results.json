@@ -1,0 +1,22 @@
+{
+  "mode": "LOOPBACK_TLS_DISPOSABLE_POSTGRES_18_6_SYNTHETIC_ONLY",
+  "command": "node scripts/migration/grouped/test-isolated-postgres.mjs --production-parity",
+  "tests": 70,
+  "pass": 70,
+  "fail": 0,
+  "skip": 0,
+  "realDatabaseAccess": false,
+  "providerCalls": "MOCKS_ONLY",
+  "migrationReleaseLock": "UNCHANGED_LOCKED",
+  "runtimeProfileActivated": false,
+  "coverage": [
+    "existing grouped archive/execution preflight/policy",
+    "production capability policy",
+    "production profile HTTP handlers and PostgreSQL persistence",
+    "historical publication concurrency/rollback regression"
+  ],
+  "notes": [
+    "Node counts nested parent tests as well as their subtests.",
+    "Six policy tests also appear in the local suite; do not claim the sum is a unique test count."
+  ]
+}

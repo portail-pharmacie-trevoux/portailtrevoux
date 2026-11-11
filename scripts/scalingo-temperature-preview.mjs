@@ -1,5 +1,5 @@
 import express from 'express';
-import {scalingoTestAdminAuth} from './scalingo-universal-rights.mjs';
+import {scalingoAdminAuth} from './scalingo-universal-rights.mjs';
 
 const importPath='/api/quality/temperatures/import';
 export const isTemperatureImport=req=>req.method==='POST'&&req.path===importPath;
@@ -9,7 +9,7 @@ export const isScalingoTemperatureRoute=req=>isTemperatureImport(req)||isTempera
 // Register before the preview's 64 KB parser. Authenticate before reading a large
 // upload; server.mjs retains its own session, readiness, origin and CSRF checks.
 export function registerScalingoTemperaturePreview(gate,{db,origin,isAllowedOrigin=value=>value===origin}){
- const commentAuth=scalingoTestAdminAuth(db);
+ const commentAuth=scalingoAdminAuth(db);
  gate.use((req,res,next)=>{
   if(!isTemperatureCommentWrite(req))return next();
   commentAuth(req,res,error=>{
@@ -19,7 +19,7 @@ export function registerScalingoTemperaturePreview(gate,{db,origin,isAllowedOrig
    next();
   });
  });
- gate.post(importPath,scalingoTestAdminAuth(db),(req,res,next)=>{
+ gate.post(importPath,scalingoAdminAuth(db),(req,res,next)=>{
   if(!isAllowedOrigin(req.get('origin'))||!req.get('x-csrf-token')||req.get('x-csrf-token')!==req.cleanupAdmin.csrf)return res.status(403).json({error:'Origine ou CSRF invalide.'});
   if(!req.is('application/json'))return res.status(415).json({error:'Un import JSON contenant le fichier Excel est attendu.'});
   next();

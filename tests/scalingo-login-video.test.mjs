@@ -23,12 +23,12 @@ test('Local video validator: missing, truncated, wrong type, checksum; no downlo
  bytes.write('html',4);await writeFile(file,bytes);await assert.rejects(verifyScalingoLoginVideo({file}),/MP4 complet/);
  const legacy=await readFile(new URL('../cache-portal-media.mjs',import.meta.url),'utf8');assert(legacy.includes(scalingoLoginVideo.source));assert.equal(scalingoLoginVideo.path,'/media/portail-plus-higgsfield-original.mp4');
 });
-test('Scalingo startup validates local video; normal startup remains unchanged without a video',async t=>{
+test('Scalingo startup validates local video and refuses implicit business startup',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'portail-video-startup-'));t.after(()=>rm(dir,{recursive:true,force:true}));await mkdir(join(dir,'scripts'));await mkdir(join(dir,'public/media'),{recursive:true});
  for(const name of ['start-scalingo.mjs','scalingo-login-video-asset.mjs'])await copyFile(new URL('../scripts/'+name,import.meta.url),join(dir,'scripts',name));
  await writeFile(join(dir,'server.mjs'),"console.log('NORMAL_FIXTURE_STARTED');");await writeFile(join(dir,'scripts/serve-scalingo-ui-preview.mjs'),"console.log('PREVIEW_FIXTURE_STARTED');");
  const launch=async preview=>{const child=spawn(process.execPath,['scripts/start-scalingo.mjs'],{cwd:dir,env:{SCALINGO_PREVIEW_SAFE_MODE:preview?'true':'false',SCALINGO_PREVIEW_UI_ENABLED:preview?'true':'false'},stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b);const [code]=await once(child,'exit');return {code,output};};
- const normal=await launch(false);assert.equal(normal.code,0);assert.match(normal.output,/NORMAL_FIXTURE_STARTED/);
+ const normal=await launch(false);assert.notEqual(normal.code,0);assert.match(normal.output,/NO_BUSINESS_STARTUP/);assert(!normal.output.includes('NORMAL_FIXTURE_STARTED'));
  const missing=await launch(true);assert.notEqual(missing.code,0);assert.match(missing.output,/Vidéo originale absente/);assert(!missing.output.includes('PREVIEW_FIXTURE_STARTED'));
  if(available){await copyFile(scalingoLoginVideo.file,join(dir,'public/media/portail-plus-higgsfield-original.mp4'));const ready=await launch(true);assert.equal(ready.code,0);assert.match(ready.output,/SCALINGO_LOGIN_VIDEO_VERIFIED/);assert.match(ready.output,/PREVIEW_FIXTURE_STARTED/);}
 });

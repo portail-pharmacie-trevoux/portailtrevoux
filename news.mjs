@@ -32,14 +32,14 @@ export async function unreadNews(db,userId){
     JOIN team_messages m ON m.id=r.message_id WHERE r.user_id=$1 AND NOT r.seen
     AND (r.archived OR ${newsDeadline()}>now())`,[userId])).rows[0]?.unread||0;
 }
-export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser}){
+export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser,purgeOnRead=true,automationFields=false}){
   const access=viewUniverse('Actualités');
   app.get('/api/news/recipients',auth,ready,access,async(req,res)=>{
     res.json((await db.query('SELECT id,name FROM users WHERE active=TRUE ORDER BY last_name,first_name,id')).rows);
   });
   app.get('/api/news',auth,ready,access,async(req,res)=>{
-    await purgeNews(db);
-    res.json((await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,
+    if(purgeOnRead)await purgeNews(db);
+    res.json((await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,${automationFields?'COALESCE(m.automation_text,m.text) AS text,m.reminder_kind':'m.text'},m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,
       CASE WHEN parent.sender_id=$1 AND ${newsDeadline('parent')}>now() THEN jsonb_build_object('text',parent.text,'createdAt',parent.created_at) ELSE NULL END AS reply_context,
       ${newsDeadline()} AS expires_at,r.seen,r.archived
       FROM team_message_recipients r JOIN team_messages m ON m.id=r.message_id LEFT JOIN team_messages parent ON parent.id=m.reply_to_id
@@ -47,15 +47,15 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
       ORDER BY m.created_at DESC,m.id DESC`,[req.auth.id])).rows);
   });
   app.get('/api/news/sent',auth,ready,access,async(req,res)=>{
-    await purgeNews(db);
-    const {rows}=await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,
+    if(purgeOnRead)await purgeNews(db);
+    const {rows}=await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,${automationFields?'COALESCE(m.automation_text,m.text) AS text,m.reminder_kind':'m.text'},m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,
       COALESCE(jsonb_agg(jsonb_build_object('id',r.user_id,'name',COALESCE(u.name,'Ancien collaborateur'),'seen',r.seen,'seenAt',r.seen_at,'archived',r.archived) ORDER BY u.name) FILTER(WHERE r.user_id IS NOT NULL),'[]'::jsonb) AS recipients
       FROM team_messages m LEFT JOIN team_message_recipients r ON r.message_id=m.id LEFT JOIN users u ON u.id=r.user_id
       WHERE m.sender_id=$1 AND ${newsDeadline()}>now() GROUP BY m.id ORDER BY m.created_at DESC,m.id DESC`,[req.auth.id]);res.json(rows);
   });
   app.get('/api/news/threads/:thread',auth,ready,access,async(req,res)=>{
     const thread=Number(req.params.thread);if(!Number.isSafeInteger(thread)||thread<1)throw fail(400,'Fil de discussion invalide.');
-    const rows=(await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,m.text,m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,r.seen,r.archived
+    const rows=(await db.query(`SELECT m.id,m.title,m.sender_id,m.sender_name AS sender,${automationFields?'COALESCE(m.automation_text,m.text) AS text,m.reminder_kind':'m.text'},m.priority,m.created_at,m.attachment_name,m.can_archive,m.planning_week,m.is_reply,m.reply_to_id,COALESCE(m.thread_id,m.id) AS thread_id,m.challenge_digest,m.order_digest,m.merchandising_month,${newsDeadline()} AS expires_at,r.seen,r.archived
       FROM team_messages m LEFT JOIN team_message_recipients r ON r.message_id=m.id AND r.user_id=$1
       WHERE COALESCE(m.thread_id,m.id)=$2 AND ((r.user_id=$1 AND (r.archived OR ${newsDeadline()}>now())) OR (m.sender_id=$1 AND ${newsDeadline()}>now()))
       ORDER BY m.created_at DESC,m.id DESC LIMIT 201`,[req.auth.id,thread])).rows;
@@ -102,7 +102,7 @@ export function registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadPar
       AND (m.can_archive OR $4::boolean IS NOT TRUE)
       RETURNING r.seen,r.archived,m.created_at`,[id,req.auth.id,body.seen??null,body.archived??null]);
     if(!rows[0])throw fail(404,body.archived===true?'Ce message ne peut pas être archivé ou n’est plus disponible.':'Ce message est indisponible ou a expiré.');
-    await purgeNews(db);
+    if(purgeOnRead)await purgeNews(db);
     res.json({ok:true});
   });
 }

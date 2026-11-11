@@ -1,3 +1,4 @@
+import {registerTrainingAttestationImport} from './training-attestation-import.mjs';
 import {registerPortalQuickLinks} from './portal-quick-links.mjs';
 import {registerContactDocuments} from './contact-documents.mjs';
 import {migrateProcedureFiles} from './procedure-file-migration.mjs';
@@ -66,7 +67,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/music/import','/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import'].includes(req.path)||/^\/api\/merchandising\/promotions\/[1-9]\d*\/documents$/.test(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/music/import','/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import','/api/quality/training/imports/analyze'].includes(req.path)||/^\/api\/merchandising\/promotions\/[1-9]\d*\/documents$/.test(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && !allowedOrigins.has(req.get('origin')))return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -94,18 +95,19 @@ export function createApp(db,config) {
   registerTrainingDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:'15mb'})});
   registerProcedures({app,db,auth,ready,admin,adminManagement:config.procedureAdminManagement===true,csrf,viewUniverse,editUniverse,fail,publish,uploadParser:express.json({limit:procedureUploadJsonLimit})});
   registerMerchDocuments({app,db,auth,ready,csrf,viewUniverse,editUniverse,canModify,fail,uploadParser:express.json({limit:'70mb'})});
-  registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify,uploadParser:express.json({limit:'15mb'})});
-  registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'22mb'})});
+  registerMerchandising({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,canModify,searchWeb:config.merchandisingSearch,uploadParser:express.json({limit:'15mb'})});
+  registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,assessmentCompatibility:config.temperatureAssessmentCompatibility===true,uploadParser:express.json({limit:'22mb'})});
   registerTiersPayant({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'200kb'})});
   registerQualityErrors({app,db,auth,ready,csrf,viewUniverse,fail});
-  registerQualityTraining({app,db,auth,ready,viewUniverse,fail});
+  registerQualityTraining({app,db,auth,ready,viewUniverse,fail,structuredFields:config.trainingAttestationsEnabled===true});
+  if(config.trainingAttestationsEnabled===true)registerTrainingAttestationImport({app,db,auth,ready,csrf,viewUniverse,fail});
   registerQualityServices({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'3mb'})});
   registerContacts({app,db,auth,ready,admin,csrf,viewUniverse,fail,publish});
   registerContactDocuments({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser:express.json({limit:'15mb'})});
   const orderMFA=registerOrderMFA({app,db,auth,ready,csrf,viewUniverse,fail,secret});
   app.use('/api/order-planning',auth,ready,viewUniverse("Outils d'aide aux commandes"),orderMFA.guard);
   registerOrderPlanning({app,db,auth,ready,csrf,viewUniverse,editUniverse,fail,secret});
-  registerNews({app,db,auth,ready,csrf,viewUniverse,fail,uploadParser:express.json({limit:'15mb'})});
+  registerNews({app,db,auth,ready,csrf,viewUniverse,fail,purgeOnRead:config.purgeNewsOnRead!==false,automationFields:config.messageAutomationAdminEnabled===true,uploadParser:express.json({limit:'15mb'})});
    // Administrative CRUD only; scheduling and message delivery remain disabled.
    if(config.messageAutomationAdminEnabled===true)registerMessageAutomationAdmin({app,db,auth,ready,admin,csrf,fail});
   const youtrust=config.youtrustClient||createYoutrust({getSetting,setSetting,deleteSetting:key=>db.query('DELETE FROM settings WHERE key=$1',[key]),secret,origin,fail,config,fetchImpl:config.youtrustFetch});
@@ -177,18 +179,19 @@ export function createApp(db,config) {
   });
   registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeImportFetch??config.employeeScanFetch,requireConsent:config.employeeImportConsentRequired===true,previewRestrictions:config.employeeAccountsReadOnly?{accountReadOnly:config.scalingoAccountManagement!==true}:undefined,uploadParser:express.json({limit:'15mb'})});
   registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true,scalingoAccountManagement:config.scalingoAccountManagement===true});
+  const calendarFetch=config.calendarFetch||fetch;
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');
     let tokens=decrypt(stored,secret);
     if(tokens.expires_at>Date.now()+60000)return tokens;
     if(!tokens.refresh_token)throw fail(409,'Reconnectez Google Agenda.');
-    const result=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,refresh_token:tokens.refresh_token,grant_type:'refresh_token'}),signal:AbortSignal.timeout(20000)});
+    const result=await calendarFetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,refresh_token:tokens.refresh_token,grant_type:'refresh_token'}),signal:AbortSignal.timeout(20000)});
     if(!result.ok)throw fail(result.status===429||result.status>=500?502:409,result.status===429||result.status>=500?'Google Agenda est momentanément indisponible. Nouvelle tentative automatique.':'L’autorisation Google doit être renouvelée.');
     const fresh=await result.json();tokens={...tokens,...fresh,expires_at:Date.now()+fresh.expires_in*1000};
     await setSetting('google_tokens',encrypt(tokens,secret));return tokens;
   }
   async function googleGet(path){
-    const tokens=await googleTokens();const result=await fetch('https://www.googleapis.com/calendar/v3/'+path,{headers:{Authorization:'Bearer '+tokens.access_token},signal:AbortSignal.timeout(20000)});
+    const tokens=await googleTokens();const result=await calendarFetch('https://www.googleapis.com/calendar/v3/'+path,{headers:{Authorization:'Bearer '+tokens.access_token},signal:AbortSignal.timeout(20000)});
     if(!result.ok)throw fail(502,'Google Agenda est momentanément indisponible, ou cet agenda n’est pas accessible.');
     return result.json();
   }
@@ -214,15 +217,16 @@ export function createApp(db,config) {
       await setSetting('sync_error','');
     })().catch(async error=>{await setSetting('sync_error',error.status?error.message:'Échec de la synchronisation. Réessayez plus tard.');throw error;}).finally(()=>{syncing=null;});return syncing;
   }
-  const youtube=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt});
-  const youtubeMusic=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt,playlistTarget:'music'});
+  const youtube=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt,fetchImpl:config.youtubeFetch||fetch});
+  const youtubeMusic=createYouTube({db,config,secret,getSetting,setSetting,fail,encrypt,decrypt,playlistTarget:'music',fetchImpl:config.youtubeFetch||fetch});
   app.get('/api/youtube-music/status',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await youtubeMusic.status()));
   app.get('/api/youtube-music/playlists',auth,ready,admin,async(req,res)=>{const selected=await youtubeMusic.status();res.json(selected.playlistId?[{id:selected.playlistId,name:selected.playlistName}]:[]);});
   app.post('/api/youtube-music/playlist',auth,ready,admin,csrf,async(req,res)=>{const selected=await youtubeMusic.status();if(!selected.playlistId||req.body.id!==selected.playlistId)throw fail(409,'La playlist équipe est la seule destination autorisée.');res.json(await youtubeMusic.choosePlaylist(req.body.id));});
   app.post('/api/youtube-music/playlists',auth,ready,admin,csrf,async(req,res)=>{throw fail(409,'Utilisez la playlist équipe déjà configurée, créée dans YouTube Music.');});
   app.get('/api/youtube/status',auth,ready,viewUniverse('Fun'),async(req,res)=>res.json(await youtube.status()));
   app.post('/api/youtube/connect',auth,ready,admin,csrf,async(req,res)=>{
-    if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
+    if(config.enforceOAuthCanonicalOrigin===true&&req.get('host')!==new URL(origin).host)throw fail(409,'Ouvrez la session administrateur sur '+origin+'/trevoux pour établir cette connexion.');
+    if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google du portail doit être complétée.');
     const state='youtube_'+token(),verifier=token();
     await db.query("UPDATE sessions SET oauth_state=$1,oauth_expires=now()+interval '10 minutes',oauth_verifier=$2 WHERE id=$3",[digest(state),verifier,req.auth.session_id]);
     const params=new URLSearchParams({client_id:config.googleId,redirect_uri:callback,response_type:'code',scope:youtube.scope,access_type:'offline',prompt:'select_account consent',state,code_challenge:Buffer.from(digest(verifier),'hex').toString('base64url'),code_challenge_method:'S256'});
@@ -236,6 +240,7 @@ export function createApp(db,config) {
     res.json({ok:true});
   });
   app.post('/api/mail/connect',auth,ready,admin,csrf,async(req,res)=>{
+    if(config.enforceOAuthCanonicalOrigin===true&&req.get('host')!==new URL(origin).host)throw fail(409,'Ouvrez la session administrateur sur '+origin+'/trevoux pour établir cette connexion.');
     if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google du portail doit être complétée.');
     const state='mail_'+token(),verifier=token();
     await db.query("UPDATE sessions SET oauth_state=$1,oauth_expires=now()+interval '10 minutes',oauth_verifier=$2 WHERE id=$3",[digest(state),verifier,req.auth.session_id]);
@@ -244,7 +249,8 @@ export function createApp(db,config) {
   });
   app.post('/api/mail/disconnect',auth,ready,admin,csrf,async(req,res)=>{await db.query("DELETE FROM settings WHERE key='mail_tokens'");res.json({ok:true});});
   app.post('/api/google/connect',auth,ready,admin,csrf,async(req,res)=>{
-    if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google doit être ajoutée dans Render.');
+    if(config.enforceOAuthCanonicalOrigin===true&&req.get('host')!==new URL(origin).host)throw fail(409,'Ouvrez la session administrateur sur '+origin+'/trevoux pour établir cette connexion.');
+    if(!config.googleId||!config.googleSecret)throw fail(409,'La configuration Google du portail doit être complétée.');
     const state=token(),verifier=token();
     await db.query("UPDATE sessions SET oauth_state=$1,oauth_expires=now()+interval '10 minutes',oauth_verifier=$2 WHERE id=$3",[digest(state),verifier,req.auth.session_id]);
     const params=new URLSearchParams({client_id:config.googleId,redirect_uri:callback,response_type:'code',scope:'openid email https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.calendarlist.readonly',access_type:'offline',prompt:'consent',login_hint:config.googleEmail,state,code_challenge:Buffer.from(digest(verifier),'hex').toString('base64url'),code_challenge_method:'S256'});
@@ -257,11 +263,12 @@ export function createApp(db,config) {
     const forYouTube=state.startsWith('youtube_'),forMail=state.startsWith('mail_');
     if(req.query.error)return res.redirect(forMail?'/?mail=refused':forYouTube?'/?youtube=refused':'/?google=refused');
     if(typeof req.query.code!=='string')throw fail(400,'Autorisation Google invalide.');
-    const result=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,code:req.query.code,grant_type:'authorization_code',redirect_uri:callback,code_verifier:rows[0].verifier}),signal:AbortSignal.timeout(20000)});
+    const oauthFetch=config.oauthFetch||calendarFetch;
+    const result=await oauthFetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,code:req.query.code,grant_type:'authorization_code',redirect_uri:callback,code_verifier:rows[0].verifier}),signal:AbortSignal.timeout(20000)});
     if(!result.ok)throw fail(400,'Connexion Google impossible. Vérifiez les réglages puis réessayez.');
     const tokens=await result.json();
     if(forYouTube){await youtube.connect(tokens);return res.redirect('/?youtube=connected');}
-    const identity=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token},signal:AbortSignal.timeout(20000)});
+    const identity=await oauthFetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token},signal:AbortSignal.timeout(20000)});
     const profile=identity.ok?await identity.json():{};
     if(!profile.email_verified||(forMail?!sameMailAccount(profile.email,mailSender):profile.email?.toLowerCase()!==config.googleEmail.toLowerCase()))throw fail(403,'Connectez le compte Google de la pharmacie.');
     const scopes=new Set((tokens.scope||'').split(' '));
@@ -295,7 +302,7 @@ export function createApp(db,config) {
     if(syncing){try{await syncing;}catch{}}
     const stored=await getSetting('google_tokens');
     await db.query("DELETE FROM settings WHERE key IN ('google_tokens','calendar_id','calendar_name','sync_error')");await db.query('DELETE FROM calendar_cache');
-    if(stored){const t=decrypt(stored,secret);try{await fetch('https://oauth2.googleapis.com/revoke',{method:'POST',body:new URLSearchParams({token:t.refresh_token||t.access_token}),signal:AbortSignal.timeout(10000)});}catch{}}
+    if(stored){const t=decrypt(stored,secret);try{await calendarFetch('https://oauth2.googleapis.com/revoke',{method:'POST',body:new URLSearchParams({token:t.refresh_token||t.access_token}),signal:AbortSignal.timeout(10000)});}catch{}}
     res.json({ok:true});
   });
   app.post('/api/google/sync',auth,ready,admin,csrf,async(req,res)=>{await sync();res.json({ok:true});});
@@ -304,7 +311,7 @@ export function createApp(db,config) {
   app.get('/api/calendar',auth,ready,async(req,res)=>{
     if(!canAccess(req.auth,'Agenda'))throw fail(403,'Vous n’avez pas accès à l’agenda.');
     const cached=(await db.query('SELECT * FROM calendar_cache WHERE singleton=TRUE')).rows[0];
-    if(!cached||Date.now()-new Date(cached.synced_at).getTime()>15*60000){try{await sync();}catch{}}
+    if(config.calendarReadThrough!==false&&(!cached||Date.now()-new Date(cached.synced_at).getTime()>15*60000)){try{await sync();}catch{}}
     const current=(await db.query('SELECT * FROM calendar_cache WHERE singleton=TRUE')).rows[0];
     res.json({name:await getSetting('calendar_name')||'Agenda équipe',events:await personalCalendarEvents(req.auth.id,current?.events||[]),syncedAt:current?.synced_at||null,error:await getSetting('sync_error')||'',connected:!!await getSetting('google_tokens')});
   });

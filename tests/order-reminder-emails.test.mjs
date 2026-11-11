@@ -18,3 +18,9 @@ test('Mail du mardi : référent actif résolu, un seul envoi, succès et résul
  await orderReminderEmails(db,mailer,'https://portailtrevoux.onrender.com',new Date('2026-10-20T06:00:00Z'));await orderReminderEmails(db,mailer,'https://portailtrevoux.onrender.com',new Date('2026-10-20T07:00:00Z'));assert.equal(sends,1);assert.equal(state,error?'uncertain':'sent');assert.equal(queries[0].args[0],'2026-10-20');
  }
 });
+test('Scheduled order mail keeps its own occurrence in claim and result, rather than the nearest Tuesday',async()=>{
+ const row={period:'2026-11-19',user_id:7,email:'synthetic@example.invalid',service:'Commandes programmées',heading:'Synthetic',digest:{items:[]}},writes=[];
+ const db={query:async(sql,args)=>{if(sql.startsWith('SELECT'))return{rows:[row]};writes.push(args);return{rows:sql.startsWith('INSERT')?[{user_id:7}]:[]};}};
+ let sends=0;await orderReminderEmails(db,{status:async()=>({connected:true,sender:'pharmacie.trevoux@gmail.com'}),sendText:async()=>{sends++;return'synthetic-id';}},'https://www.portailplus-officine.fr',new Date('2026-11-20T10:00:00Z'),true);
+ assert.equal(sends,1);assert(writes.every(args=>args[0]==='2026-11-19'));
+});

@@ -56,9 +56,9 @@ try{
  if(result.rows[0]?.name!=='portailplus_7495'||result.rows[0]?.tls!==true)throw Error('Unexpected database or insecure connection');
  // Staging accounts may now be imported from Render; never recreate demo identities.
  const demoEmails=['adjoint.demo@portailplus.invalid','preparateur.demo@portailplus.invalid','preparatrice.demo@portailplus.invalid','apprenti.demo@portailplus.invalid','rayonniste.demo@portailplus.invalid'];
- const users=await db.query('SELECT email,role,active FROM users');
- const admin=users.rows.filter(u=>u.email==='admin-test@portailplus.invalid'&&u.role==='admin'&&u.active===true);
- if(admin.length!==1)throw Error('Expected staging administrator missing');
+ const users=await db.query('SELECT email,role,active,must_change FROM users');
+ const admin=users.rows.filter(u=>u.role==='admin'&&u.active===true&&!u.must_change);
+ if(!admin.length)throw Error('An active ready administrator is required; no account is created');
  // The former demo-only roster and template seed have been permanently disabled.
  // Real collaborators remain unable to authenticate until separately configured.
  // Preview bypasses initialize(): prepare the additive schema used by its routes
@@ -108,7 +108,7 @@ try{
  registerScalingoAccountCreation({gate,db,adminAuth:cleanupAuth,secret:env.APP_SECRET});
  registerScalingoPasswordChange(gate,app);
  registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db),origin,secret:env.APP_SECRET,isAllowedOrigin:isScalingoOrigin,accountManagement:true});
- registerScalingoRights({gate,db,adminAuth:cleanupAuth,origin,env,isAllowedOrigin:isScalingoOrigin});
+ registerScalingoRights({gate,db,adminAuth:scalingoAdminAuth(db),origin,env,isAllowedOrigin:isScalingoOrigin});
  gate.use(scalingoUniverseBoundary(db));
  // POST /api/quality/tiers-payant/import: real app auth, CSRF, referent rights and validation.
  registerScalingoTiersPayantImport(gate,app);

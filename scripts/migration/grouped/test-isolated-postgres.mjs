@@ -19,6 +19,7 @@ try{
  if(!ready)throw Error('SYNTHETIC_POSTGRES_NOT_READY');
  const address=docker('port',name,'5432/tcp');if(!/^127\.0\.0\.1:\d+$/.test(address))throw Error('LOOPBACK_BIND_REQUIRED');
  const testFiles=['scripts/migration/grouped/archive-integration.test.mjs','scripts/migration/grouped/execution-preflight.test.mjs','scripts/migration/grouped/execution-policy.test.mjs'];
+ if(process.argv.includes('--production-parity')){docker('exec',name,'psql','-h','127.0.0.1','-U','postgres','-v','ON_ERROR_STOP=1','-c','CREATE DATABASE portailplus_publication_test');env.PORTAIL_PUBLICATION_TEST_DATABASE_URL='postgresql://postgres@'+address+'/portailplus_publication_test';testFiles.push('tests/scalingo-production-profile-postgres.test.mjs','tests/scalingo-production-policy.test.mjs','tests/scalingo-schedule-publication.test.mjs');}
  if(process.argv.includes('--parity'))testFiles.push('tests/parity-schema.test.mjs');
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap',...testFiles],{cwd:root,env:{...env,PORTAIL_SYNTHETIC_POSTGRES_ADDRESS:address,PORTAIL_SYNTHETIC_POSTGRES_CA:join(directory,'server.crt'),PORTAIL_SYNTHETIC_POSTGRES_CONTAINER:name},stdio:'inherit'});
  if(result.error)throw result.error;process.exitCode=result.status??1;

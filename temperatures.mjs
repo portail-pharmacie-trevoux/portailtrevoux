@@ -3,15 +3,17 @@ import {parseTemperatureWorkbook} from './temperature-xlsx.mjs';
 import {monthlySummary,parisStamp,stampMs,reviewedExcursions,dailyValidations} from './temperature-analysis.mjs';
 const universe="Outils d'aide à la démarche qualité";
 const today=()=>parisStamp(new Date().toISOString().slice(0,19).replace('T',' ')).slice(0,10);
-export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser}){
+export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,fail,uploadParser,assessmentCompatibility=false}){
  const read=[auth,ready,viewUniverse(universe)],write=[...read,csrf];
  const validMonth=m=>{if(typeof m!=='string'||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(m))throw fail(400,'Mois invalide.');return m;};
+ // Explicit Render assessments are read compatibly, without rewriting historical rows.
+ const validationColumn=assessmentCompatibility?"COALESCE(validation,CASE assessment WHEN 'ok' THEN 'V' WHEN 'problem' THEN 'X' END) AS validation":'validation';
  const asStamp="to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')";
  app.get('/api/quality/temperatures',...read,async(req,res)=>{
   const month=validMonth(req.query.month),sensors=(await db.query('SELECT * FROM temperature_sensors ORDER BY name,id')).rows;
   // Use complete retained episodes so validation survives midnight/month boundaries.
   const readings=(await db.query(`SELECT sensor_id,${asStamp} AS time,value FROM temperature_readings WHERE recorded_at>=now()-interval '3 years' ORDER BY sensor_id,recorded_at`)).rows;
-  const comments=(await db.query("SELECT id,sensor_id,to_char(happened_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') AS happened_at,text,validation,revision,created_at,updated_at,operator_name FROM temperature_comments WHERE happened_at>=now()-interval '3 years' ORDER BY created_at,id")).rows;
+  const comments=(await db.query(`SELECT id,sensor_id,to_char(happened_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') AS happened_at,text,${validationColumn},revision,created_at,updated_at,operator_name FROM temperature_comments WHERE happened_at>=now()-interval '3 years' ORDER BY created_at,id`)).rows;
   const summaries=sensors.map(s=>{
    const all=readings.filter(r=>r.sensor_id===s.id).map(r=>[r.time,r.value]);
    const list=all.filter(r=>parisStamp(r[0]).slice(0,7)===month),events=reviewedExcursions(all,comments.filter(c=>c.sensor_id===s.id),s.low_threshold,s.high_threshold);
@@ -33,7 +35,7 @@ export function registerTemperatures({app,db,auth,ready,admin,csrf,viewUniverse,
  app.get('/api/quality/temperatures/:sensor',...read,async(req,res)=>{
   const month=validMonth(req.query.month),sensor=(await db.query('SELECT * FROM temperature_sensors WHERE id=$1',[req.params.sensor])).rows[0];if(!sensor)throw fail(404,'Sonde introuvable.');
   const all=(await db.query(`SELECT ${asStamp} AS time,value FROM temperature_readings WHERE sensor_id=$1 AND recorded_at>=now()-interval '3 years' ORDER BY recorded_at`,[sensor.id])).rows.map(r=>[r.time,r.value]);
-  const comments=(await db.query("SELECT id,to_char(happened_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') AS happened_at,text,validation,revision,created_at,updated_at,operator_name FROM temperature_comments WHERE sensor_id=$1 AND happened_at>=now()-interval '3 years' ORDER BY created_at,id",[sensor.id])).rows;
+  const comments=(await db.query(`SELECT id,to_char(happened_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') AS happened_at,text,${validationColumn},revision,created_at,updated_at,operator_name FROM temperature_comments WHERE sensor_id=$1 AND happened_at>=now()-interval '3 years' ORDER BY created_at,id`,[sensor.id])).rows;
   const events=reviewedExcursions(all,comments,sensor.low_threshold,sensor.high_threshold).filter(e=>parisStamp(e.start).slice(0,7)<=month&&parisStamp(e.last).slice(0,7)>=month);
   const readings=all.filter(r=>parisStamp(r[0]).slice(0,7)===month);const gaps=[];for(let i=1;i<all.length;i++){const seconds=(stampMs(all[i][0])-stampMs(all[i-1][0]))/1000;if(seconds>900&&parisStamp(all[i][0]).slice(0,7)>=month&&parisStamp(all[i-1][0]).slice(0,7)<=month)gaps.push({start:all[i-1][0],end:all[i][0],seconds});}
   res.json({sensor,month,readings,events,gaps});

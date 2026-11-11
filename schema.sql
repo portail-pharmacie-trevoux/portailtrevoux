@@ -485,3 +485,7 @@ WITH automatic_states AS (
 ) UPDATE quality_errors e SET status=a.value,revision=e.revision+1,
  status_history=e.status_history||jsonb_build_array(jsonb_build_object('from',e.status,'to',a.value,'at',now(),'by','Portail+ — état automatique'))
  FROM automatic_states a WHERE e.id=a.id AND e.status<>a.value;
+
+-- Prepared parity candidate: apply only after schema review and explicit authorization.
+ALTER TABLE calendar_tasks ADD COLUMN IF NOT EXISTS source_message_id INTEGER REFERENCES team_messages(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS calendar_tasks_source_message ON calendar_tasks(user_id,source_message_id) WHERE source_message_id IS NOT NULL;

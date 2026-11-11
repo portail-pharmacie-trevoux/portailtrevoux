@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import pg from 'pg';
+import {readFile} from 'node:fs/promises';
 import {once} from 'node:events';
 import {createApp} from '../server.mjs';
 import {token,digest} from '../security.mjs';
@@ -15,7 +16,7 @@ test('Scalingo : publication uniquement, sans ouverture générale des écriture
 });
 test('Scalingo/PostgreSQL : publication atomique, message interne, Vu, idempotence et concurrence',{skip:!database},async t=>{
  const url=new URL(database);assert.equal(url.hostname,'127.0.0.1');assert.equal(url.pathname,'/portailplus_publication_test');assert.equal(url.search,'');
- const db=new pg.Pool({connectionString:database,max:5});t.after(()=>db.end());
+ const db=new pg.Pool({connectionString:database,max:5,...(process.env.PORTAIL_SYNTHETIC_POSTGRES_CA?{ssl:{ca:await readFile(process.env.PORTAIL_SYNTHETIC_POSTGRES_CA,'utf8'),rejectUnauthorized:true}}:{})});t.after(()=>db.end());
  await db.query(`DROP TABLE IF EXISTS team_message_recipients,team_messages,publications,schedule_weeks,sessions,users CASCADE;
  CREATE TABLE users(id integer PRIMARY KEY,name text,job text,schedule_position integer,role text,active boolean,must_change boolean,rights jsonb DEFAULT '[]',edit_rights jsonb DEFAULT '[]',permissions_configured boolean DEFAULT true);
  CREATE TABLE sessions(id text PRIMARY KEY,user_id integer REFERENCES users(id),csrf text,expires_at timestamptz);
@@ -41,9 +42,9 @@ test('Scalingo/PostgreSQL : publication atomique, message interne, Vu, idempoten
  const published=(await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0];assert.deepEqual(published.published,draft);assert.equal(published.published_revision,3);assert.equal(published.revision,3);assert(published.published_at>new Date('2026-10-01T10:00:00Z'));
  const loaded=await(await readSchedule()).json();assert.equal(loaded.unpublishedChanges,false);assert.equal(loaded.publishedAt,published.published_at.toISOString());assert.deepEqual((await(await readSchedule(2)).json()).entries,[entry]);
  const notices=async()=>(await db.query('SELECT * FROM team_messages WHERE planning_week=$1 ORDER BY id',[week])).rows;assert.equal((await notices()).length,1);const notice=(await notices())[0];assert.equal(notice.sender_name,'Portail +');assert.match(notice.text,/02\/11\/2026 au 08\/11\/2026/);assert.match(notice.text,/Merci de consulter.*Emplois du temps/);assert.equal(notice.priority,'normal');assert.equal(notice.can_archive,false);
- const deliveries=(await db.query('SELECT * FROM team_message_recipients WHERE message_id=$1 ORDER BY user_id',[notice.id])).rows;assert.deepEqual(deliveries.map(r=>r.user_id),[1,2,3,5]);assert(deliveries.every(r=>!r.seen&&!r.archived));
- for(const user of [2,3]){const inbox=await(await request('/api/news','GET',undefined,user)).json();assert(inbox.some(m=>m.id===notice.id&&m.text===notice.text));}
- assert.equal((await request('/api/news/'+notice.id,'PATCH',{seen:true},2,{'x-csrf-token':'bad'})).status,403);assert.equal((await request('/api/news/'+notice.id,'PATCH',{seen:true},2)).status,200);const seen=(await db.query('SELECT user_id,seen,seen_at FROM team_message_recipients WHERE message_id=$1 ORDER BY user_id',[notice.id])).rows;assert(seen.find(r=>r.user_id===2).seen_at);assert.equal(seen.find(r=>r.user_id===3).seen,false);
+ const deliveries=(await db.query('SELECT * FROM team_message_recipients WHERE message_id=$1 ORDER BY user_id',[notice.id])).rows;assert.deepEqual(deliveries.map(r=>r.user_id),[2]);assert(deliveries.every(r=>!r.seen&&!r.archived));
+ for(const user of [2]){const inbox=await(await request('/api/news','GET',undefined,user)).json();assert(inbox.some(m=>m.id===notice.id&&m.text===notice.text));}
+ assert.equal((await request('/api/news/'+notice.id,'PATCH',{seen:true},2,{'x-csrf-token':'bad'})).status,403);assert.equal((await request('/api/news/'+notice.id,'PATCH',{seen:true},2)).status,200);const seen=(await db.query('SELECT user_id,seen,seen_at FROM team_message_recipients WHERE message_id=$1 ORDER BY user_id',[notice.id])).rows;assert(seen.find(r=>r.user_id===2).seen_at);assert.equal(seen.some(r=>r.user_id===3),false);
  assert.equal((await request('/api/news/'+notice.id,'PATCH',{archived:true},2)).status,404);
  assert.equal((await(await publish()).json()).alreadyPublished,true);assert.equal((await notices()).length,1);assert.equal((await db.query('SELECT count(*)::int AS n FROM publications')).rows[0].n,1);
  // A new draft revision may publish once; a stale revision cannot overwrite it.
@@ -58,7 +59,7 @@ test('Scalingo/PostgreSQL : publication atomique, message interne, Vu, idempoten
   assert.equal((await(await request('/api/schedule/'+legacyWeek+'/publish','POST',{revision:1})).json()).alreadyPublished,true);
  }
  // Simulated delivery failure must roll back the publication and its notice.
- await db.query("UPDATE schedule_weeks SET revision=5 WHERE week=$1",[week]);const beforeFailure=(await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0];await db.query("CREATE FUNCTION reject_local_delivery() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'local fixture failure'; END $$; CREATE TRIGGER reject_delivery BEFORE INSERT ON team_message_recipients FOR EACH ROW EXECUTE FUNCTION reject_local_delivery()");assert.equal((await publish(5)).status,500);assert.deepEqual((await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0],beforeFailure);assert.equal((await notices()).length,2);assert.equal((await db.query('SELECT count(*)::int AS n FROM publications')).rows[0].n,5);await db.query('DROP TRIGGER reject_delivery ON team_message_recipients; DROP FUNCTION reject_local_delivery()');
+ await db.query(`UPDATE schedule_weeks SET revision=5,draft=jsonb_set(draft,'{2:2026-11-02,kind}',to_jsonb('conge'::text)) WHERE week=$1`,[week]);const beforeFailure=(await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0];await db.query("CREATE FUNCTION reject_local_delivery() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'local fixture failure'; END $$; CREATE TRIGGER reject_delivery BEFORE INSERT ON team_message_recipients FOR EACH ROW EXECUTE FUNCTION reject_local_delivery()");assert.equal((await publish(5)).status,500);assert.deepEqual((await db.query('SELECT * FROM schedule_weeks WHERE week=$1',[week])).rows[0],beforeFailure);assert.equal((await notices()).length,2);assert.equal((await db.query('SELECT count(*)::int AS n FROM publications')).rows[0].n,5);await db.query('DROP TRIGGER reject_delivery ON team_message_recipients; DROP FUNCTION reject_local_delivery()');
  server.closeAllConnections();await new Promise(r=>server.close(r));server=start();await once(server,'listening');const afterReload=await(await readSchedule()).json();assert.equal(afterReload.unpublishedChanges,true);assert.equal(afterReload.publishedAt,beforeFailure.published_at.toISOString());assert((await(await request('/api/news','GET',undefined,2)).json()).some(m=>m.id===notice.id&&m.seen));
  assert.equal(external,0);assert.deepEqual(await protectedWeek(),before);assert.deepEqual(await protectedMessage(),messageBefore);
 });

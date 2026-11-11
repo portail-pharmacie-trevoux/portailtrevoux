@@ -29,7 +29,7 @@ test('Filtre température : seules les routes exactes import et consultation de 
  for(const [method,url] of [['DELETE',path],['POST',path+'/other'],['PUT','/api/quality/temperatures/FRIGO_TEST']])assert.equal(isScalingoTemperatureRoute({method,path:url}),false);
 });
 test('Import Scalingo : administrateur, session, origine et CSRF vérifiés avant le parseur volumineux ; erreurs JSON explicites',async t=>{
- let actor={id:1,email:'admin-test@portailplus.invalid',role:'admin',active:true,must_change:false,csrf:'csrf'};
+ let actor={id:1,email:'synthetic-personal-admin@example.invalid',role:'admin',active:true,must_change:false,csrf:'csrf'};
  const db={query:async()=>({rows:actor?[actor]:[]})},gate=express();registerScalingoTemperaturePreview(gate,{db,origin});gate.post(path,(req,res)=>res.json({accepted:true}));gate.use((e,req,res,next)=>res.status(e.status||500).json({error:e.message}));
  const server=gate.listen(0);t.after(()=>server.close());const url='http://127.0.0.1:'+server.address().port+path;
  const headers={cookie:'trevoux_session='+token(),origin,'x-csrf-token':'csrf','content-type':'application/json'};

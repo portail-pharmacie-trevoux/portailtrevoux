@@ -55,6 +55,18 @@ export function copySchedule(source,sourceWeek,targetWeek,allowedIds){
   }
   return result;
 }
+// Compare only information displayed on the collaborator's published schedule.
+export function changedScheduleUsers(previous={},draft={}){
+ const normalize=e=>({kind:e.kind,slots:(e.slots||[]).map(([start,end],i)=>({start,end,kind:slotKind(e,i),post:e.postIds?.[i]??null,comment:e.comments?.[i]||''})),durations:(e.durations||[]).map(d=>({kind:d.kind,minutes:d.minutes,comment:d.comment||''})),mealTicket:!!e.mealTicket,actualMinutes:e.actualMinutes??null,leavePart:e.leavePart??null});
+ const users=new Set();
+ for(const key of new Set([...Object.keys(previous||{}),...Object.keys(draft||{})])){
+  const a=previous?.[key],b=draft?.[key];
+  if(JSON.stringify(a?normalize(a):null)!==JSON.stringify(b?normalize(b):null)){
+   const id=Number((b||a).userId);if(Number.isSafeInteger(id)&&id>0)users.add(id);
+  }
+ }
+ return [...users];
+}
 export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModify,fail}){
   const tools=registerScheduleTools({app,db,auth,ready,admin,csrf,canAccess,fail});
   const access=(req,res,next)=>canAccess(req.auth,'Emplois du temps')?next():next(fail(403,'Accès refusé.'));
@@ -86,7 +98,7 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
     const people=scope==='mine'?all.filter(p=>p.id===req.auth.id):all,ids=new Set(people.map(p=>p.id));
     const entries=Object.values(isAdmin?row?.draft||{}:row?.published||{}).filter(e=>ids.has(e.userId)).map(entry=>{if(req.auth.role==='admin')return entry;const {mealTicket,actualMinutes,...e}=entry;return {...redactScheduleEntry(e,entry.userId===req.auth.id),...(entry.userId===req.auth.id&&mealTicket!==undefined?{mealTicket}:{}),...(entry.userId===req.auth.id&&actualMinutes!==undefined?{actualMinutes}:{}),...(sensitive(entry)?{readOnly:true}: {})};});
     res.json({week,people,entries,lockedDays:row?.locked_days||{},canEdit:isAdmin,draftEntryCount:isAdmin?Object.keys(row?.draft||{}).length:undefined,revision:isAdmin?row?.revision||0:undefined,publishedAt:row?.published_at||null,
-      unpublishedChanges:isAdmin?!!row&&row.revision!==row.published_revision:undefined});
+      unpublishedChanges:isAdmin?!!row&&(!row.published_at||row.revision!==row.published_revision||JSON.stringify(row.draft)!==JSON.stringify(row.published)):undefined});
   });
   app.put('/api/schedule/:week/day',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision),entry=validateDay(req.body,week);
@@ -117,7 +129,12 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
   });
   app.post('/api/schedule/:week/publish',auth,ready,editor,csrf,async(req,res)=>{
     const week=validWeek(req.params.week),revision=validRevision(req.body.revision);await ensureWeek(week);
-    const {rows}=await db.query(`WITH changed AS (
+    const client=await db.connect();try{
+    await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(78451024)');
+    const previous=(await client.query('SELECT * FROM schedule_weeks WHERE week=$1::date FOR UPDATE',[week])).rows[0];
+    if(!previous||previous.revision!==revision)throw conflict();
+    const affected=changedScheduleUsers(previous.published||{},previous.draft||{});
+    const {rows}=await client.query(`WITH changed AS (
       UPDATE schedule_weeks SET published=draft,published_revision=revision,published_at=now()
       WHERE week=$1::date AND revision=$2 AND (published_at IS NULL OR published_revision IS DISTINCT FROM revision OR published IS DISTINCT FROM draft)
       RETURNING published_at
@@ -125,18 +142,19 @@ export function registerSchedule({app,db,auth,ready,admin,csrf,canAccess,canModi
       INSERT INTO publications(universe,title) SELECT 'Emplois du temps',$3 FROM changed RETURNING id
     ), notice AS (
       INSERT INTO team_messages(sender_name,text,priority,can_archive,planning_week)
-      SELECT 'Portail +',$4,'normal',FALSE,$1::date FROM changed RETURNING id
+      SELECT 'Portail +',$4,'normal',FALSE,$1::date FROM changed WHERE EXISTS(SELECT 1 FROM users WHERE active=TRUE AND id=ANY($5::int[])) RETURNING id
     ), deliveries AS (
       INSERT INTO team_message_recipients(message_id,user_id)
-      SELECT notice.id,u.id FROM notice CROSS JOIN users u WHERE u.active=TRUE RETURNING message_id
-    ) SELECT publication.id,changed.published_at,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication CROSS JOIN changed`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Un nouvel emploi du temps est disponible pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.']);
+      SELECT notice.id,u.id FROM notice CROSS JOIN users u WHERE u.active=TRUE AND u.id=ANY($5::int[]) RETURNING message_id
+    ) SELECT publication.id,changed.published_at,(SELECT COUNT(*) FROM deliveries) AS notified FROM publication CROSS JOIN changed`,[week,revision,'Planning de la semaine du '+week.split('-').reverse().join('/')+' publié','Un nouvel emploi du temps est disponible pour la semaine du '+week.split('-').reverse().join('/')+' au '+shiftDate(week,6).split('-').reverse().join('/')+'. Merci de consulter votre nouvel emploi du temps dans la rubrique Emplois du temps.',affected]);
     if(!rows.length){
-      const row=(await db.query('SELECT revision,published_revision,published_at,published IS NOT DISTINCT FROM draft AS publication_matches_draft FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];
+      const row=(await client.query('SELECT revision,published_revision,published_at,published IS NOT DISTINCT FROM draft AS publication_matches_draft FROM schedule_weeks WHERE week=$1::date',[week])).rows[0];
       if(row?.revision!==revision)throw conflict();
       if(!row.published_at||row.published_revision!==revision||row.publication_matches_draft!==true)throw fail(409,'La publication n’a pas été enregistrée. Rechargez la semaine avant de réessayer.');
-      return res.json({ok:true,alreadyPublished:true,publishedRevision:row.published_revision,publishedAt:row.published_at});
+      await client.query('COMMIT');return res.json({ok:true,alreadyPublished:true,publishedRevision:row.published_revision,publishedAt:row.published_at});
     }
-    res.json({ok:true,publishedRevision:revision,publishedAt:rows[0].published_at});
+    await client.query('COMMIT');res.json({ok:true,publishedRevision:revision,publishedAt:rows[0].published_at,notified:Number(rows[0].notified||0)});
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
   });
 }
 
