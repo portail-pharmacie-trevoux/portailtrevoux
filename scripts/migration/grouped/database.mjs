@@ -91,10 +91,10 @@ async function materialize(c,op,schema){
  }
 }
 const order=['schedule_posts','schedule_templates','leave_requests','schedule_weeks','leave_schedule_changes','message_automations','team_messages','team_message_recipients','message_automation_runs','message_automation_changes','publications','publication_reads'];
-export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{},decisions={}}){
+export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{},beforeWrite=async()=>{},decisions={}}){
  if(approval?.approved!==true||!approval.reference||!approval.backupReference||approval.sourceDigest!==source.digest||!approval.targetDigest)throw fail('EXPLICIT_BATCH_AUTHORIZATION_REQUIRED');
  if(Object.keys(decisions).length&&approval.decisionsDigest!==hash(decisions))throw fail('EXPLICIT_DECISION_AUTHORIZATION_REQUIRED');
- const c=await pool.connect();try{
+ const c=await pool.connect();let commitStarted=false;try{
   await c.query('BEGIN');await guard(c,'portailplus_7495');await c.query("SET LOCAL lock_timeout='3s'");await c.query("SET LOCAL statement_timeout='30s'");await c.query("SET LOCAL idle_in_transaction_session_timeout='30s'");
   await c.query("SELECT pg_advisory_xact_lock(hashtext('portailplus-grouped-render-migration'))");
   const present=(await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name=ANY($1::text[])",[Object.keys(tables)])).rows.map(r=>r.table_name);
@@ -104,6 +104,7 @@ export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{
   const before=await readSnapshot(c);if(before.digest!==approval.targetDigest)throw fail('DESTINATION_CHANGED_SINCE_AUDIT');
   if(approval.decisionsDigest!==undefined&&approval.decisionsDigest!==hash(decisions))throw fail('DECISIONS_CHANGED');
   const plan=makePlan(source,before,decisions);plan.issues.push(...reviewSchema(source,before));if(plan.issues.length)throw fail('GROUPED_CONFLICTS',{issues:plan.issues});
+  await beforeWrite(c,before);
   if(before.ddl.some(t=>!t.includes('.')))await c.query(automationDDL);
   for(const item of before.ddl.filter(t=>t.includes('.'))){const [table,col]=item.split('.');await c.query('ALTER TABLE public.'+quote(table)+' ADD COLUMN '+quote(col)+' TEXT');}
   const schema=(await c.query("SELECT table_name,column_name,udt_name FROM information_schema.columns WHERE table_schema='public' AND table_name=ANY($1::text[]) ORDER BY table_name,ordinal_position",[Object.keys(tables)])).rows;
@@ -130,6 +131,8 @@ export async function applyGrouped({source,pool,approval,beforeCommit=async()=>{
   // The final receipt must include the ledger written above, not its pre-write value.
   const committedSnapshot={...after,ledger:plan.nextLedger};delete committedSnapshot.digest;
   const result={...summarize(plan),committed:true,sourceDigest:source.digest,ledgerDigest:hash(plan.nextLedger),targetAfterDigest:hash(committedSnapshot),totalInserted:plan.operations.filter(o=>o.action==='insert').length,totalUpdated:plan.operations.filter(o=>o.action==='update').length,attachmentsVerified:source.tables.team_messages.filter(r=>r.attachment_content!==null).length};
-  await beforeCommit(result);await c.query('COMMIT');return result;
- }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c.release();}
+  await beforeCommit(result,c);commitStarted=true;await c.query('COMMIT');return result;
+ }catch(e){let rolledBack=false;try{await c.query('ROLLBACK');rolledBack=true;}catch{}
+  e.migrationTransactionState=commitStarted?'UNKNOWN':rolledBack?'ROLLED_BACK':'UNKNOWN';throw e;
+ }finally{c.release();}
 }

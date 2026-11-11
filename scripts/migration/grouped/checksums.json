@@ -1,8 +1,11 @@
 {
   "model.mjs": "55a40272da6d68687e0e4df6efcb41785415f94db8c64ac406159afdd3e935f6",
-  "database.mjs": "53f7838fe20840cce90742b867a55258408bc5d32119d005ec2cd1bf0afafdb6",
+  "database.mjs": "1ae5ed5ac5f4b169bcce883cbb8de72ddf179e05993f83a1e00063c0617fa729",
   "diagnostics.mjs": "f77bcdcdfebd79e1bea241f1eba8b4f806ab7f3d7e9e5d8a3145dae5f265ec25",
   "secure-channel.mjs": "15e834deb2dfd16014fb154975021cd5e7fc9bdca05d160a413a97eed7c47276",
   "run.mjs": "683d7e7f0f8d5591a8e5f1a396dfdaeda84a3ba65346f5790cb40f5544587ecf",
-  "bootstrap.sh": "3a39c7aa2de63614cbe65509f063f95509af92a3f74106ec538a2fbd6a7c2214"
+  "bootstrap.sh": "3a39c7aa2de63614cbe65509f063f95509af92a3f74106ec538a2fbd6a7c2214",
+  "execution-policy.mjs": "03b42fc97da475c9935ec42dd7cf91402465738eef92a37fe34e7c80dc9cad46",
+  "secure-executor.mjs": "075e6ffe19c10eb98e5ad2b67915bafe9755cab223dfa6c38b10748babc54ae3",
+  "execution-preflight.mjs": "8b78c586fdb641c5969d50b0530b03dba654df64ae123da0172e29f85f2c9641"
 }
