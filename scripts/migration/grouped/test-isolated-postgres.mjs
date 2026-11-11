@@ -18,7 +18,9 @@ try{
  let ready=false;for(let i=0;i<100;i++){try{docker('exec',name,'pg_isready','-h','127.0.0.1','-U','postgres');ready=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}
  if(!ready)throw Error('SYNTHETIC_POSTGRES_NOT_READY');
  const address=docker('port',name,'5432/tcp');if(!/^127\.0\.0\.1:\d+$/.test(address))throw Error('LOOPBACK_BIND_REQUIRED');
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/migration/grouped/archive-integration.test.mjs','scripts/migration/grouped/execution-preflight.test.mjs','scripts/migration/grouped/execution-policy.test.mjs'],{cwd:root,env:{...env,PORTAIL_SYNTHETIC_POSTGRES_ADDRESS:address,PORTAIL_SYNTHETIC_POSTGRES_CA:join(directory,'server.crt'),PORTAIL_SYNTHETIC_POSTGRES_CONTAINER:name},stdio:'inherit'});
+ const testFiles=['scripts/migration/grouped/archive-integration.test.mjs','scripts/migration/grouped/execution-preflight.test.mjs','scripts/migration/grouped/execution-policy.test.mjs'];
+ if(process.argv.includes('--parity'))testFiles.push('tests/parity-schema.test.mjs');
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',...testFiles],{cwd:root,env:{...env,PORTAIL_SYNTHETIC_POSTGRES_ADDRESS:address,PORTAIL_SYNTHETIC_POSTGRES_CA:join(directory,'server.crt'),PORTAIL_SYNTHETIC_POSTGRES_CONTAINER:name},stdio:'inherit'});
  if(result.error)throw result.error;process.exitCode=result.status??1;
 }finally{
  if(container)docker('stop',name);

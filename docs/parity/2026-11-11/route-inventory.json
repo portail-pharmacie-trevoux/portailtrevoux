@@ -1,0 +1,5784 @@
+{
+  "version": 1,
+  "runtimeSources": [
+    {
+      "file": "server.mjs",
+      "hash": "59a0021eaf1692091240ad2f59763e5ff327d02efe6b3321b04643521f05e097"
+    },
+    {
+      "file": "security.mjs",
+      "hash": "8fd616ba18ad66732d3e2176ab9b6f27d2930eaace480d57a56ede85f9045165"
+    },
+    {
+      "file": "Procfile",
+      "hash": "ea8ef9c3d5a402801ae63c170873a2e51341330e8c509431c336039d18e887d5"
+    },
+    {
+      "file": "scripts/start-scalingo.mjs",
+      "hash": "add8ddbcf590d91a2d654dadc1986aac9a7cc7e9ac05be9e8059a5f69ae8f5ea"
+    },
+    {
+      "file": "scripts/serve-scalingo-ui-preview.mjs",
+      "hash": "e6a2a08ca2033dedc208eec8bcc3c88b7cf851bc9325253d30b8b537ec1e32a4"
+    }
+  ],
+  "auditedAt": "2026-11-11T17:54:34.220Z",
+  "baselineMainRevision": "0a006e2eff2fd8c1259390a9424e4968c56bbf23",
+  "scalingoRuntimeRevision": "c6dc40db372e047ed638b44979b8e90a4e900491",
+  "mode": "LOCAL_FAKE_DB_NO_BUSINESS_HANDLERS_NO_EXTERNAL_SERVICES",
+  "limitations": [
+    "Routes declared by main code are not proof of its deployed revision or enabled integrations.",
+    "Delegation is not proof of business correctness or valid live schema.",
+    "Data counts, live OAuth, DNS/TLS, mail and accounts were not inspected.",
+    "Generic numeric probe IDs and empty synthetic payloads can trigger validation failures."
+  ],
+  "counts": {
+    "main": 246,
+    "branch": 241,
+    "union": 251,
+    "delegated": 137,
+    "absent": 6,
+    "restrictedConfiguration": 4
+  },
+  "modules": {
+    "Agenda et Google Calendar": {
+      "total": 12,
+      "main": 12,
+      "branch": 12,
+      "delegated": 12,
+      "restricted": 0,
+      "absent": 0
+    },
+    "Challenges": {
+      "total": 11,
+      "main": 10,
+      "branch": 11,
+      "delegated": 5,
+      "restricted": 6,
+      "absent": 0
+    },
+    "Collaborateurs et accès": {
+      "total": 20,
+      "main": 19,
+      "branch": 20,
+      "delegated": 13,
+      "restricted": 7,
+      "absent": 0
+    },
+    "Contacts utiles": {
+      "total": 12,
+      "main": 11,
+      "branch": 12,
+      "delegated": 11,
+      "restricted": 1,
+      "absent": 0
+    },
+    "Ressources humaines": {
+      "total": 13,
+      "main": 13,
+      "branch": 13,
+      "delegated": 7,
+      "restricted": 6,
+      "absent": 0
+    },
+    "Laboratoires": {
+      "total": 14,
+      "main": 13,
+      "branch": 14,
+      "delegated": 13,
+      "restricted": 1,
+      "absent": 0
+    },
+    "Merchandising": {
+      "total": 26,
+      "main": 26,
+      "branch": 26,
+      "delegated": 13,
+      "restricted": 13,
+      "absent": 0
+    },
+    "Fun": {
+      "total": 16,
+      "main": 16,
+      "branch": 16,
+      "delegated": 6,
+      "restricted": 10,
+      "absent": 0
+    },
+    "Commandes programmées et MFA": {
+      "total": 21,
+      "main": 21,
+      "branch": 21,
+      "delegated": 8,
+      "restricted": 13,
+      "absent": 0
+    },
+    "Procédures": {
+      "total": 7,
+      "main": 7,
+      "branch": 7,
+      "delegated": 6,
+      "restricted": 1,
+      "absent": 0
+    },
+    "Démarche qualité": {
+      "total": 31,
+      "main": 30,
+      "branch": 29,
+      "delegated": 16,
+      "restricted": 13,
+      "absent": 2
+    },
+    "Emplois du temps et absences": {
+      "total": 30,
+      "main": 30,
+      "branch": 30,
+      "delegated": 10,
+      "restricted": 20,
+      "absent": 0
+    },
+    "Formations et références": {
+      "total": 6,
+      "main": 6,
+      "branch": 6,
+      "delegated": 6,
+      "restricted": 0,
+      "absent": 0
+    },
+    "Courriels et intégrations": {
+      "total": 4,
+      "main": 4,
+      "branch": 4,
+      "delegated": 0,
+      "restricted": 4,
+      "absent": 0
+    },
+    "Portail et navigation": {
+      "total": 7,
+      "main": 7,
+      "branch": 7,
+      "delegated": 4,
+      "restricted": 3,
+      "absent": 0
+    },
+    "Messagerie et communication": {
+      "total": 14,
+      "main": 14,
+      "branch": 10,
+      "delegated": 7,
+      "restricted": 7,
+      "absent": 0
+    },
+    "Calculs et PromoFlash (retrait volontaire)": {
+      "total": 3,
+      "main": 3,
+      "branch": 3,
+      "delegated": 0,
+      "restricted": 3,
+      "absent": 0
+    },
+    "Accès testeurs": {
+      "total": 4,
+      "main": 4,
+      "branch": 0,
+      "delegated": 0,
+      "restricted": 0,
+      "absent": 4
+    }
+  },
+  "middleware": [
+    {
+      "file": "scripts/scalingo-account-inventory.mjs",
+      "hash": "14cfe3c2a3fae029a9d13e831f2601002c48d3c728de98ee7d6e854afeef1c79"
+    },
+    {
+      "file": "scripts/scalingo-accounts-preview.mjs",
+      "hash": "bd52e6f04e3ffc102598d412a8a6a8aa497ff64281764c520dbe59da24cf5d24"
+    },
+    {
+      "file": "scripts/scalingo-account-creation.mjs",
+      "hash": "baa9cc7dc0a54c34acecd15162171720f647c47fcb2c3a6d8f4e18358f007806"
+    },
+    {
+      "file": "scripts/scalingo-www-redirect.mjs",
+      "hash": "f04e02ec5e4b2b87c362548690da7f2dd8c39a5bb6ee0ccedae8ae30b4208756"
+    },
+    {
+      "file": "scripts/scalingo-personal-admin-diagnostic.mjs",
+      "hash": "5e86dc38c597e88e6678d3aa9597c772d9776677e434b85cd67730530ebcd747"
+    },
+    {
+      "file": "scripts/scalingo-origins-preview.mjs",
+      "hash": "235df055880b77145ef008777daa54508db35641e2fb88576e8241db4a736d5e"
+    },
+    {
+      "file": "scripts/scalingo-trevoux-entry-preview.mjs",
+      "hash": "65176cfe7f15baed00fbc3bd1418918dfe05ec8c67454c1e37c1139c26460a30"
+    },
+    {
+      "file": "scripts/scalingo-order-mfa-preview.mjs",
+      "hash": "1db1c2d922974082b48fb38ac25b42b3f19c1263f1be277f638fe72ce7d444d3"
+    },
+    {
+      "file": "scripts/scalingo-retired-calculations-preview.mjs",
+      "hash": "9a85c722b44047778508428ae94b0d699d6246aceca3483bc9982700737b78c1"
+    },
+    {
+      "file": "scripts/scalingo-challenge-deletion-preview.mjs",
+      "hash": "45ce99fb82f6fd3f80c7c745cd0dea4520130701bbdd498059ca64022a7bfab2"
+    },
+    {
+      "file": "scripts/scalingo-calendar-reminders-preview.mjs",
+      "hash": "c56b75dfc138a0ce393bdf0eb526a410a021967d1c57feefdd114392a139f358"
+    },
+    {
+      "file": "scripts/scalingo-google-calendar-preview.mjs",
+      "hash": "8e0608da9e4999cbaf2ad8914326d1a78a7d6b476295752375c6207ee9228ea2"
+    },
+    {
+      "file": "scripts/scalingo-employee-import-preview.mjs",
+      "hash": "258294a9e49196cd2be547a2ad2e5cf77a30c117d99adf96e1dc412c022447c1"
+    },
+    {
+      "file": "scripts/scalingo-registration-form-preview.mjs",
+      "hash": "db48afb625307d845684263d97cdafb3728a56bb5f6530841424ad3e1e1751ac"
+    },
+    {
+      "file": "scripts/scalingo-employee-deletion.mjs",
+      "hash": "84ee11050494f756e04a2b8a8febf10b5f706a76be3420ef7f0f6373bc77afe1"
+    },
+    {
+      "file": "scripts/scalingo-employee-records-preview.mjs",
+      "hash": "f97eacc4e2185100d0ddd43ee11a51d54b5f4cb9a16d5dd3f82c112a475d2159"
+    },
+    {
+      "file": "scripts/scalingo-universal-rights.mjs",
+      "hash": "83316ba44ab78bd4336fa4bdcc559bc5380486e170aba7984c35a6fd822dcfa4"
+    },
+    {
+      "file": "scripts/scalingo-temperature-preview.mjs",
+      "hash": "d3ba7b538ea44bfa5aef9edc516ee25b9d5d34bac9f308c0a97888097189617d"
+    },
+    {
+      "file": "scripts/scalingo-quality-errors-preview.mjs",
+      "hash": "494209f8ce9572b59ec18bdfaf2a1de31e2771a758f6c367527b7cb7788c994a"
+    },
+    {
+      "file": "scripts/scalingo-training-documents-preview.mjs",
+      "hash": "101e6383c58428c01074d91897958b541570410379f310ef518691391135a76a"
+    },
+    {
+      "file": "scripts/ensure-scalingo-training-documents-schema.mjs",
+      "hash": "5e249f6a43a3790bd8df4506fcc075dec5618374ee51420d308e7c0e493073b4"
+    },
+    {
+      "file": "scripts/scalingo-music-preview.mjs",
+      "hash": "ba1a926d3aff169a7512f34247af961c2306c65f3109e3fe0ec89bf734aaaee3"
+    },
+    {
+      "file": "scripts/scalingo-schedule-publication-preview.mjs",
+      "hash": "01a679de7e65f69a9fab15ce719148ae411cf4084927aa202b21b6cf335a2a35"
+    },
+    {
+      "file": "scripts/scalingo-news-threads-preview.mjs",
+      "hash": "4bf4e0ef05dfb54cf437d1baa7d27baffc8c203ed166d0f3dec5b1eab805cf8e"
+    },
+    {
+      "file": "scripts/scalingo-laboratories-preview.mjs",
+      "hash": "bf45972989adb36409821d7071270e26a881bec00867f4b11730fededd1d0ad6"
+    },
+    {
+      "file": "scripts/scalingo-promotion-documents-preview.mjs",
+      "hash": "1b5ee7a3e281e4ec4a99d1c03918417d412913880c5e3de8131c3b3e56455708"
+    },
+    {
+      "file": "scripts/scalingo-hr-documents-preview.mjs",
+      "hash": "28cdb9aae452f3634ed4a53bff059a38d26b26b74646f62c5e5dae13548c5f95"
+    },
+    {
+      "file": "scripts/scalingo-procedures-preview.mjs",
+      "hash": "14f8e71c29eb75d54f504b17d785a5a95bc6f455b44a8d0f6da7865c6a769da6"
+    },
+    {
+      "file": "scripts/scalingo-tiers-payant-preview.mjs",
+      "hash": "1b33b31bb32659bed476e88b34fdaf7317ab4e03da2b4ce4b22b731fb38f7643"
+    },
+    {
+      "file": "scripts/ensure-scalingo-temperature-schema.mjs",
+      "hash": "262ac51d100189d886ba466de8a27080c1d68494f6c537b3e0a76f0c7bdacf28"
+    },
+    {
+      "file": "scripts/ensure-scalingo-quality-followup-schema.mjs",
+      "hash": "46e30ef1f68905babe72b3c45e36d8ae0bdda3f479b2d23578f7889ecaa10c69"
+    }
+  ],
+  "codeDifferences": [
+    {
+      "file": "calendar-tasks.mjs",
+      "mainHash": "d3377e2a7d96718cf2f71553f10c4e5cd0ac94d4dd3477c36ac12dfa6f80fbc8",
+      "branchHash": "ffe6f1bfb6b0acc3a11dbb182fafb99930d7e242668477169ca8d2bb92069e04",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "challenges.mjs",
+      "mainHash": "d91306dcaff6ae168049f42df36a085fd935907d4b01838aaeb2d295985d288b",
+      "branchHash": "4355ecf797d9cde5a75d5e702099f48ae8cd8b2ea60f1eeefd91239070f25111",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "collaborateurs.mjs",
+      "mainHash": "c64a3d80d418050cf22da438bc7a3790e1e7cb0b64770dda4c01f7c185fad86f",
+      "branchHash": "29a28ffa258959e787ed745232c196f79c572ee244452d89101fdc10d2dd943c",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "contacts.mjs",
+      "mainHash": "315a68fc199cc095b037c8ff82614661f1d06c6e6d1dab9a453bb7c0012f076a",
+      "branchHash": "8ac287cbe4f8e274447db6cd5c56bf8305977a5dc1959cd7e5bcf1eefa9e0cd7",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "employee-details.mjs",
+      "mainHash": "4082ef3ba7573db418f9ab992f4daaab31fa8efabf7602c6be6f6785ff261a89",
+      "branchHash": "a53d7d820d807cd353fc5a1c55d4c2cf8b307fb93dc0d00453c61541c83dee25",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "employee-import.mjs",
+      "mainHash": "cd99d6ce850db3783d9dcda318fca0b13104180e9936741911f69277f9e4ff52",
+      "branchHash": "fe5a52637bfc90d0be8cd55ca36493d21a74e3ae21c3648494017920cba3df0b",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "invitations.mjs",
+      "mainHash": "7a50558f87b593d56ea25dcb27fce1ebe641005dff3799e70155a7887787d6d9",
+      "branchHash": "a0dde21814bf74b6e3729474fac8f39eba42a9ada52523f0e7095d0882037199",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "laboratories.mjs",
+      "mainHash": "a4c266cc62036d34ba2e892c5f6a01bb187ff51da01db8ae325b18c7dc7e27f1",
+      "branchHash": "a56e7c3306e2e93562c55b9d6d1816a2f7e74335fa3a8a4c3dba29727aec4066",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "leave-planning.mjs",
+      "mainHash": "690d48278b7172a2ed7ff3182fc0d855279ce246bf2d10eb9ccd9a141eaf513d",
+      "branchHash": "0cb78c91f470aeea6e2de23f49bd6e1efa204e4d75a0b3f0b12245361f7e1fd7",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "merchandising-documents.mjs",
+      "mainHash": "c47a916dcadc7dcbc6b7158d3aa4c6ef9b9438a9659486885566b0bec76f29f1",
+      "branchHash": "74433f918a5cfb6f0bdcac19ad9b2e6dec24d3aaac29b40dc7e2176f2fb93e85",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "merchandising-impact.mjs",
+      "mainHash": "ee3c2e91e76ef68e59f6981da517fd5834cc126d0c6263402ce1b4eda69b39f4",
+      "branchHash": "66ec2a32bb512806692689a97ce5f8acae2a985ec71b86e0c6b89495af09e231",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "merchandising-promotion-documents.mjs",
+      "mainHash": "7346cee8a2ac25da3fad5ef3d9e47c16c0244a47b415d950bc4e7900762672a9",
+      "branchHash": "cc37accc766b39d489ee771fdbe802b1302ad0d0f3a094dfc85fa02eaeaaef20",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "news.mjs",
+      "mainHash": "f59fe822b858bfc6262844869d533a27f30b616174532d95cac7494244519a2c",
+      "branchHash": "65559de4eed2fe534b71a08db5b41bd2ffa3d8e7ad955c13da224da7b12a108b",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "order-reminder-emails.mjs",
+      "mainHash": "2f03873360690654052f84b47c4d97b9efad884c667a5940aafc7a234c64aa0b",
+      "branchHash": "d093e32aea09d99757bd9e372a036d9f73bc6f1e4c68e86e3e75d5f53c0b4918",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "package.json",
+      "mainHash": "8c8ae7bac5fc09ffdac49c4cecf3617ea4819926f6652c0e68dab126e747f338",
+      "branchHash": "79c71dc407335dd3583528358cc2b7acd0f9b1a549aa7a61e6f8496df4ac203a",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "procedure-files.mjs",
+      "mainHash": "d337cfa948ff053a37328ee67b6bb8a6c44fcf32ab9518ac57ea7239b90c6b2e",
+      "branchHash": "729233968b860e0976ae43d1d1b73e6968aa75b999c757a47ead3d949bb0f2ad",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "procedures.mjs",
+      "mainHash": "25bbf3e30535dde82c35b84f8a3cf2543229834b3e554f1a4a7163401ba1ea7d",
+      "branchHash": "a662e24f67c66503a9eb03f2b1864936646f82b8d4ca2ed61f01d43323cf69ef",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/admin-access.css",
+      "mainHash": "83d6750607be0f7705cc6f2649aefad251a20e7cf89667117ccf32c6bb382e4a",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/admin-access.js",
+      "mainHash": "25e85a86d1e110ae6312c6c1f8b7a4d208cbb70e954f7207aab62c1e8aa6411a",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/app.js",
+      "mainHash": "a0159b33cd8ce31cd69793a6564b649543a23821abbaf23f2a0190c4e5706917",
+      "branchHash": "911c90d74bb58d857bbd609e94cd6b7260e8750b6da6a952452533971c3afedc",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/challenges.js",
+      "mainHash": "4fd763bc6a3610f8402bd64c5e3bc707d26a654e5e0995c3420fb14a04fe1ff8",
+      "branchHash": "9a035e4b594981f6d629e101128aeda96402e443d047da8742bcb99932ec9722",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/contacts.js",
+      "mainHash": "92b6a6a87e7e285294861b0a2d454dfd1f56c79c514bccbf0cb1d6ceee8df97b",
+      "branchHash": "70a18d8a1f17302379b9364b3a2919f8e80c7753496aa7eb6b4aea7ae9fa82d7",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/employee-import.js",
+      "mainHash": "44e4e635d207bfb7c12ae980f646d488c6d6293eb4990f68e08a0c9ca64c15ce",
+      "branchHash": "69cdbb6f2157a7cd76dd226d33799fde137b658098d63c43ac14b993a8f3f751",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/employee-record.js",
+      "mainHash": "bac2c0c51932c2a0de1c12f535d9d7074133c0617f4d2402abfc37fb207ff8e5",
+      "branchHash": "70880c772ec41a1cdc0daed7d1b747b4517475c15c36d272e0dc90374bddb0e2",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/hr-documents.js",
+      "mainHash": "c69ae43b072272cb1f24a096f2ec2d96f4e3bdf368eb044bd0ea46569e899895",
+      "branchHash": "ef593b6d5ce66f96ef4fb1960c4ac7bade519a53812b9f0218582b674a684a7c",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/index.html",
+      "mainHash": "721411811d19b49df7131851951b01af50431714b9fd97f4fd7b7580fb73131b",
+      "branchHash": "7d4f8238567a6f2e993ae61b5dbe16edeb73fe068b95dcaf12d761e2fd1bc07d",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/laboratories.js",
+      "mainHash": "bf4b0f662346f269a67b2f0a0bcdef1344c45728750ffe2678a3ed7d7bbdddca",
+      "branchHash": "6f6f688e57e605aec239e1350f562bdfd10cc617f3c2cfeb8d9b0ea8c966c80b",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/merchandising-impact.js",
+      "mainHash": "2849bd98aad7a9340e12667de7d342679f6f89bcafbf23c4a4daed3622b2fece",
+      "branchHash": "15e369549d16d3a4d6d62c3734b8f474e07cf36741b408b94bdb021cccc7bcd7",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/merchandising-promotions.js",
+      "mainHash": "7f53097bbfe28c428b0a7a8c77347a49670d4fea29be6eb24a6941bd38a70ba4",
+      "branchHash": "cd4385fedcfaa34993e5f6ec00b4059c486fd836da4afe49784530ed3dce5b7b",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/merchandising.js",
+      "mainHash": "a853c2a3d1a795451a2835e31f7d452e96b2df75c9f9dc6586b4c94170aa81fd",
+      "branchHash": "b599d1a7871b9084336969d74fe091b52cf8e2afcb8a8a1b4882843693987df8",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/news.js",
+      "mainHash": "95c49b2b5b161437de20931e7f62647a38761ca39c1e2cdc34d834316ff556dc",
+      "branchHash": "faed0369660c8b1beaa1a55abe73c418016184a23662e615798581fa8a6e69cd",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/portal-quick-links.css",
+      "mainHash": "a66f1688a8c33d29fbe3f4ab5c28e764b4e9c32941705e0f62c81e602317d321",
+      "branchHash": "6e6c013bdcdff69e355311422766dec016851e864941c9c51171af1202f176f8",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/portal-quick-links.js",
+      "mainHash": "1ca715d190d0552c6ad9460aa4eece2820e3938484f021b7387410d754fc7dad",
+      "branchHash": "521116914c7830e7e7edcdced2c1d0ab009eec0a9248da58651349d11642e4d4",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/portal-ux.js",
+      "mainHash": "81f5187a620000b64dd59041cb550c7e7f2961e4963bf18a71a1a0a4135dbdbe",
+      "branchHash": "3eff2fb66f16ad2680f035278389d0fc942af0d8a7fd7175ccdcc4587bb610c7",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/procedures.js",
+      "mainHash": "9d80c1c47e2320507bef9d32587b39cdeaac90279894365d695df24bfbb668e7",
+      "branchHash": "ed8c100e044d4cdec13860cd02009f580dc1bb33576b7352318c8867a82cdac8",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/quality-errors.js",
+      "mainHash": "53a3a96175e19c1b91d2aff5495e60088ffab2ea55087d612254fce119f299eb",
+      "branchHash": "2a5117bdbede3f95ef7432fb12bb275c8b2a69c9ee3c3c5d848b7540f9c17b87",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/quality-prescriber-calls.js",
+      "mainHash": "1272c5775931f99b77cb0d57e5212c8e3a4592309b31a85b72bbc6584613454e",
+      "branchHash": "24f2891514d119013bbdd9b43fb47f513f2c745e65ffbfee74a6608225e33541",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/quality-training.css",
+      "mainHash": "6e910ee1737fbc6e2ad5aebfee31b0a25dfd898188e58b89afbcf4d3abc1460d",
+      "branchHash": "0606ede4cfad34d891835db219a1736fba4964486c4446e1cb85fbdb0ccd6eb6",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/quality-training.js",
+      "mainHash": "7cc4dd23d4ee0eeef48b31e07782ee2ee5d994163a04e72729a1b131b249fe42",
+      "branchHash": "fec66fd097c8d7b9747d830a172f4366e6c7a76b6ec91a04a58892464589f5b6",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/quality.js",
+      "mainHash": "a759c9d658d1fba8bddc12f875936de4dd1e25112fdae87a6e2bac8114b23a1d",
+      "branchHash": "54c6d2321972d78b6e879173894064a432bdeda627b8f13db60bd6672db6a66e",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/schedule-month.js",
+      "mainHash": "611a1623da5662dcb4414c1d675a2a880d731148febf31c25fc860c6ce89dacb",
+      "branchHash": "398f175c8d4a76a68557e70ae38fbf2ab3e6662b0147e0b2b6959ac2518a919a",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/schedule-templates.js",
+      "mainHash": "7cb9d08e5cfec060a79e3e2b98e2d912c2d36f04014a7520b01d2fe4dc9a0aa7",
+      "branchHash": "b8933771db1338e25e4184a358c33b36a7db8cab0dfaf4e6191f5cee2684d02c",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/schedule-week-time.css",
+      "mainHash": "b954403f5d7ec7ff53891bd0d1d8653c18a68f902293e39099ed26f0bcd6535d",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/schedule-week-time.js",
+      "mainHash": "ee7da746107bcd08cd5f60d30695d5bff27d4480f262477bf79cdcf49aa620ee",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/styles.css",
+      "mainHash": "8d68f71f13e97772c9671095eb2c816d32dafa36671d50b24c8362f01fd782a2",
+      "branchHash": "343ce2733376b34189c8799c08a349015fc58aa302cd28c6c867978200221851",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/temperatures.js",
+      "mainHash": "335607db3ef52ec50c8eb6ed6f7fe49e0522d192a79e35069812c4e026eda678",
+      "branchHash": "d6064ebf534c56329f0df25bddc609d43cd166b8ec6e3a874f8183395bef7d35",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "public/tester-admin.js",
+      "mainHash": "0afbb141096b75dedce74d9d23c700e502385f66f622cb019967b3d504c728aa",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/tester-demo.css",
+      "mainHash": "807ac54349e26cb6d4f45c0f768748b4f58ae895d628364dfaf9d78e8b72d526",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/tester-demo.js",
+      "mainHash": "c8fdbe119297b962ecc18077fa80faca481fbfc83866c5a53c84ab3d00eff961",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/training-attestation-import.js",
+      "mainHash": "a05a4cb54d4e38c2a0ba238b89b20368154b435f88d3e366a4aa4bba3cf7334a",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "public/training-documents.js",
+      "mainHash": "0e63a8273903e4198233b82a76281aaed0ca8366e673af887e771c1c4839ff34",
+      "branchHash": "92afed71c18243d4df276a719f36a633ed524ba02d8bff60628f7eb3a73e431d",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "quality-errors.mjs",
+      "mainHash": "0533302d1af7d7e19a063979d5ae0808ae59e35c9861ae3202b643ccba37e798",
+      "branchHash": "e3a008d876481a4b02949a6b0e07c6b1c2fe04c65dd2f3ba7ad276a6d940aece",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "quality-reminders.mjs",
+      "mainHash": "9c4f54c41f7f279bd0aac06f20ef2030e3375190402234e0b6e45d1755217b26",
+      "branchHash": "0c886e16f388b8b3ccc26e6882f4eed3946bcfc9516e84d5097c5872138c07d6",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "quality-training.mjs",
+      "mainHash": "0db53ccc233ef9c841eeb6593780fe79cb313e070238a3328827acccff81683c",
+      "branchHash": "832edc2d052c68efa89fd4f9c5cbdba16cb972885d588e75bc4d2c5aecf9cf36",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "schedule.mjs",
+      "mainHash": "22b04324dd2952f38fe11b1fe3bdc46b9ad7c9a41cf04a559fd676f257ef5720",
+      "branchHash": "7c310940ec71b7b9e69dc57efb98bc6801153b84070d74ace67c390efec7dda5",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "schema.sql",
+      "mainHash": "ea6582b7721e2877daf1eb77fd2acf8e80b54c7d358e397f2b6e2d1bb59d41cc",
+      "branchHash": "180db58ffaf549bbfa33083975c470d79067f71d03c049db50f19f06651658b5",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "security.mjs",
+      "mainHash": "4dc4e7479ec7ac53457b960631fe30d5e6cca6bac080517182bcdddb8508f9ff",
+      "branchHash": "8fd616ba18ad66732d3e2176ab9b6f27d2930eaace480d57a56ede85f9045165",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "server.mjs",
+      "mainHash": "2bbda0ada183549d923b2304eac89a00ae37e9b721c5e5978eaf2ce26e0e44d4",
+      "branchHash": "59a0021eaf1692091240ad2f59763e5ff327d02efe6b3321b04643521f05e097",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "temperature-analysis.mjs",
+      "mainHash": "ececdcce6417920eb408bd318fac23fd45e228bf4605c27308af9d9e3fb4fa5c",
+      "branchHash": "728fd3db7b4aed84f44cc25f92e9f2b8d0d059955848ae0aa53850245d2de3b7",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "temperature-maintenance.mjs",
+      "mainHash": "1246b6f2c8d9987b66043e1ec88d25cddacad2d12001c4d01c83df331c9be0df",
+      "branchHash": "1df47d23337174cf04501e345375a656feeeb95fadc541d6d429023e499c4db1",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "temperatures.mjs",
+      "mainHash": "a1043955d43d9f75e38aded91c5f81d4249fbc201d0d612c737fea3792e5599b",
+      "branchHash": "b96e91f7667b94ea71d0a5d5daf3022a4d50cc4a80eca5740885c180d4e7d072",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "tester-access.mjs",
+      "mainHash": "5f6c5bb986ea0c48ba48e275243c2271e18af5b5db3a2358fc60c6691bfe56f5",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "training-attestation-import.mjs",
+      "mainHash": "305494b944e47ff11e5e25a3c773d874506ea4f23c20f6a7236364d7664bc28d",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "training-documents.mjs",
+      "mainHash": "81af76756dfec76103a6a919f4358978a67ce2c153f13b61086694dea3b51050",
+      "branchHash": "320e78d69eecb927bd7de91d91fff4e159a49bb90c5866b5449c9a97acbbcbff",
+      "state": "different_requires_semantic_review"
+    },
+    {
+      "file": "training-pdf-text.mjs",
+      "mainHash": "ae16241db5a519f44f24c9cc2d812f0ff858ae0775ae75a78858b09d27eaa40c",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "training-pdf-worker.mjs",
+      "mainHash": "9af04a794cd687bc51f4842340573b36e79b9ef560613ecde758cf2e7f74ce46",
+      "branchHash": null,
+      "state": "absent_on_branch"
+    },
+    {
+      "file": "training-reminders.mjs",
+      "mainHash": "49e528aa25a8715ee151c5f0d48db52767417ee914995c669c823a8eea079098",
+      "branchHash": "25bc233637ba7f0351de06ed51b68d55b70188cba1643b408e78084921be5e8e",
+      "state": "different_requires_semantic_review"
+    }
+  ],
+  "routes": [
+    {
+      "method": "DELETE",
+      "path": "/api/calendar/tasks/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/calendar/tasks/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/challenges/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": false,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/collaborateurs/scan/config",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/scan/config",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/contacts/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/contacts/:id/documents/:documentId",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/7/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hr/documents/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/laboratories/:id/documents/:documentId",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/laboratories/:id/logo",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/logo",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/merchandising/:id/months/:month",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/7/months/2026-11",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (DELETE /api/merchandising/7/months/2026-11).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/merchandising/documents/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/documents/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (DELETE /api/merchandising/documents/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/merchandising/promotions/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/merchandising/promotions/:id/documents/:document",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions/7/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/music/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/music/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/order-planning/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (DELETE /api/order-planning/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/procedures/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Procédures",
+      "probePath": "/api/procedures/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/quality/errors/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/quality/services/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (DELETE /api/quality/services/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/quality/services/:id/icon",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services/7/icon",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (DELETE /api/quality/services/7/icon).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/schedule-posts/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "csrf",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-posts/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (DELETE /api/schedule-posts/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/schedule-templates/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-templates/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (DELETE /api/schedule-templates/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/training/documents/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Formations et références",
+      "probePath": "/api/training/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/users/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users/7",
+      "status": 500,
+      "delegated": false,
+      "reason": "Opération Scalingo impossible.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "probe_inconclusive",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/users/:id/permanent",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users/7/permanent",
+      "status": 400,
+      "delegated": false,
+      "reason": "Confirmez le collaborateur et saisissez exactement SUPPRIMER.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "intercepted_requires_business_validation",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/calendar",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/calendar",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/challenges",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/challenges/:id/logo",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7/logo",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/challenges/7/logo).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/challenges/:id/reports",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7/reports",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/challenges/7/reports).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/challenges/:id/reports/:reportId/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7/reports/7/file",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/challenges/7/reports/7/file).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/challenges/options",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/options",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/collaborateurs/celebrations",
+      "guards": [
+        "auth",
+        "ready",
+        "directoryAccess"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/celebrations",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/collaborateurs/celebrations).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/collaborateurs/me/payroll",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/me/payroll",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/collaborateurs/me/payroll).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/collaborateurs/registration-form",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/registration-form",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/collaborateurs/scan/status",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/scan/status",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/contacts",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/contacts/:id/documents",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/7/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/contacts/:id/documents/:documentId/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/7/documents/7/file",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/contacts/export.xlsx",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/export.xlsx",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/contacts/export.xlsx).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/google/calendars",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/google/calendars",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/google/status",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/google/status",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/hr/documents",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/hr/documents/:id/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/documents/7/file",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/hr/signatories",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/signatories",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/hr/signatures",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/signatures",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/hr/signatures/:id/file",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/signatures/7/file",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/hr/signatures/7/file).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/integrations/google-health",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Courriels et intégrations",
+      "probePath": "/api/integrations/google-health",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/integrations/google-health).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/laboratories",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/laboratories/:id/documents",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/laboratories/:id/documents/:documentId/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/documents/7/file",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/laboratories/:id/logo",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/logo",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/laboratories/export.xlsx",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/export.xlsx",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/laboratories/export.xlsx).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/laboratories/responsibles",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/responsibles",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/leave-requests",
+      "guards": [
+        "auth",
+        "ready",
+        "access"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/leave-requests",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/leave-requests/:id/preview",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/leave-requests/7/preview",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/mail/status",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Courriels et intégrations",
+      "probePath": "/api/mail/status",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/mail/status).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/me",
+      "guards": [
+        "auth"
+      ],
+      "module": "Portail et navigation",
+      "probePath": "/api/me",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/documents",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/documents/:id/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/documents/7/file",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/merchandising/documents/7/file).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/export.xlsx",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/export.xlsx",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/merchandising/export.xlsx).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/impact",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/impact",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/impact/products/:ean",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/impact/products/1234567890123",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/merchandising/impact/products/1234567890123).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/impact/products/:ean/name",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/impact/products/1234567890123/name",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/merchandising/impact/products/1234567890123/name).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/impact/products/:ean/photo",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/impact/products/1234567890123/photo",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/merchandising/impact/products/1234567890123/photo).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/plan",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/plan",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/promotions",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/promotions/:id/documents",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions/7/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/merchandising/promotions/:id/documents/:document/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions/7/documents/7/file",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/music",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Fun",
+      "probePath": "/api/music",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/news",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/news/:id/attachment",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/7/attachment",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/news/7/attachment).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/news/automations",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/automations",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/news/automations).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": true,
+      "statusLabel": "restricted_configuration",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/news/recipients",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/recipients",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/news/sent",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/sent",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/news/threads/:thread",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/threads/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/order-mfa/status",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/status",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/order-mfa/users",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "guard"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/users",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/order-mfa/users).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/order-planning",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/order-planning/export.xlsx",
+      "guards": [
+        "auth",
+        "ready",
+        "manager"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/export.xlsx",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/order-planning/export.xlsx).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/order-planning/options",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/options",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/procedures",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Procédures",
+      "probePath": "/api/procedures",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/procedures/:id/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Procédures",
+      "probePath": "/api/procedures/7/file",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/promoflash/image/:ean",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Calculs et PromoFlash (retrait volontaire)",
+      "probePath": "/api/promoflash/image/1234567890123",
+      "status": 403,
+      "delegated": false,
+      "reason": "Cette rubrique est retirée du portail Scalingo.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "retired_by_prior_decision",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/promoflash/prices/:ean",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Calculs et PromoFlash (retrait volontaire)",
+      "probePath": "/api/promoflash/prices/1234567890123",
+      "status": 403,
+      "delegated": false,
+      "reason": "Cette rubrique est retirée du portail Scalingo.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "retired_by_prior_decision",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/promoflash/product/:ean",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Calculs et PromoFlash (retrait volontaire)",
+      "probePath": "/api/promoflash/product/1234567890123",
+      "status": 403,
+      "delegated": false,
+      "reason": "Cette rubrique est retirée du portail Scalingo.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "retired_by_prior_decision",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/publications",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/publications",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/publications/:name",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/publications/Agenda",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/publications/Agenda).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/errors",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/errors/export.xlsx",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors/export.xlsx",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/prescriber-calls",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/prescriber-calls",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/services",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/services/:id/icon",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services/7/icon",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/quality/services/7/icon).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/temperatures",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/temperatures",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/temperatures/:sensor",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/temperatures/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/tiers-payant",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/tiers-payant",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quality/training",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/training",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/quality/training).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/quick-links",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Portail et navigation",
+      "probePath": "/api/quick-links",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/quick-links).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule",
+      "guards": [
+        "auth",
+        "ready",
+        "access"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule-month",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "access"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-month",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/schedule-month).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule-month/pdf",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "access"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-month/pdf",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/schedule-month/pdf).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule-posts",
+      "guards": [
+        "auth",
+        "ready",
+        "access"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-posts",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule-templates",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-templates",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule-templates/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-templates/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/schedule/today",
+      "guards": [
+        "auth",
+        "ready",
+        "access"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/today",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/schedule/today).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/testers",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Accès testeurs",
+      "probePath": "/api/testers",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/testers).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": false,
+      "statusLabel": "absent_code",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/training/documents",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Formations et références",
+      "probePath": "/api/training/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/training/documents/:id/file",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Formations et références",
+      "probePath": "/api/training/documents/7/file",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/training/documents/:id/print",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Formations et références",
+      "probePath": "/api/training/documents/7/print",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/universes/:name",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Portail et navigation",
+      "probePath": "/api/universes/Agenda",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/universes/Agenda).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "guards": [
+        "auth",
+        "ready",
+        "directoryAccess"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/:id/details",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users/7/details",
+      "status": 200,
+      "delegated": false,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "intercepted_requires_business_validation",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/youtrust/status",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/youtrust/status",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/youtrust/status).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/youtube-music/playlists",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube-music/playlists",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/youtube-music/playlists).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/youtube-music/status",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube-music/status",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/youtube-music/status).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/youtube/playlists",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube/playlists",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/youtube/playlists).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/youtube/status",
+      "guards": [
+        "auth",
+        "ready"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube/status",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (GET /api/youtube/status).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "guards": [
+        "auth",
+        "ready",
+        "admin"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/auth/google/callback",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "guards": [],
+      "module": "Portail et navigation",
+      "probePath": "/health",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hr/documents/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/news/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/calendar/reminders",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/calendar/reminders",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/calendar/tasks",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/calendar/tasks",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/challenges",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/challenges/:id/reports",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7/reports",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/challenges/7/reports).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/challenges/:id/reports/:reportId/confirm",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7/reports/7/confirm",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/challenges/7/reports/7/confirm).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/challenges/:id/reports/:reportId/send",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7/reports/7/send",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/challenges/7/reports/7/send).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/collaborateurs/import",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/import",
+      "status": 403,
+      "delegated": false,
+      "reason": "Import réservé aux 16 collaborateurs réels prévus.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/collaborateurs/scan",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/scan",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/collaborateurs/scan/config",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/collaborateurs/scan/config",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/contacts",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/contacts/:id/documents",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/7/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/contacts/:id/restore",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/7/restore",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/contacts/import",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/import",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/contacts/parse-xlsx",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/parse-xlsx",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": false,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/google/calendar",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/google/calendar",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/google/connect",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/google/connect",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/google/disconnect",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/google/disconnect",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/google/sync",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/google/sync",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/hr/documents/:id/signatures",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/documents/7/signatures",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/hr/documents/7/signatures).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/hr/documents/import",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/documents/import",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/hr/signatures/:id/refresh",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/hr/signatures/7/refresh",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/hr/signatures/7/refresh).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/invitations/accept",
+      "guards": [],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/invitations/accept",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/invitations/check",
+      "guards": [],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/invitations/check",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/laboratories",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/laboratories/:id/documents",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/laboratories/:id/email",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/email",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/laboratories/:id/logo",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/logo",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/leave-requests",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/leave-requests",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/leave-requests).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/leave-requests/:id/cancel",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/leave-requests/7/cancel",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/leave-requests/7/cancel).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/leave-requests/:id/cancel-approved",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "csrf",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/leave-requests/7/cancel-approved",
+      "status": 403,
+      "delegated": false,
+      "reason": "Annulation réservée au congé fictif validé.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/leave-requests/:id/review",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "csrf",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/leave-requests/7/review",
+      "status": 403,
+      "delegated": false,
+      "reason": "Validation réservée à la demande de congé fictive.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "guards": [],
+      "module": "Portail et navigation",
+      "probePath": "/api/login",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/logout",
+      "guards": [
+        "auth",
+        "csrf"
+      ],
+      "module": "Portail et navigation",
+      "probePath": "/api/logout",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/mail/connect",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Courriels et intégrations",
+      "probePath": "/api/mail/connect",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/mail/connect).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/mail/disconnect",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Courriels et intégrations",
+      "probePath": "/api/mail/disconnect",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/mail/disconnect).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/merchandising/documents/import",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/documents/import",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/merchandising/documents/import).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/merchandising/promotions",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/merchandising/promotions/:id/documents",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions/7/documents",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/music",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/music",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/music/delete-selected",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/music/delete-selected",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/music/export.csv",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/music/export.csv",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/music/import",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Fun",
+      "probePath": "/api/music/import",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/news",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/news/automations",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/automations",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/news/automations).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": true,
+      "statusLabel": "restricted_configuration",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/news/automations/preview",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/automations/preview",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/news/automations/preview).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": true,
+      "statusLabel": "restricted_configuration",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/confirm",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/confirm",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/lock",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/lock",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/paper",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/paper",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-mfa/paper).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/recovery",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "guard"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/recovery",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-mfa/recovery).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/reset",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "admin",
+        "guard"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/reset",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-mfa/reset).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/setup",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/setup",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/totp-disable",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/totp-disable",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-mfa/totp-disable).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/touch",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "guard"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/touch",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-mfa/unlock",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-mfa/unlock",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-planning",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "createOrder"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-planning).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-planning/:id/confirmation",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/7/confirmation",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-planning/7/confirmation).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-planning/:id/delivery",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/7/delivery",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-planning/7/delivery).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-planning/:id/suspension",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/7/suspension",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-planning/7/suspension).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/order-planning/import",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "manager",
+        "createOrder"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/import",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/order-planning/import).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/password",
+      "guards": [
+        "auth",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/password",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/procedures",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Procédures",
+      "probePath": "/api/procedures",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/procedures).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/procedures/:id/restore",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Procédures",
+      "probePath": "/api/procedures/7/restore",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/procedures/import",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Procédures",
+      "probePath": "/api/procedures/import",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/publications/:name/read",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/publications/Agenda/read",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/publications/Agenda/read).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/errors",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/prescriber-calls",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/prescriber-calls",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/services",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/quality/services).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/services/:id/icon",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services/7/icon",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/quality/services/7/icon).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/temperatures/:sensor/comments",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/temperatures/7/comments",
+      "status": 403,
+      "delegated": false,
+      "reason": "Administrateur TEST uniquement, mot de passe personnel requis.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/temperatures/import",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/temperatures/import",
+      "status": 403,
+      "delegated": false,
+      "reason": "Administrateur TEST uniquement, mot de passe personnel requis.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/tiers-payant/import",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "check",
+        "jsonParser"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/tiers-payant/import",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/training/imports/:id/confirm",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/training/imports/7/confirm",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/quality/training/imports/7/confirm).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": false,
+      "statusLabel": "absent_code",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/quality/training/imports/analyze",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/training/imports/analyze",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/quality/training/imports/analyze).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": false,
+      "statusLabel": "absent_code",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule-posts",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "csrf",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-posts",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule-templates",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-templates",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/schedule-templates).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule-templates/:id/clear-day",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-templates/7/clear-day",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/schedule-templates/7/clear-day).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule/:week/apply-template",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/2026-11-02/apply-template",
+      "status": 403,
+      "delegated": false,
+      "reason": "Seule la semaine type fictive est autorisée.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule/:week/clear-day",
+      "guards": [
+        "auth",
+        "ready",
+        "editor",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/2026-11-02/clear-day",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule/:week/copy",
+      "guards": [
+        "auth",
+        "ready",
+        "editor",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/2026-11-02/copy",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/schedule/2026-11-02/copy).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule/:week/day-lock",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/2026-11-02/day-lock",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/schedule/2026-11-02/day-lock).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule/:week/meal-ticket",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/2026-11-02/meal-ticket",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/schedule/2026-11-02/meal-ticket).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule/:week/publish",
+      "guards": [
+        "auth",
+        "ready",
+        "editor",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/2026-11-02/publish",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/schedule/people-order",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/people-order",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/schedule/people-order).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/testers",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Accès testeurs",
+      "probePath": "/api/testers",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/testers).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": false,
+      "statusLabel": "absent_code",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/testers/:id/renew",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Accès testeurs",
+      "probePath": "/api/testers/7/renew",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/testers/7/renew).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": false,
+      "statusLabel": "absent_code",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/testers/:id/revoke",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Accès testeurs",
+      "probePath": "/api/testers/7/revoke",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/testers/7/revoke).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": false,
+      "statusLabel": "absent_code",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/training/documents/import",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "jsonParser"
+      ],
+      "module": "Formations et références",
+      "probePath": "/api/training/documents/import",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/users",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/:id/invitation",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users/7/invitation",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/:id/invitation-preview",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users/7/invitation-preview",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": false,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/:id/restore",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users/7/restore",
+      "status": 500,
+      "delegated": false,
+      "reason": "Opération Scalingo impossible.",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "probe_inconclusive",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtrust/config",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/youtrust/config",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtrust/config).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtrust/disconnect",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Ressources humaines",
+      "probePath": "/api/youtrust/disconnect",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtrust/disconnect).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtube-music/playlist",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube-music/playlist",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtube-music/playlist).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtube-music/playlists",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube-music/playlists",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtube-music/playlists).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtube/connect",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube/connect",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtube/connect).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtube/disconnect",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube/disconnect",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtube/disconnect).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtube/playlist",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube/playlist",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtube/playlist).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/youtube/playlists",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Fun",
+      "probePath": "/api/youtube/playlists",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (POST /api/youtube/playlists).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/calendar/tasks/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Agenda et Google Calendar",
+      "probePath": "/api/calendar/tasks/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/challenges/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Challenges",
+      "probePath": "/api/challenges/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/contacts/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Contacts utiles",
+      "probePath": "/api/contacts/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/laboratories/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/laboratories/:id/documents/:documentId",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Laboratoires",
+      "probePath": "/api/laboratories/7/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": false,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/merchandising/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/merchandising/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/merchandising/:id/months/:month/validation",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/7/months/2026-11/validation",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/merchandising/7/months/2026-11/validation).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/merchandising/documents/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/documents/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/merchandising/documents/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/merchandising/impact",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/impact",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/merchandising/impact).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/merchandising/impact/products/:ean/name",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/impact/products/1234567890123/name",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/merchandising/impact/products/1234567890123/name).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/merchandising/promotions/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/merchandising/promotions/:id/assignment",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Merchandising",
+      "probePath": "/api/merchandising/promotions/7/assignment",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/news/automations/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Messagerie et communication",
+      "probePath": "/api/news/automations/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/news/automations/7).",
+      "mainDeclared": true,
+      "branchDeclared": false,
+      "branchOptional": true,
+      "statusLabel": "restricted_configuration",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/order-planning/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Commandes programmées et MFA",
+      "probePath": "/api/order-planning/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/order-planning/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/procedures/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Procédures",
+      "probePath": "/api/procedures/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/errors/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/errors/:id/correction-note",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors/7/correction-note",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/errors/:id/notification",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors/7/notification",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/errors/:id/status",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/errors/7/status",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/prescriber-calls/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/prescriber-calls/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/services/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/quality/services/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/services/:id/evaluation",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/services/7/evaluation",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/quality/services/7/evaluation).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/temperatures/:sensor",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/temperatures/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/quality/temperatures/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/temperatures/:sensor/comments/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/temperatures/7/comments/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Administrateur TEST uniquement, mot de passe personnel requis.",
+      "mainDeclared": false,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quality/tiers-payant/:month",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf",
+        "check"
+      ],
+      "module": "Démarche qualité",
+      "probePath": "/api/quality/tiers-payant/2026-11",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/quality/tiers-payant/2026-11).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/quick-links",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Portail et navigation",
+      "probePath": "/api/quick-links",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/quick-links).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/schedule-month/accountant",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "access",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-month/accountant",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/schedule-month/accountant).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/schedule-posts/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "csrf",
+        "admin"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-posts/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/schedule-posts/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/schedule-templates/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-templates/7",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/schedule-templates/7).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/schedule-templates/:id/day",
+      "guards": [
+        "auth",
+        "ready",
+        "access",
+        "admin",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule-templates/7/day",
+      "status": 403,
+      "delegated": false,
+      "reason": "Fonction désactivée dans la prévisualisation (PUT /api/schedule-templates/7/day).",
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "restricted",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/schedule/:week/day",
+      "guards": [
+        "auth",
+        "ready",
+        "editor",
+        "csrf"
+      ],
+      "module": "Emplois du temps et absences",
+      "probePath": "/api/schedule/2026-11-02/day",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/training/documents/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "csrf"
+      ],
+      "module": "Formations et références",
+      "probePath": "/api/training/documents/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/users/:id",
+      "guards": [
+        "auth",
+        "ready",
+        "admin",
+        "csrf"
+      ],
+      "module": "Collaborateurs et accès",
+      "probePath": "/api/users/7",
+      "status": 200,
+      "delegated": true,
+      "reason": null,
+      "mainDeclared": true,
+      "branchDeclared": true,
+      "branchOptional": true,
+      "statusLabel": "delegated_not_business_verified",
+      "dataStatus": "NOT_READ_NOT_VERIFIED",
+      "businessTested": false
+    }
+  ]
+}

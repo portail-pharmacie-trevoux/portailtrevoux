@@ -1,0 +1,31 @@
+import {readFile,writeFile,mkdir,readdir} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {resolve} from 'node:path';
+import {createHash} from 'node:crypto';
+import {branchAppRoutes,probeRows,routesFromCheckout,moduleFor} from './parity-harness.mjs';
+const args=process.argv.slice(2),option=name=>args.indexOf(name)<0?undefined:args[args.indexOf(name)+1];
+const mainCheckout=option('--main-checkout'),mainRevision=option('--main-revision'),out=option('--output');
+if(!mainCheckout||!out||!(/^[a-f0-9]{40}$/.test(mainRevision||'')))throw Error('EXPLICIT_CODE_BASELINE_AND_OUTPUT_REQUIRED');
+const hash=x=>createHash('sha256').update(x).digest('hex'),key=r=>r.method+' '+r.path;
+if(hash(await readFile(resolve(mainCheckout,'server.mjs')))!==hash(execFileSync('git',['show',mainRevision+':server.mjs'])))throw Error('BASELINE_CODE_MISMATCH');
+const baselineFiles=execFileSync('git',['ls-tree','-r','--name-only',mainRevision],{encoding:'utf8'}).split('\n').filter(name=>(/\.(?:mjs|js|html|css)$/.test(name)||['schema.sql','package.json'].includes(name))&&!name.startsWith('tests/')&&!name.startsWith('scripts/'));
+for(const name of baselineFiles)if(hash(await readFile(resolve(mainCheckout,name)))!==hash(execFileSync('git',['show',mainRevision+':'+name])))throw Error('BASELINE_DEPENDENCY_MISMATCH');
+const baseline=await routesFromCheckout(mainCheckout),branch=branchAppRoutes(),optional=branchAppRoutes({optional:true});
+const mainMap=new Map(baseline.map(r=>[key(r),r])),branchMap=new Map(branch.map(r=>[key(r),r])),optionalMap=new Map(optional.map(r=>[key(r),r]));
+const union=[...new Map([...baseline,...branch].map(r=>[key(r),r])).values()].sort((a,b)=>key(a).localeCompare(key(b)));
+const {rows}=await probeRows(union);
+const inventory=rows.map(r=>({...r,mainDeclared:mainMap.has(key(r)),branchDeclared:branchMap.has(key(r)),branchOptional:optionalMap.has(key(r)),statusLabel:!branchMap.has(key(r))?optionalMap.has(key(r))?'restricted_configuration':'absent_code':r.delegated?'delegated_not_business_verified':r.reason?.includes('rubrique est retirée')?'retired_by_prior_decision':r.status===403?'restricted':r.status>=500?'probe_inconclusive':'intercepted_requires_business_validation',dataStatus:'NOT_READ_NOT_VERIFIED',businessTested:false}));
+const modules={};for(const r of inventory){const m=modules[r.module]??={total:0,main:0,branch:0,delegated:0,restricted:0,absent:0};m.total++;m.main+=Number(r.mainDeclared);m.branch+=Number(r.branchDeclared);m.delegated+=Number(r.branchDeclared&&r.delegated);m.restricted+=Number(r.branchDeclared&&!r.delegated||r.statusLabel==='restricted_configuration');m.absent+=Number(r.statusLabel==='absent_code');}
+const files=baselineFiles;
+const codeDifferences=[];for(const name of files){const mainHash=hash(execFileSync('git',['show',mainRevision+':'+name]));let branchHash=null;try{branchHash=hash(await readFile(name));}catch{}if(mainHash!==branchHash)codeDifferences.push({file:name,mainHash,branchHash,state:branchHash?'different_requires_semantic_review':'absent_on_branch'});}
+const entry=await readFile('scripts/serve-scalingo-ui-preview.mjs','utf8');
+const middlewareFiles=[...new Set([...entry.matchAll(/from ['"](\.\/[^'"]+)['"]/g)].map(m=>'scripts/'+m[1].slice(2)))];
+const middleware=[];for(const file of middlewareFiles)middleware.push({file,hash:hash(await readFile(file))});
+const runtimeSources=[];for(const file of ['server.mjs','security.mjs','Procfile','scripts/start-scalingo.mjs','scripts/serve-scalingo-ui-preview.mjs'])runtimeSources.push({file,hash:hash(await readFile(file))});
+const report={version:1,runtimeSources,auditedAt:new Date().toISOString(),baselineMainRevision:mainRevision,scalingoRuntimeRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),mode:'LOCAL_FAKE_DB_NO_BUSINESS_HANDLERS_NO_EXTERNAL_SERVICES',limitations:['Routes declared by main code are not proof of its deployed revision or enabled integrations.','Delegation is not proof of business correctness or valid live schema.','Data counts, live OAuth, DNS/TLS, mail and accounts were not inspected.','Generic numeric probe IDs and empty synthetic payloads can trigger validation failures.'],counts:{main:mainMap.size,branch:branchMap.size,union:inventory.length,delegated:inventory.filter(r=>r.branchDeclared&&r.delegated).length,absent:inventory.filter(r=>r.statusLabel==='absent_code').length,restrictedConfiguration:inventory.filter(r=>r.statusLabel==='restricted_configuration').length},modules,middleware,codeDifferences,routes:inventory};
+await mkdir(out,{recursive:true});await writeFile(resolve(out,'route-inventory.json'),JSON.stringify(report,null,2)+'\n');
+const columns=['module','method','path','mainDeclared','branchDeclared','branchOptional','statusLabel','status','probePath','delegated','reason','dataStatus','businessTested','guards'];
+const csv=v=>'"'+String(Array.isArray(v)?v.join('|'):v??'').replaceAll('"','""')+'"';
+await writeFile(resolve(out,'route-inventory.csv'),columns.join(',')+'\n'+inventory.map(row=>columns.map(c=>csv(row[c])).join(',')).join('\n')+'\n');
+await writeFile(resolve(out,'code-differences.csv'),'file,state,main_sha256,branch_sha256\n'+codeDifferences.map(r=>[r.file,r.state,r.mainHash,r.branchHash].map(csv).join(',')).join('\n')+'\n');
+console.log(JSON.stringify({counts:report.counts,modules:report.modules,codeDifferences:codeDifferences.length,middleware:middleware.length}));

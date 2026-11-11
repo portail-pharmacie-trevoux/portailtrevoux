@@ -1,0 +1,193 @@
+{
+  "mode": "SYNTHETIC_DDL_PROJECTIONS_NOT_LIVE_DATABASES",
+  "rawMainInitialization": {
+    "success": false,
+    "code": "P0001",
+    "message": "Migration novembre interrompue : vérifiez les validations et les intitulés"
+  },
+  "projection": {
+    "source": {
+      "statements": 185,
+      "omitted": [
+        {
+          "kind": "UPDATE"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "UPDATE"
+        },
+        {
+          "kind": "DO"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "UPDATE"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "DO"
+        }
+      ]
+    },
+    "target": {
+      "statements": 157,
+      "omitted": [
+        {
+          "kind": "UPDATE"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "UPDATE"
+        },
+        {
+          "kind": "DO"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "WITH"
+        },
+        {
+          "kind": "INSERT"
+        },
+        {
+          "kind": "UPDATE"
+        },
+        {
+          "kind": "WITH"
+        }
+      ]
+    }
+  },
+  "mainTables": 69,
+  "scalingoTables": 55,
+  "missingTables": [
+    "merchandising_november_2026_backup",
+    "merchandising_product_name_events",
+    "merchandising_product_names",
+    "merchandising_product_overrides",
+    "merchandising_promotion_documents",
+    "merchandising_promotion_events",
+    "merchandising_promotions",
+    "message_automation_changes",
+    "message_automation_runs",
+    "message_automations",
+    "portal_data_operations",
+    "portal_tester_sessions",
+    "portal_testers",
+    "training_attestation_imports",
+    "training_attestation_reads"
+  ],
+  "missingColumns": [
+    {
+      "table_name": "calendar_tasks",
+      "column_name": "source_message_id",
+      "udt_name": "int4",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "hr_documents",
+      "column_name": "training_title",
+      "udt_name": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "hr_documents",
+      "column_name": "training_date",
+      "udt_name": "date",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "hr_documents",
+      "column_name": "training_kind",
+      "udt_name": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "hr_documents",
+      "column_name": "training_verified_by",
+      "udt_name": "int4",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "hr_documents",
+      "column_name": "training_verified_at",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "team_messages",
+      "column_name": "reminder_kind",
+      "udt_name": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "team_messages",
+      "column_name": "automation_text",
+      "udt_name": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "temperature_comments",
+      "column_name": "assessment",
+      "udt_name": "text",
+      "is_nullable": "YES"
+    }
+  ],
+  "differences": [],
+  "engineCompatibility": {
+    "compatible": true
+  },
+  "liveDataVerified": false
+}

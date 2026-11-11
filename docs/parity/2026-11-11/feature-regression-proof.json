@@ -1,0 +1,22 @@
+{
+  "feature": "message-reminder-to-calendar",
+  "baselineBranch": "c6dc40db372e047ed638b44979b8e90a4e900491",
+  "baselineMain": "0a006e2eff2fd8c1259390a9424e4968c56bbf23",
+  "original": {
+    "exitCode": 1,
+    "pass": 1,
+    "fail": 1
+  },
+  "main": {
+    "exitCode": 0,
+    "pass": 2,
+    "fail": 0
+  },
+  "candidate": {
+    "exitCode": 0,
+    "pass": 2,
+    "fail": 0
+  },
+  "appliedToRuntimeBranch": false,
+  "appliedToRealDatabase": false
+}
