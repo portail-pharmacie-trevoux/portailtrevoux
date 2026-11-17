@@ -18,7 +18,12 @@ test('Passerelle : uniquement liste, import, fichier et suppression des document
   const response=await fetch('http://127.0.0.1:'+server.address().port+path,{method});assert.equal(response.status,status,method+' '+path);
  }
  const entry=await readFile(new URL('../scripts/serve-scalingo-ui-preview.mjs',import.meta.url),'utf8');
- assert.match(entry,/isScalingoPromotionDocumentImport\(req\).*next\(\):smallJson/);
+
+ // Upload exceptions share one branch, with a separate parser for contact spreadsheets.
+ const parser=entry.match(/gate\.use\(\(req,res,next\)=>\(([^\n]+)\)\?next\(\):\(req\.path===[^\n]+\?contactsExcelJson\(req,res,next\):smallJson\(req,res,next\)\)\);/);
+ assert.ok(parser,'Les imports sont délégués avant les parseurs généraux.');
+ assert.ok(parser[1].split('||').includes('isScalingoPromotionDocumentImport(req)'));
+
  assert(entry.indexOf('gate.use(scalingoUniverseBoundary(db))')<entry.indexOf(' registerScalingoPromotionDocuments(gate,app)'));
 });
 

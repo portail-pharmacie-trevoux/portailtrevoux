@@ -15,7 +15,12 @@ test('Scalingo Laboratoires : exceptions exactes uniquement, fichiers bruts et f
  const gate=express();registerScalingoLaboratories(gate,(q,s)=>s.json({ok:true}));gate.use(deny);const server=gate.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>server.close());
  for(const [method,path,status]of [['POST','/1/logo',200],['GET','/1/logo',200],['DELETE','/1/logo',200],['POST','/1/documents',200],['GET','/1/documents',200],['GET','/1/documents/2/file',200],['DELETE','/1/documents/2',200],['POST','/1/email',200],['PUT','/1/documents/2',200],['PUT','/1/documents/2/file',403],['PUT','/1/documents/0',403],['PUT','/1/logo',403],['POST','/1/documents/2/file',403],['GET','/1/email',403],['POST','/0/logo',403],['DELETE','/1',403],['POST','/1/invite',403],['POST','/1/documents/0',403]])assert.equal((await fetch('http://127.0.0.1:'+server.address().port+root+path,{method})).status,status,method+path);
  assert(isScalingoLaboratoryUpload({method:'POST',path:root+'/1/logo'}));assert(!isScalingoLaboratoryUpload({method:'POST',path:root+'/1/email'}));
- const source=await readFile(new URL('../scripts/serve-scalingo-ui-preview.mjs',import.meta.url),'utf8');assert.match(source,/isScalingoLaboratoryUpload\(req\).*next\(\):smallJson/);assert(source.indexOf('gate.use(scalingoUniverseBoundary(db))')<source.indexOf(' registerScalingoLaboratories(gate,app)'));
+ const source=await readFile(new URL('../scripts/serve-scalingo-ui-preview.mjs',import.meta.url),'utf8');
+ // Upload exceptions share one branch, with a separate parser for contact spreadsheets.
+ const parser=source.match(/gate\.use\(\(req,res,next\)=>\(([^\n]+)\)\?next\(\):\(req\.path===[^\n]+\?contactsExcelJson\(req,res,next\):smallJson\(req,res,next\)\)\);/);
+ assert.ok(parser,'Les imports sont délégués avant les parseurs généraux.');
+ assert.ok(parser[1].split('||').includes('isScalingoLaboratoryUpload(req)'));
+ assert(source.indexOf('gate.use(scalingoUniverseBoundary(db))')<source.indexOf(' registerScalingoLaboratories(gate,app)'));
 });
 
 test('Scalingo/PostgreSQL Laboratoires : logos 2 Mo, documents 10 Mo, messagerie simulée et préservation',{skip:!database},async t=>{
