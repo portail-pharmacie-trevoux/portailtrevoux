@@ -1,0 +1,30 @@
+# Maintenance de la prévisualisation Scalingo
+
+État de cette livraison : code et recette locale. La maintenance réelle, le déploiement et la migration restent soumis à des décisions séparées. Le profil de production et le verrou de migration ne changent pas.
+
+## Comportement
+
+L'entrée de prévisualisation choisit le mode avant de créer le pool PostgreSQL, de préparer le schéma et d'enregistrer les routes métier. En maintenance, un serveur HTTP autonome accepte uniquement `GET /health` et `HEAD /health`. Les autres requêtes HTTP reçoivent 503. Le contrôle de santé est local au processus et sans accès PostgreSQL. Son JSON expose la génération et un identifiant aléatoire de démarrage. Il n'expose ni identifiant de conteneur fourni par le service, ni configuration privée.
+
+Le serveur de maintenance ne démarre aucun traitement métier et n'ouvre aucun client de notification. Une configuration de maintenance ambiguë, sans génération valide ou avec un démarrage métier ou des tâches planifiées activées, fait échouer le démarrage. L'absence du paramètre ou sa valeur `false` conserve le chemin normal, y compris sa préparation du schéma.
+
+## Activer après décision humaine
+
+1. Obtenir la décision de l'opérateur pour la version de prévisualisation contenant ce code. Planifier la fenêtre et identifier les deux conteneurs web, tous les autres producteurs d'écritures et les canaux de diffusion. Pour une transition progressive, bloquer les écritures à l'ingress en amont et désactiver ou isoler les autres producteurs avant de remplacer les anciens processus. Un déploiement progressif seul laisse potentiellement servir l'ancienne version.
+2. Pendant cette fenêtre, un opérateur habilité configure `SCALINGO_PREVIEW_MAINTENANCE=true` et un identifiant inédit dans `SCALINGO_PREVIEW_MAINTENANCE_GENERATION`, puis fait démarrer les deux conteneurs avec la version approuvée. Conserver les deux opt-ins de prévisualisation. Le démarrage métier et les tâches planifiées doivent rester désactivés. L'identifiant de génération peut être un UUID sans contenu sensible.
+3. Depuis le canal d'administration authentifié, relever l'inventaire des deux conteneurs web en service pour `portailplus-hds`. Sonder chaque instance directement, par exemple depuis son espace réseau si la plateforme le permet, et associer chaque résultat à l'identifiant de l'instance fourni par le plan de contrôle. Sur chaque instance, vérifier `GET /health` à 200, statut `maintenance`, génération attendue et `bootId` distinct. Vérifier aussi un GET et un POST applicatifs inoffensifs à 503, sans identifiants ni contenu métier. Deux appels via le répartiteur ne prouvent pas la couverture de deux instances. Si une instance ne peut pas être identifiée et sondée individuellement, le gel reste non vérifié.
+4. Vérifier indépendamment que les anciens processus sont arrêtés ou drainés, que les connexions et transactions applicatives résiduelles ont disparu, que les workers, ordonnanceurs et intégrations d'envoi sont arrêtés, que les files et tentatives sortantes sont drainées ou suspendues, et qu'aucun autre client ne peut écrire pendant la fenêtre. Recouper l'état plateforme, les métriques et la télémétrie disponibles et, si autorisé, les métadonnées de sessions PostgreSQL en lecture seule. Le nombre de connexions à lui seul ne prouve pas le drainage. Conserver les références d'observation et relever zéro tâche en cours. En cas de preuve manquante, maintenir le blocage.
+
+## Justificatif et maintien
+
+`buildPreviewPauseReceipt` dans `scripts/migration/grouped/preview-maintenance-evidence.mjs` reçoit `inventory`, `probes`, `drain` et une `reference` d'attestation. Les champs attendus sont définis dans le module et exercés dans `tests/scalingo-preview-maintenance.test.mjs`. Le module vérifie deux instances et démarrages distincts, une même génération, les réponses 200/503, une observation indépendante de drainage au moins aussi récente et des preuves de moins de cinq minutes. Il conserve l'observation la plus ancienne dans le reçu compatible avec `requirePaused`.
+
+Seul un collecteur habilité et raccordé à ces sources peut fournir les observations. Le module valide la cohérence et la fraîcheur de ses entrées. Il n'authentifie pas les personnes ou la provenance des observations, et n'est raccordé à aucun collecteur réel dans cette livraison. Un JSON saisi localement ou un signal de santé seul ne constitue pas une attestation. Conserver les preuves originales dans le canal approuvé. Pendant une future intervention autorisée, vérifier de nouveau l'inventaire, le drainage et la même génération avant toute écriture et avant COMMIT. Un redémarrage de conteneur, une disparition de preuve ou une reprise de producteur invalide la vérification précédente.
+
+## Désactiver après décision humaine
+
+Maintenir l'arrêt tant que les contrôles de l'intervention et l'état du COMMIT ne sont pas établis. Après décision humaine distincte, l'opérateur désactive le mode de maintenance sur les deux conteneurs. Vérifier leur retour au mode de prévisualisation normal et prendre en compte que ce mode réexécute la préparation du schéma au démarrage. Réouvrir l'ingress et les autres producteurs selon une décision opérateur explicite, avec contrôle de leur état. Il n'existe aucune reprise automatique initiée par le reçu.
+
+## Limites de la recette locale
+
+Deux processus HTTP isolés démontrent le chemin sans base, le refus applicatif et les identifiants de démarrage distincts. La recette vérifie également les refus de configuration et d'attestation. Elle ne constate pas le nombre de conteneurs réellement en service sur Scalingo, le drainage des anciens processus, les sessions des autres clients ni l'absence de notifications en attente. Ces constats requièrent des preuves de l'environnement réel et restent non vérifiés.

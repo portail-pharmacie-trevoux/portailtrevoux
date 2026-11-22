@@ -39,7 +39,14 @@ import {isScalingoProcedureImport,registerScalingoProcedures} from './scalingo-p
 import {registerScalingoTiersPayantImport} from './scalingo-tiers-payant-preview.mjs';
 import {ensureScalingoTemperatureSchema} from './ensure-scalingo-temperature-schema.mjs';
 import {ensureScalingoQualityFollowupSchema} from './ensure-scalingo-quality-followup-schema.mjs';
+import {previewMaintenanceConfig,startPreviewMaintenance} from './scalingo-preview-maintenance.mjs';
+
 const env=process.env;
+const maintenance=previewMaintenanceConfig(env);
+if(maintenance){
+ const server=startPreviewMaintenance(maintenance);
+ process.once('SIGTERM',()=>server.close());
+}else{
 const origin='https://portailplus-hds.osc-fr1.scalingo.io';
 if(env.SCALINGO_PREVIEW_SAFE_MODE!=='true'||env.SCALINGO_PREVIEW_UI_ENABLED!=='true')throw Error('Explicit safe UI preview opt-in required');
 if(env.SCALINGO_REQUIRE_DB_TLS!=='true'||env.SCALINGO_ENABLE_BUSINESS_STARTUP==='true'||env.SCALINGO_ENABLE_SCHEDULED_JOBS==='true')throw Error('Unsafe staging configuration');
@@ -208,3 +215,4 @@ try{
  const server=gate.listen(Number(env.PORT)||3000,env.SCALINGO_PREVIEW_BIND_HOST==='127.0.0.1'?'127.0.0.1':'0.0.0.0',()=>console.log('Prévisualisation Portail+ restreinte active.'));
  process.on('SIGTERM',()=>server.close(()=>db.end()));
 }catch(err){await db.end();throw err;}
+}
