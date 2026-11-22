@@ -36,14 +36,16 @@ test('normal startup preserves the existing staging checks; invalid maintenance 
  }
 });
 
-async function startReplica(t){
+async function startReplica(t,index){
  const reservation=createServer();
  reservation.listen(0,'127.0.0.1');await once(reservation,'listening');
  const {port}=reservation.address();
  await new Promise(resolve=>reservation.close(resolve));
  const child=spawn(process.execPath,[entry],{env:{...environment,...enabled,
-  PORT:String(port),SCALINGO_PREVIEW_BIND_HOST:'127.0.0.1',DATABASE_URL:'invalid-by-design'},
-  stdio:['ignore','ignore','pipe']});
+  PORT:String(port),SCALINGO_PREVIEW_BIND_HOST:'127.0.0.1',DATABASE_URL:'invalid-by-design',
+  CONTAINER:'web-'+index,CONTAINER_VERSION:'a'.repeat(40)},
+  stdio:['ignore','pipe','pipe']});
+ let output='';child.stdout.setEncoding('utf8').on('data',chunk=>{output+=chunk;});
  const exit=once(child,'exit');
  t.after(async()=>{child.kill('SIGTERM');await exit;});
  const url='http://127.0.0.1:'+port;
@@ -51,14 +53,14 @@ async function startReplica(t){
   try{
    const response=await fetch(url+'/health');
    assert.equal(response.status,200);
-   return {url,health:await response.json()};
+   return {url,health:await response.json(),logs:()=>output.trim().split('\n').filter(Boolean).map(JSON.parse)};
   }catch{await sleep(25);}
  }
  throw Error('Maintenance replica did not start');
 }
 
 test('real entry starts two distinct maintenance processes without usable database config',async t=>{
- const replicas=await Promise.all([startReplica(t),startReplica(t)]);
+ const replicas=await Promise.all([startReplica(t,1),startReplica(t,2)]);
  assert.notEqual(replicas[0].health.bootId,replicas[1].health.bootId);
  for(const {url,health} of replicas){
   assert.equal(health.status,'maintenance');
@@ -70,6 +72,26 @@ test('real entry starts two distinct maintenance processes without usable databa
    assert.deepEqual(await response.json(),{status:'maintenance'});
   }
  }
+});
+
+test('maintenance logs attribute only tagged safe probes to a boot and a container',async t=>{
+ const replica=await startReplica(t,1),probe='b'.repeat(32);
+ for(const [path,method] of [['/health','GET'],['/trevoux','GET'],['/api/login','POST']])
+  await fetch(replica.url+path,{method,headers:{'x-portail-maintenance-probe':probe,authorization:'never-log-this'}});
+ await fetch(replica.url+'/trevoux?private=never-log-this',{headers:{'x-portail-maintenance-probe':probe}});
+ for(let i=0;i<40&&replica.logs().length<4;i++)await sleep(25);
+ const records=replica.logs();
+ assert.equal(records[0].event,'preview_maintenance_listening');
+ assert.deepEqual(records.slice(1).map(record=>[record.kind,record.status]),[['health',200],['application-get',503],['application-post',503]]);
+ for(const record of records){
+  assert.equal(record.container,'web-1');
+  assert.equal(record.containerVersion,'a'.repeat(40));
+  assert.equal(record.bootId,replica.health.bootId);
+  assert.equal(record.generation,replica.health.generation);
+  assert.ok(Number.isFinite(Date.parse(record.observedAt)));
+ }
+ assert.ok(records.slice(1).every(record=>record.probe===probe));
+ assert.doesNotMatch(JSON.stringify(records),/never-log-this/);
 });
 
 test('receipt requires two direct distinct probes and independent drain evidence',()=>{
