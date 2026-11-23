@@ -95,6 +95,7 @@ test('Menu-only opening checks authentication storage and closes module routes',
  const top=markup=>markup.slice(markup.indexOf('<body'),markup.indexOf('<div class="section-label"'));
  assert.equal(top(html),top(original));
  assert.match(html,/class="grid bento-menu"/);
+ assert.doesNotMatch(html,/id="organize-tiles"/);
  assert.match(html,/>Documents de référence<\/strong>/);
  assert.match(html,/>Commandes<\/strong>/);
  assert.equal((await fetch(url+'/api/quick-links')).status,401);

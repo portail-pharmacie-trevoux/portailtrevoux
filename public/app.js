@@ -123,7 +123,7 @@ function showHome(){
     }
   }
   else {void refreshHomeExtras();void refreshGoogleConnections();}
-  q('.section-label>span').textContent=[...document.querySelectorAll('.grid .tile')].some(b=>!b.classList.contains('hidden'))?'Vos espaces autorisés':'Vos tuiles sont masquées. Utilisez « Organiser mes tuiles » pour les réafficher.';
+  q('.section-label>span').textContent=[...document.querySelectorAll('.grid .tile')].some(b=>!b.classList.contains('hidden'))?'Vos espaces autorisés':(q('.grid.bento-menu')?'Aucun espace autorisé.':'Vos tuiles sont masquées. Utilisez « Organiser mes tuiles » pour les réafficher.');
 }
 
 let googleConnectionsPending=false;
@@ -386,10 +386,11 @@ function tilePreferences(){
   return {order,hidden:Array.isArray(saved?.hidden)?saved.hidden:[]};
 }
 function applyTileVisibility(){
-  const hidden=new Set(tilePreferences().hidden);
+  const hidden=new Set(q('.grid.bento-menu')?[]:tilePreferences().hidden);
   document.querySelectorAll('.grid [data-universe]').forEach(tile=>tile.classList.toggle('hidden',!tileAllowed(tile.dataset.universe)||hidden.has(tile.dataset.universe)));
 }
 function applyTileOrder(){
+  if(q('.grid.bento-menu'))return applyTileVisibility();
   const saved=tilePreferences().order;
   const order=[...new Set([...saved.filter(n=>initialTileOrder.includes(n)),...initialTileOrder])];
   const grid=q('.grid');
@@ -414,11 +415,11 @@ function renderTileOrder(focusName,focusDirection){
   });
   if(focusName){const controls=[...list.querySelectorAll('button')];const focused=controls.find(b=>b.dataset.name===focusName&&b.dataset.direction===focusDirection&&!b.disabled)||controls.find(b=>b.dataset.name===focusName&&!b.disabled);focused?.focus();}
 }
-q('#organize-tiles').onclick=()=>{
+q('#organize-tiles')?.addEventListener('click',()=>{
   draftTileOrder=[...document.querySelectorAll('.grid [data-universe]')].filter(b=>tileAllowed(b.dataset.universe)).map(b=>b.dataset.universe);
   draftHiddenTiles=new Set(tilePreferences().hidden.filter(name=>initialTileOrder.includes(name)));
   q('#tile-order-status').textContent='';renderTileOrder();q('#tile-order-dialog').showModal();
-};
+});
 q('#tile-order-cancel').onclick=()=>q('#tile-order-dialog').close();
 q('#tile-order-reset').onclick=()=>{draftTileOrder=initialTileOrder.filter(tileAllowed);draftHiddenTiles.clear();renderTileOrder();q('#tile-order-status').textContent='Ordre initial et toutes vos tuiles affichées.';};
 q('#tile-order-save').onclick=()=>{
