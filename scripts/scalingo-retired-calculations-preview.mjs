@@ -2,8 +2,15 @@
 import {readFileSync} from 'node:fs';
 import {posix} from 'node:path';
 export const retiredCalculationUniverse='Outils de calculs rapides';
-export function scalingoHomepage(){
+export function scalingoHomepage({bento=false}={}){
  const original=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ if(bento){
+  const start=original.indexOf('<div class="grid">',original.indexOf('id="home"'));
+  const end=original.indexOf('<div class="tile-order-shortcut"',start);
+  if(start<0||end<start)throw Error('Expected Scalingo home grid');
+  const menu=readFileSync(new URL('./scalingo-bento-menu.html',import.meta.url),'utf8');
+  return (original.slice(0,start)+menu+original.slice(end)).replace('</head>','<link rel="stylesheet" href="/bento-menu.css"></head>');
+ }
  const tile=/<button\b[^>]*data-universe="Outils de calculs rapides"[^>]*>[\s\S]*?<\/button>/g;
  if([...original.matchAll(tile)].length!==1)throw Error('Expected exactly one calculation tile');
  return original.replace(tile,'').replace('<div class="grid">','<div class="grid scalingo-without-calculations">');

@@ -101,14 +101,27 @@ async function api(path,method='GET',data){
 function error(e){q('#global-message').textContent=e.message;}
 function showLogin(){q('#portal-quick-links')?.remove();q('#google-connection-alert')?.remove();q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
+  const linksUserId=session.user.id,groupement=q('#bento-groupement');
+  if(groupement||!session.features?.menuOnly)void import('/portal-quick-links.js').then(module=>{if(session?.user.id===linksUserId&&!session.user.mustChange)void module.setupQuickLinks({api,userId:linksUserId,isAdmin:session.user.role==='admin',isCurrent:()=>session?.user.id===linksUserId&&!session.user.mustChange,trigger:groupement});}).catch(error);
   if(!session.features?.menuOnly){
-  const linksUserId=session.user.id;void import('/portal-quick-links.js').then(module=>{if(session?.user.id===linksUserId&&!session.user.mustChange)void module.setupQuickLinks({api,userId:linksUserId,isAdmin:session.user.role==='admin',isCurrent:()=>session?.user.id===linksUserId&&!session.user.mustChange});}).catch(error);
+
   const whatsappUserId=session.user.id;void import('/whatsapp.js').then(module=>{if(session?.user.id===whatsappUserId)module.setupWhatsApp({button:q('#whatsapp-button'),status:q('#whatsapp-status'),api,getUser:()=>session?.user});}).catch(error);
   }
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
   applyTileVisibility();
-  if(session.features?.menuOnly)q('#global-message').textContent='Accès initial : menu principal uniquement.';
+  if(session.features?.menuOnly){
+    q('#global-message').textContent='Accès initial : menu principal uniquement.';
+    const week=q('#bento-week');
+    if(week){
+      const monday=mondayOf(parisDay());
+      week.replaceChildren(...['Lun.','Mar.','Mer.','Jeu.','Ven.'].map((day,index)=>{
+        const cell=node('span',day);
+        cell.append(node('b',moveDay(monday,index).slice(-2)));
+        return cell;
+      }));
+    }
+  }
   else {void refreshHomeExtras();void refreshGoogleConnections();}
   q('.section-label>span').textContent=[...document.querySelectorAll('.grid .tile')].some(b=>!b.classList.contains('hidden'))?'Vos espaces autorisés':'Vos tuiles sont masquées. Utilisez « Organiser mes tuiles » pour les réafficher.';
 }
@@ -379,7 +392,8 @@ function applyTileVisibility(){
 function applyTileOrder(){
   const saved=tilePreferences().order;
   const order=[...new Set([...saved.filter(n=>initialTileOrder.includes(n)),...initialTileOrder])];
-  const grid=q('.grid');order.forEach(name=>{const tile=[...grid.children].find(b=>b.dataset.universe===name);if(tile)grid.append(tile);});applyTileVisibility();
+  const grid=q('.grid');
+  order.forEach(name=>{const tile=[...grid.querySelectorAll('[data-universe]')].find(b=>b.dataset.universe===name);if(tile)tile.parentElement.append(tile);});applyTileVisibility();
 }
 function renderTileOrder(focusName,focusDirection){
   const list=q('#tile-order-list');list.replaceChildren();
@@ -550,6 +564,7 @@ async function refreshHomeExtras(){
     if(session?.user.id!==userId)return;
     document.querySelectorAll('.grid .tile').forEach(tile=>{
       tile.querySelector('.tile-news')?.remove();
+      if(tile.dataset.universe==='Actualités'&&results[1].status==='fulfilled')tile.querySelector('.bento-pending')?.remove();
       if(tile.classList.contains('tool-tile')||tile.classList.contains('primary-space')||['Collaborateurs','Contacts utiles','Agenda','Emplois du temps','Fun','Passerelle groupement'].includes(tile.dataset.universe))return;
       const count=news.find(n=>n.universe===tile.dataset.universe)?.unread||0;
       const badge=node('span','','tile-news'+(count?' has-news':''));
@@ -560,6 +575,7 @@ async function refreshHomeExtras(){
     renderHomeAgenda(results[3].status==='fulfilled'?results[3].value:null);
     const planning=q('.grid [data-universe="Emplois du temps"]');
     if(planning){
+      planning.querySelector('.bento-pending')?.remove();
       planning.querySelector('.tile-schedule')?.remove();
       const data=results[4].status==='fulfilled'?results[4].value:null,block=node('span','','tile-schedule');
       block.append(node('span','Mes horaires aujourd’hui','tile-schedule-title'));
@@ -737,6 +753,7 @@ function homeAgendaEvents(events,today){
 function renderHomeAgenda(data){
   const tile=q('.grid [data-universe="Agenda"]');if(!tile)return;tile.querySelector('.tile-agenda')?.remove();
   if(!session||!tileAllowed('Agenda'))return;
+  tile.querySelector('.bento-pending')?.remove();
   const today=parisDay(),block=node('span','','tile-agenda'),events=homeAgendaEvents(data?.events||[],today);
   const label=e=>{
     const day=eventDays(e).start,when=e.start.date?'Journée':day<today?'En cours':new Date(e.start.dateTime).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'});

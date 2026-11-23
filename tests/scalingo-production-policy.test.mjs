@@ -66,7 +66,7 @@ test('Initial opening limits logins, existing sessions and invitation activation
 test('Menu-only opening checks authentication storage and closes module routes',async t=>{
  const {createScalingoProductionApp}=await import('../scripts/scalingo-production-profile.mjs');
  const email='owner@example.invalid';
- const user={id:1,email,role:'admin',active:true,must_change:false};
+ const user={id:1,email,role:'admin',active:true,must_change:false,csrf:'fixture-csrf'};
  const settings={...env,SCALINGO_MENU_ONLY:'true'};
  assert.throws(()=>productionConfig(settings),/INITIAL_ACCESS_EMAIL_REQUIRED/);
  const queries=[];
@@ -78,6 +78,7 @@ test('Menu-only opening checks authentication storage and closes module routes',
   return {rows:[]};
  },release(){}};},async query(sql){
   if(sql.startsWith('SELECT s.id AS session_id'))return {rows:[user]};
+  if(sql.startsWith('SELECT links,revision'))return {rows:[]};
   throw Error('Unexpected application query');
  }};
  const {app}=await createScalingoProductionApp(db,{...settings,SCALINGO_INITIAL_ACCESS_EMAIL:email});
@@ -87,7 +88,18 @@ test('Menu-only opening checks authentication storage and closes module routes',
  await new Promise(resolve=>server.once('listening',resolve));
  const url='http://127.0.0.1:'+server.address().port;
  const headers={cookie:'trevoux_session='+'a'.repeat(43)};
- assert.equal((await fetch(url+'/trevoux')).status,200);
+ const page=await fetch(url+'/trevoux');
+ assert.equal(page.status,200);
+ const html=await page.text();
+ const original=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+ const top=markup=>markup.slice(markup.indexOf('<body'),markup.indexOf('<div class="section-label"'));
+ assert.equal(top(html),top(original));
+ assert.match(html,/class="grid bento-menu"/);
+ assert.match(html,/>Documents de référence<\/strong>/);
+ assert.match(html,/>Commandes<\/strong>/);
+ assert.equal((await fetch(url+'/api/quick-links')).status,401);
+ assert.deepEqual((await (await fetch(url+'/api/quick-links',{headers})).json()).links,[]);
+ assert.equal((await fetch(url+'/api/quick-links',{method:'PUT',headers:{...headers,origin:env.APP_URL}})).status,403);
  const session=await fetch(url+'/api/me',{headers});
  assert.equal(session.status,200);
  assert.equal((await session.json()).features.menuOnly,true);
