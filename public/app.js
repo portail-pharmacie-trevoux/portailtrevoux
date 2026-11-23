@@ -101,12 +101,15 @@ async function api(path,method='GET',data){
 function error(e){q('#global-message').textContent=e.message;}
 function showLogin(){q('#portal-quick-links')?.remove();q('#google-connection-alert')?.remove();q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
+  if(!session.features?.menuOnly){
   const linksUserId=session.user.id;void import('/portal-quick-links.js').then(module=>{if(session?.user.id===linksUserId&&!session.user.mustChange)void module.setupQuickLinks({api,userId:linksUserId,isAdmin:session.user.role==='admin',isCurrent:()=>session?.user.id===linksUserId&&!session.user.mustChange});}).catch(error);
   const whatsappUserId=session.user.id;void import('/whatsapp.js').then(module=>{if(session?.user.id===whatsappUserId)module.setupWhatsApp({button:q('#whatsapp-button'),status:q('#whatsapp-status'),api,getUser:()=>session?.user});}).catch(error);
+  }
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
   applyTileVisibility();
-  void refreshHomeExtras();void refreshGoogleConnections();
+  if(session.features?.menuOnly)q('#global-message').textContent='Accès initial : menu principal uniquement.';
+  else {void refreshHomeExtras();void refreshGoogleConnections();}
   q('.section-label>span').textContent=[...document.querySelectorAll('.grid .tile')].some(b=>!b.classList.contains('hidden'))?'Vos espaces autorisés':'Vos tuiles sont masquées. Utilisez « Organiser mes tuiles » pour les réafficher.';
 }
 
@@ -148,6 +151,7 @@ function setUniverseHeading(name){
   heading.append(node('span',displayUniverse(name)));
 }
 async function openUniverse(name,{menuRoot=false}={}){
+  if(session?.features?.menuOnly)return;
   // A retired Scalingo tile cannot be reopened from stale navigation or console calls.
   if(name==='Outils de calculs rapides'&&!q('.grid [data-universe="Outils de calculs rapides"]'))return;
   const viewRequest=++universeViewRequest;
@@ -600,6 +604,7 @@ async function renderPublications(name){
 }
 setInterval(()=>{
   if(!session||session.user.mustChange||document.hidden)return;
+  if(session?.features?.menuOnly)return;
   void refreshGoogleConnections();if(currentUniverse)void renderPublications(currentUniverse);else void refreshHomeExtras();
 },60000);
 

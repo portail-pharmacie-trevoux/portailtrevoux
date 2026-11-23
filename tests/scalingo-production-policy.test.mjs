@@ -62,3 +62,37 @@ test('Initial opening limits logins, existing sessions and invitation activation
  assert.equal((await post('/api/invitations/check',{})).status,403);
  assert.equal((await post('/api/invitations/accept',{})).status,403);
 });
+
+test('Menu-only opening checks authentication storage and closes module routes',async t=>{
+ const {createScalingoProductionApp}=await import('../scripts/scalingo-production-profile.mjs');
+ const email='owner@example.invalid';
+ const user={id:1,email,role:'admin',active:true,must_change:false};
+ const settings={...env,SCALINGO_MENU_ONLY:'true'};
+ assert.throws(()=>productionConfig(settings),/INITIAL_ACCESS_EMAIL_REQUIRED/);
+ const queries=[];
+ const db={async connect(){return {async query(sql){
+  queries.push(sql);
+  if(sql.includes('current_database()'))return {rows:[{name:'portailplus_7495',tls:true}]};
+  if(sql.includes('FROM users'))return {rows:[user]};
+  if(sql.includes('information_schema')||sql.includes('pg_indexes'))throw Error('Unexpected module schema check');
+  return {rows:[]};
+ },release(){}};},async query(sql){
+  if(sql.startsWith('SELECT s.id AS session_id'))return {rows:[user]};
+  throw Error('Unexpected application query');
+ }};
+ const {app}=await createScalingoProductionApp(db,{...settings,SCALINGO_INITIAL_ACCESS_EMAIL:email});
+ assert.equal(queries.at(-1),'ROLLBACK');
+ const server=app.listen(0,'127.0.0.1');
+ t.after(()=>server.close());
+ await new Promise(resolve=>server.once('listening',resolve));
+ const url='http://127.0.0.1:'+server.address().port;
+ const headers={cookie:'trevoux_session='+'a'.repeat(43)};
+ assert.equal((await fetch(url+'/trevoux')).status,200);
+ const session=await fetch(url+'/api/me',{headers});
+ assert.equal(session.status,200);
+ assert.equal((await session.json()).features.menuOnly,true);
+ for(const path of ['/api/calendar','/API/USERS','/auth/google/callback']){
+  assert.equal((await fetch(url+path,{headers})).status,503,path);
+ }
+ assert.equal((await fetch(url+'/api/invitations/accept',{method:'POST',headers})).status,503);
+});

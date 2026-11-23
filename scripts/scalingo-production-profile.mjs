@@ -21,6 +21,8 @@ export function productionConfig(env,adapters={}){
  if(env.SCALINGO_ENABLE_BUSINESS_STARTUP==='true')throw refusal('BUSINESS_STARTUP_SEED_FORBIDDEN');
  if(env.SCALINGO_ENABLE_SCHEDULED_JOBS==='true')throw refusal('PRODUCTION_SCHEDULER_NOT_RELEASED');
  const initialAccessEmail=env.SCALINGO_INITIAL_ACCESS_EMAIL;
+ const menuOnly=env.SCALINGO_MENU_ONLY==='true';
+ if(menuOnly&&!initialAccessEmail)throw refusal('INITIAL_ACCESS_EMAIL_REQUIRED');
  if(initialAccessEmail!==undefined&&(!/^[^\s@]+@[^\s@]+$/.test(initialAccessEmail)||initialAccessEmail!==initialAccessEmail.toLowerCase()||initialAccessEmail==='admin-test@portailplus.invalid'))throw refusal('INVALID_INITIAL_ACCESS_EMAIL');
  const capabilities=productionCapabilities(env),transport=adapters.fetch||fetch;
  const permit=(enabled,allowed)=>async(url,options={})=>{
@@ -38,6 +40,7 @@ export function productionConfig(env,adapters={}){
  const config={origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:scalingoHomepage(),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,scalingoAccountCreation:true,scalingoAccountManagement:true,employeeImportConsentRequired:true,invitationSendingEnabled:capabilities.mailDelivery,messageAutomationAdminEnabled:true,trainingAttestationsEnabled:true,temperatureAssessmentCompatibility:true,purgeNewsOnRead:false,calendarReadThrough:false,enforceOAuthCanonicalOrigin:true,mailEmail:env.MAIL_SENDER_EMAIL||'',googleId:env.GOOGLE_CLIENT_ID||'',googleSecret:env.GOOGLE_CLIENT_SECRET||'',googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'',openaiKey:capabilities.analysis?env.OPENAI_API_KEY:'',youtrustKey:capabilities.signatures?env.YOUTRUST_API_KEY:'',youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailFetch,calendarFetch,oauthFetch,youtubeFetch,employeeScanFetch:analysisFetch,employeeImportFetch:analysisFetch,youtrustFetch,feastCalendar:async()=>({day:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),feasts:[],names:[],available:false}),capabilities};
  if(initialAccessEmail){
   config.initialAccessEmail=initialAccessEmail;
+  config.menuOnly=menuOnly;
   config.allowsPortalUser=user=>user?.email===initialAccessEmail&&user.role==='admin'&&user.active===true;
   config.invitationSendingEnabled=false;
  }
@@ -46,16 +49,21 @@ export function productionConfig(env,adapters={}){
  if(capabilities.productWeb)config.merchandisingSearch=createWebProductSearch({readKey:async()=>env.OPENAI_API_KEY||'',fetchImpl:analysisFetch,...(adapters.readProductPage?{readPage:adapters.readProductPage}:{})});
  return config;
 }
-export async function checkProductionPrerequisites(db,initialAccessEmail){
+export async function checkProductionPrerequisites(db,initialAccessEmail,{menuOnly=false}={}){
  const c=await db.connect();try{
   await c.query('BEGIN READ ONLY');
   const context=(await c.query("SELECT current_database() AS name,(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()) AS tls,current_setting('cluster_name') AS cluster")).rows[0];
   const synthetic=db.options?.host==='127.0.0.1'&&context.cluster==='portailplus-grouped-synthetic';
   if(!context.tls||context.name!=='portailplus_7495'&&!synthetic)throw refusal('SCALINGO_DATABASE_TLS_REQUIRED');
-  const columns=(await c.query("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public'")).rows;
-  const required=['calendar_tasks.source_message_id','team_messages.reminder_kind','team_messages.automation_text','hr_documents.training_date','hr_documents.training_kind','hr_documents.training_title','temperature_comments.assessment','temperature_comments.validation','quality_errors.correction_note_history','training_documents.removed_at','message_automations.revision','message_automation_runs.occurrence','message_automation_changes.action','training_attestation_imports.proposal','training_attestation_reads.requested_at','merchandising_promotions.prices','merchandising_promotions.stocks','merchandising_promotion_documents.file_content','scalingo_employee_deletion_audit.deleted_user_id'];
-  const missing=required.filter(k=>!columns.some(r=>r.table_name+'.'+r.column_name===k));if(missing.length)throw Object.assign(refusal('ADDITIVE_SCHEMA_REVIEW_REQUIRED'),{missing});
-  const index=(await c.query("SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND tablename='calendar_tasks'")).rows;if(!index.some(r=>/UNIQUE/.test(r.indexdef)&&/user_id, source_message_id/.test(r.indexdef)&&/IS NOT NULL/.test(r.indexdef)))throw refusal('MESSAGE_TASK_UNIQUE_INDEX_REQUIRED');
+  if(menuOnly){
+   await c.query('SELECT id,user_id,csrf,expires_at FROM sessions LIMIT 0');
+   await c.query('SELECT key,count,until_at FROM login_attempts LIMIT 0');
+  }else{
+   const columns=(await c.query("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public'")).rows;
+   const required=['calendar_tasks.source_message_id','team_messages.reminder_kind','team_messages.automation_text','hr_documents.training_date','hr_documents.training_kind','hr_documents.training_title','temperature_comments.assessment','temperature_comments.validation','quality_errors.correction_note_history','training_documents.removed_at','message_automations.revision','message_automation_runs.occurrence','message_automation_changes.action','training_attestation_imports.proposal','training_attestation_reads.requested_at','merchandising_promotions.prices','merchandising_promotions.stocks','merchandising_promotion_documents.file_content','scalingo_employee_deletion_audit.deleted_user_id'];
+   const missing=required.filter(k=>!columns.some(r=>r.table_name+'.'+r.column_name===k));if(missing.length)throw Object.assign(refusal('ADDITIVE_SCHEMA_REVIEW_REQUIRED'),{missing});
+   const index=(await c.query("SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND tablename='calendar_tasks'")).rows;if(!index.some(r=>/UNIQUE/.test(r.indexdef)&&/user_id, source_message_id/.test(r.indexdef)&&/IS NOT NULL/.test(r.indexdef)))throw refusal('MESSAGE_TASK_UNIQUE_INDEX_REQUIRED');
+  }
   const admins=(await c.query("SELECT id,email,role,active,must_change FROM users WHERE role='admin' AND active=TRUE AND must_change=FALSE")).rows;
   if(!admins.some(u=>u.email&&u.email!=='admin-test@portailplus.invalid'))throw refusal('PERSONAL_READY_ADMINISTRATOR_REQUIRED');
   if(initialAccessEmail&&!admins.some(u=>u.email===initialAccessEmail))throw refusal('INITIAL_ACCESS_ADMINISTRATOR_REQUIRED');
@@ -63,11 +71,18 @@ export async function checkProductionPrerequisites(db,initialAccessEmail){
  }finally{await c.query('ROLLBACK');c.release();}
 }
 export async function createScalingoProductionApp(db,env,adapters={}){
- const config=productionConfig(env,adapters);await checkProductionPrerequisites(db,config.initialAccessEmail);config.dummyHash=await hashPassword(token());
+ const config=productionConfig(env,adapters);await checkProductionPrerequisites(db,config.initialAccessEmail,{menuOnly:config.menuOnly});config.dummyHash=await hashPassword(token());
  const {app,mailer,sync,connectionHealth}=createApp(db,config),gate=express();gate.disable('x-powered-by');
  registerScalingoWwwRedirect(gate);
  gate.use((req,res,next)=>{
   if(env.SCALINGO_MAINTENANCE_MODE==='true'&&req.path!=='/health')return res.status(503).set('Retry-After','300').json({error:'Portail temporairement en maintenance.'});
+  if(config.menuOnly){
+   const path=req.path.toLowerCase().replace(/\/$/,'');
+   const request=req.method+' '+path;
+   const sessionRoute=['GET /api/me','HEAD /api/me','POST /api/login','POST /api/logout'].includes(request);
+   const pageOrAsset=['GET','HEAD'].includes(req.method)&&!/^\/(?:api|auth)(?:\/|$)/.test(path);
+   if(!sessionRoute&&!pageOrAsset)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
+  }
   if(req.path.startsWith('/staging-')||req.path.startsWith('/api/staging-')||req.path==='/api/collaborateurs/import')return res.status(403).json({error:'Outil de préparation indisponible en production.'});
   const p=req.path,cap=config.capabilities;
   const denied=(p==='/auth/google/callback'?(String(req.query.state||'').startsWith('mail_')?!cap.mailOAuth:String(req.query.state||'').startsWith('youtube_')?!cap.youtube:!cap.calendar):/^\/api\/google\/(?!status$)/.test(p)?!cap.calendar:/^\/api\/mail\/(connect|disconnect)$/.test(p)?!cap.mailOAuth:/^\/api\/youtube/.test(p)?!cap.youtube:/^\/api\/youtrust/.test(p)||/^\/api\/hr\/(?:documents\/[^/]+\/signatures|signatures\/[^/]+\/(?:refresh|file))$/.test(p)?!cap.signatures:/^\/api\/challenges\/[^/]+\/reports\/[^/]+\/send$/.test(p)||/^\/api\/laboratories\/[^/]+\/email$/.test(p)?!cap.mailDelivery:false);

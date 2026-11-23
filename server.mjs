@@ -54,6 +54,7 @@ const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function createApp(db,config) {
   const allowsPortalUser=config.allowsPortalUser??(()=>true);
   const sessionFeatures=config.employeeAccountsReadOnly===true?{features:{employeeAccountsReadOnly:true,...(config.scalingoEmployeeLifecycle===true?{scalingoEmployeeLifecycle:true}:{}),...(config.scalingoAccountCreation===true?{scalingoAccountCreation:true}:{})}}:{};
+  if(config.menuOnly===true)(sessionFeatures.features??={}).menuOnly=true;
   if(config.scalingoAccountManagement===true)Object.assign(sessionFeatures.features??={}, {scalingoAccountManagement:true,invitationPreview:true,invitationSendingEnabled:config.invitationSendingEnabled===true});
   const app=express(), secret=config.secret, origin=new URL(config.origin).origin;
   const allowedOrigins=new Set([origin,...(config.allowedOrigins||[])]);
