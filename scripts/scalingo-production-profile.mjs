@@ -20,6 +20,8 @@ export function productionConfig(env,adapters={}){
  if(!env.APP_SECRET||env.APP_SECRET.length<32)throw refusal('SCALINGO_APP_SECRET_REQUIRED');
  if(env.SCALINGO_ENABLE_BUSINESS_STARTUP==='true')throw refusal('BUSINESS_STARTUP_SEED_FORBIDDEN');
  if(env.SCALINGO_ENABLE_SCHEDULED_JOBS==='true')throw refusal('PRODUCTION_SCHEDULER_NOT_RELEASED');
+ const initialAccessEmail=env.SCALINGO_INITIAL_ACCESS_EMAIL;
+ if(initialAccessEmail!==undefined&&(!/^[^\s@]+@[^\s@]+$/.test(initialAccessEmail)||initialAccessEmail!==initialAccessEmail.toLowerCase()||initialAccessEmail==='admin-test@portailplus.invalid'))throw refusal('INVALID_INITIAL_ACCESS_EMAIL');
  const capabilities=productionCapabilities(env),transport=adapters.fetch||fetch;
  const permit=(enabled,allowed)=>async(url,options={})=>{
   const u=new URL(String(url)),method=options.method||'GET';
@@ -34,12 +36,17 @@ export function productionConfig(env,adapters={}){
  const analysisFetch=permit(capabilities.analysis||capabilities.productWeb,u=>u.hostname==='api.openai.com');
  const youtrustFetch=permit(capabilities.signatures,u=>['api.yousign.app','api-sandbox.yousign.app'].includes(u.hostname));
  const config={origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:scalingoHomepage(),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,scalingoAccountCreation:true,scalingoAccountManagement:true,employeeImportConsentRequired:true,invitationSendingEnabled:capabilities.mailDelivery,messageAutomationAdminEnabled:true,trainingAttestationsEnabled:true,temperatureAssessmentCompatibility:true,purgeNewsOnRead:false,calendarReadThrough:false,enforceOAuthCanonicalOrigin:true,mailEmail:env.MAIL_SENDER_EMAIL||'',googleId:env.GOOGLE_CLIENT_ID||'',googleSecret:env.GOOGLE_CLIENT_SECRET||'',googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'',openaiKey:capabilities.analysis?env.OPENAI_API_KEY:'',youtrustKey:capabilities.signatures?env.YOUTRUST_API_KEY:'',youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailFetch,calendarFetch,oauthFetch,youtubeFetch,employeeScanFetch:analysisFetch,employeeImportFetch:analysisFetch,youtrustFetch,feastCalendar:async()=>({day:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),feasts:[],names:[],available:false}),capabilities};
+ if(initialAccessEmail){
+  config.initialAccessEmail=initialAccessEmail;
+  config.allowsPortalUser=user=>user?.email===initialAccessEmail&&user.role==='admin'&&user.active===true;
+  config.invitationSendingEnabled=false;
+ }
  if(capabilities.calendar||capabilities.mailOAuth||capabilities.youtube)for(const key of ['googleId','googleSecret','googleEmail'])if(!config[key])throw refusal('GOOGLE_CONFIGURATION_REQUIRED');
  if(capabilities.mailDelivery&&(!capabilities.mailOAuth||!env.MAIL_SENDER_EMAIL))throw refusal('APPROVED_MAIL_SENDER_AND_OAUTH_REQUIRED');
  if(capabilities.productWeb)config.merchandisingSearch=createWebProductSearch({readKey:async()=>env.OPENAI_API_KEY||'',fetchImpl:analysisFetch,...(adapters.readProductPage?{readPage:adapters.readProductPage}:{})});
  return config;
 }
-export async function checkProductionPrerequisites(db){
+export async function checkProductionPrerequisites(db,initialAccessEmail){
  const c=await db.connect();try{
   await c.query('BEGIN READ ONLY');
   const context=(await c.query("SELECT current_database() AS name,(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()) AS tls,current_setting('cluster_name') AS cluster")).rows[0];
@@ -51,11 +58,12 @@ export async function checkProductionPrerequisites(db){
   const index=(await c.query("SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND tablename='calendar_tasks'")).rows;if(!index.some(r=>/UNIQUE/.test(r.indexdef)&&/user_id, source_message_id/.test(r.indexdef)&&/IS NOT NULL/.test(r.indexdef)))throw refusal('MESSAGE_TASK_UNIQUE_INDEX_REQUIRED');
   const admins=(await c.query("SELECT id,email,role,active,must_change FROM users WHERE role='admin' AND active=TRUE AND must_change=FALSE")).rows;
   if(!admins.some(u=>u.email&&u.email!=='admin-test@portailplus.invalid'))throw refusal('PERSONAL_READY_ADMINISTRATOR_REQUIRED');
+  if(initialAccessEmail&&!admins.some(u=>u.email===initialAccessEmail))throw refusal('INITIAL_ACCESS_ADMINISTRATOR_REQUIRED');
   return {ready:true,personalAdministrators:admins.filter(u=>u.email!=='admin-test@portailplus.invalid').length,dataWrites:0,jobsStarted:0};
  }finally{await c.query('ROLLBACK');c.release();}
 }
 export async function createScalingoProductionApp(db,env,adapters={}){
- const config=productionConfig(env,adapters);await checkProductionPrerequisites(db);config.dummyHash=await hashPassword(token());
+ const config=productionConfig(env,adapters);await checkProductionPrerequisites(db,config.initialAccessEmail);config.dummyHash=await hashPassword(token());
  const {app,mailer,sync,connectionHealth}=createApp(db,config),gate=express();gate.disable('x-powered-by');
  registerScalingoWwwRedirect(gate);
  gate.use((req,res,next)=>{
@@ -69,12 +77,12 @@ export async function createScalingoProductionApp(db,env,adapters={}){
  gate.get('/api/google/status',(req,res,next)=>{const json=res.json;res.json=function(data){return json.call(this,{...data,configured:config.capabilities.calendar&&data.configured,calendarEnabled:config.capabilities.calendar,environment:'scalingo'});};app(req,res,next);});
  gate.get('/api/mail/status',(req,res,next)=>{const json=res.json;res.json=function(data){return json.call(this,{...data,configured:config.capabilities.mailOAuth&&data.configured,deliveryEnabled:config.capabilities.mailDelivery});};app(req,res,next);});
  registerScalingoTrevouxEntry(gate,app);registerScalingoRetiredCalculations(gate);
- const universeBoundary=scalingoUniverseBoundary(db);
+ const universeBoundary=scalingoUniverseBoundary(db,config.allowsPortalUser);
  // Personal attestation uploads retain their own authenticated owner/admin ACL,
  // rather than requiring administrative edit rights on the whole Quality module.
  gate.use((req,res,next)=>req.method==='POST'&&(req.path==='/api/quality/training/imports/analyze'||/^\/api\/quality\/training\/imports\/[a-f0-9-]{36}\/confirm$/i.test(req.path))?next():universeBoundary(req,res,next));
  registerScalingoAccountManagement(gate,app);
- registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db),origin:config.origin,secret:config.secret,isAllowedOrigin:o=>scalingoAllowedOrigins.includes(o),accountManagement:true});
+ registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db,config.allowsPortalUser),origin:config.origin,secret:config.secret,isAllowedOrigin:o=>scalingoAllowedOrigins.includes(o),accountManagement:true});
  gate.use(app);gate.use((e,req,res,next)=>res.status(e.status||500).json({error:e.status?e.message:'Opération Scalingo impossible.',...(e.code?{code:e.code}:{})}));
  return {app:gate,config,mailer,sync,connectionHealth,jobsStarted:0};
 }

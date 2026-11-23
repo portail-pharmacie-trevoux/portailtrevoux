@@ -52,6 +52,7 @@ const root=fileURLToPath(new URL('.',import.meta.url));
 const cleanUser=u=>({id:u.id,name:u.name,job:u.job,phone:u.phone||'',email:u.email,role:u.role,rights:u.rights,editRights:u.edit_rights||[],permissionsConfigured:!!u.permissions_configured,mustChange:u.must_change});
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function createApp(db,config) {
+  const allowsPortalUser=config.allowsPortalUser??(()=>true);
   const sessionFeatures=config.employeeAccountsReadOnly===true?{features:{employeeAccountsReadOnly:true,...(config.scalingoEmployeeLifecycle===true?{scalingoEmployeeLifecycle:true}:{}),...(config.scalingoAccountCreation===true?{scalingoAccountCreation:true}:{})}}:{};
   if(config.scalingoAccountManagement===true)Object.assign(sessionFeatures.features??={}, {scalingoAccountManagement:true,invitationPreview:true,invitationSendingEnabled:config.invitationSendingEnabled===true});
   const app=express(), secret=config.secret, origin=new URL(config.origin).origin;
@@ -76,7 +77,7 @@ export function createApp(db,config) {
     const cookie=req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('trevoux_session='))?.slice(16);
     if(cookie && /^[\w-]{43}$/.test(cookie)){
       const {rows}=await db.query('SELECT s.id AS session_id,s.csrf,u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now() AND u.active=TRUE',[digest(cookie)]);
-      if(rows[0])req.auth=rows[0];
+      if(rows[0]&&allowsPortalUser(rows[0]))req.auth=rows[0];
     }
     next();
   });
@@ -150,7 +151,7 @@ export function createApp(db,config) {
     res.cookie('trevoux_session',raw,cookieOptions);
     return {user:cleanUser(user),csrf:csrfToken,...sessionFeatures};
   }
-  registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession,sendEnabled:config.scalingoAccountManagement===true?config.invitationSendingEnabled===true:config.invitationSendingEnabled!==false,previewEnabled:config.scalingoAccountManagement===true});
+  registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession,sendEnabled:config.scalingoAccountManagement===true?config.invitationSendingEnabled===true:config.invitationSendingEnabled!==false,previewEnabled:config.scalingoAccountManagement===true,acceptEnabled:!config.initialAccessEmail});
   app.get('/health',async(req,res)=>{await db.query('SELECT 1');res.json({ok:true});});
   app.post('/api/login',async(req,res)=>{
     const email=typeof req.body.email==='string'?req.body.email.trim().toLowerCase():'';
@@ -162,7 +163,7 @@ export function createApp(db,config) {
     }
     const user=(await db.query('SELECT * FROM users WHERE email=$1',[email])).rows[0];
     const valid=await verifyPassword(req.body.password,user?.password_hash||config.dummyHash);
-    if(!user||!valid||!user.active)throw fail(401,'Adresse ou mot de passe incorrect.');
+    if(!user||!valid||!user.active||!allowsPortalUser(user))throw fail(401,'Adresse ou mot de passe incorrect.');
     if(req.auth)await db.query('DELETE FROM sessions WHERE id=$1',[req.auth.session_id]);
     res.json(await newSession(user,res));
   });

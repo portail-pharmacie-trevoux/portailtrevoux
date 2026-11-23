@@ -74,7 +74,7 @@ export function createInvitationMailer({getSetting,setSetting,secret,clientId,cl
   }
  };
 }
-export function registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession,sendEnabled=true,previewEnabled=false}){
+export function registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,origin,mailer,newSession,sendEnabled=true,previewEnabled=false,acceptEnabled=true}){
  const bad=()=>fail(400,'Ce lien est invalide, expiré ou déjà utilisé. Demandez une nouvelle invitation à la pharmacie.');
  async function transaction(work){const client=db.connect?await db.connect():db;try{await client.query('BEGIN');const result=await work(client);await client.query('COMMIT');return result;}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}}
  const checkedToken=raw=>{if(typeof raw!=='string'||!/^[-\w]{43}$/.test(raw))throw bad();return digest(raw);};
@@ -114,10 +114,12 @@ export function registerInvitations({app,db,auth,ready,admin,csrf,fail,secret,or
   });res.json({ok:true,email:result.email});
  });
  app.post('/api/invitations/check',async(req,res)=>{
+  if(!acceptEnabled)throw fail(403,'Activation des invitations temporairement indisponible.');
   const hash=checkedToken(req.body?.token);await limit(req,'invitation-check',80);const person=await validRow(db,hash);if(!person)throw bad();
   res.json({firstName:person.first_name,email:person.invitation_email});
  });
  app.post('/api/invitations/accept',async(req,res)=>{
+  if(!acceptEnabled)throw fail(403,'Activation des invitations temporairement indisponible.');
   const hash=checkedToken(req.body?.token);await limit(req,'invitation-accept',20);
   if(!passwordValid(req.body.password))throw fail(400,'Choisissez un mot de passe de 12 caractères minimum (256 octets maximum).');
   const person=await transaction(async client=>{

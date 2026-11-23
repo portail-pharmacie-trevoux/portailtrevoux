@@ -6,15 +6,15 @@ const protectedEdits=['Emplois du temps','Collaborateurs','Ressources humaines']
 const sorted=a=>[...new Set(a||[])].sort();
 const equal=(a,b)=>JSON.stringify(sorted(a))===JSON.stringify(sorted(b));
 const fail=(status,message)=>Object.assign(Error(message),{status});
-function scalingoAdministratorAuth(db,testOnly){return async(req,res,next)=>{try{
+function scalingoAdministratorAuth(db,testOnly,allowsPortalUser=()=>true){return async(req,res,next)=>{try{
  const raw=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('trevoux_session='))?.slice(16);
  if(!raw||! /^[\w-]{43}$/.test(raw))throw fail(401,'Connexion administrateur requise.');
  const row=(await db.query('SELECT u.id,u.email,u.role,u.active,u.must_change,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now()',[digest(raw)])).rows[0];
- if(!row||(testOnly&&row.email!=='admin-test@portailplus.invalid')||row.role!=='admin'||!row.active||row.must_change)throw fail(403,testOnly?'Administrateur TEST uniquement, mot de passe personnel requis.':'Administrateur actif uniquement, mot de passe personnel requis.');
+ if(!row||!allowsPortalUser(row)||(testOnly&&row.email!=='admin-test@portailplus.invalid')||row.role!=='admin'||!row.active||row.must_change)throw fail(403,testOnly?'Administrateur TEST uniquement, mot de passe personnel requis.':'Administrateur actif uniquement, mot de passe personnel requis.');
  req.cleanupAdmin=row;next();
  }catch(e){next(e);}};}
 export const scalingoTestAdminAuth=db=>scalingoAdministratorAuth(db,true);
-export const scalingoAdminAuth=db=>scalingoAdministratorAuth(db,false);
+export const scalingoAdminAuth=(db,allowsPortalUser)=>scalingoAdministratorAuth(db,false,allowsPortalUser);
 export function validateRights(body){
  if(!body||Object.keys(body).some(k=>!['rights','editRights'].includes(k)))throw fail(400,'Seuls les droits peuvent être modifiés ici. Utilisez Administration des droits Scalingo.');
  const {rights,editRights}=body;
@@ -38,7 +38,7 @@ export function backupReady(env,now=Date.now()){
  return !!env.SCALINGO_RIGHTS_BACKUP_REFERENCE?.trim()&&Number.isFinite(at)&&at<=now&&now-at<24*3600000;
 }
 // Extra boundary for modules whose historic write guards only checked consultation.
-export function scalingoUniverseBoundary(db){
+export function scalingoUniverseBoundary(db,allowsPortalUser=()=>true){
  const prefixes=[['/api/calendar','Agenda'],['/api/schedule','Emplois du temps'],['/api/schedule-posts','Emplois du temps'],['/api/schedule-templates','Emplois du temps'],['/api/laboratories','Laboratoires'],['/api/merchandising',"Outils d'aide au merchandising"],['/api/challenges','Challenges'],['/api/procedures','Procédures'],['/api/hr','Ressources humaines'],['/api/training','Formations'],['/api/contacts','Contacts utiles'],['/api/quality',"Outils d'aide à la démarche qualité"],['/api/music','Fun']];
  return async(req,res,next)=>{try{
   const universe=prefixes.find(([prefix])=>req.path===prefix||req.path.startsWith(prefix+'/'))?.[1];
@@ -46,7 +46,7 @@ export function scalingoUniverseBoundary(db){
   const raw=req.headers.cookie?.split(';').map(x=>x.trim()).find(x=>x.startsWith('trevoux_session='))?.slice(16);
   if(!raw||! /^[\w-]{43}$/.test(raw))throw fail(401,'Connectez-vous pour continuer.');
   const user=(await db.query('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.expires_at>now() AND u.active=TRUE',[digest(raw)])).rows[0];
-  if(!user)throw fail(401,'Connectez-vous pour continuer.');
+  if(!user||!allowsPortalUser(user))throw fail(401,'Connectez-vous pour continuer.');
   if(user.must_change)throw fail(403,'Changez votre mot de passe provisoire.');
   if(!canAccess(user,universe)||(!['GET','HEAD'].includes(req.method)&&!canModify(user,universe)))throw fail(403,'Cet univers est en consultation seule ou inaccessible.');
   next();

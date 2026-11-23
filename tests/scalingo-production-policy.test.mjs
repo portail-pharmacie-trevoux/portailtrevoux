@@ -29,3 +29,36 @@ test('Production SQL is additive, separate from initialization, and does not mod
  const sql=await readFile(new URL('../scripts/sql/scalingo-production-parity.sql',import.meta.url),'utf8');assert(!/\b(?:INSERT INTO|UPDATE\s+users|DELETE FROM|TRUNCATE|DROP TABLE|DO\s+\$)/i.test(sql));
  const startup=await readFile(new URL('../scripts/serve-scalingo-production.mjs',import.meta.url),'utf8');assert(!/initialize\(|setInterval\(|schema\.sql|purgeNews\(/.test(startup));const executor=await readFile(new URL('../scripts/migration/grouped/secure-executor.mjs',import.meta.url),'utf8');assert.match(executor,/REAL_EXECUTION_ENABLED=false/);
 });
+
+test('Initial opening limits logins, existing sessions and invitation activation to the intended scope',async t=>{
+ const {createApp}=await import('../server.mjs');
+ const {hashPassword,digest}=await import('../security.mjs');
+ const email='owner@example.invalid';
+ const password='fixture-password-123';
+ const password_hash=await hashPassword(password);
+ const owner={id:1,email,role:'admin',active:true,must_change:false,password_hash};
+ const other={...owner,id:2,email:'other@example.invalid'};
+ const db={async query(sql,[key]=[]){
+  if(sql.startsWith('SELECT s.id AS session_id'))return {rows:[key===digest('a'.repeat(43))?owner:other]};
+  if(sql.startsWith('INSERT INTO login_attempts'))return {rows:[{count:1}]};
+  if(sql.startsWith('SELECT * FROM users WHERE email'))return {rows:[key===email?owner:other]};
+  if(sql.startsWith('INSERT INTO sessions')&&key)return {rows:[]};
+  throw Error('Unexpected database operation');
+ }};
+ assert.throws(()=>productionConfig({...env,SCALINGO_INITIAL_ACCESS_EMAIL:'admin-test@portailplus.invalid'}),/INVALID_INITIAL_ACCESS_EMAIL/);
+ const config=productionConfig({...env,SCALINGO_INITIAL_ACCESS_EMAIL:email});
+ assert.equal(config.allowsPortalUser({...owner,role:'employee'}),false);
+ const {app}=createApp(db,config);
+ const server=app.listen(0,'127.0.0.1');
+ t.after(()=>server.close());
+ await new Promise(resolve=>server.once('listening',resolve));
+ const url='http://127.0.0.1:'+server.address().port;
+ const post=(path,body)=>fetch(url+path,{method:'POST',headers:{origin:config.origin,'content-type':'application/json'},body:JSON.stringify(body)});
+ const me=letter=>fetch(url+'/api/me',{headers:{cookie:'trevoux_session='+letter.repeat(43)}});
+ assert.equal((await post('/api/login',{email,password})).status,200);
+ assert.equal((await post('/api/login',{email:other.email,password})).status,401);
+ assert.equal((await me('a')).status,200);
+ assert.equal((await me('b')).status,401);
+ assert.equal((await post('/api/invitations/check',{})).status,403);
+ assert.equal((await post('/api/invitations/accept',{})).status,403);
+});
