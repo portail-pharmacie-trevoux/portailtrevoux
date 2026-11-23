@@ -67,7 +67,10 @@ test('Menu-only opening checks authentication storage and closes module routes',
  const {createScalingoProductionApp}=await import('../scripts/scalingo-production-profile.mjs');
  const email='owner@example.invalid';
  const user={id:1,email,role:'admin',active:true,must_change:false,csrf:'fixture-csrf'};
- const settings={...env,SCALINGO_MENU_ONLY:'true'};
+ const settings={...env,SCALINGO_MENU_ONLY:'true',SCALINGO_ENABLE_GOOGLE_CALENDAR:'true',GOOGLE_ACCOUNT_EMAIL:'calendar@example.invalid',GOOGLE_CLIENT_ID:'fixture',GOOGLE_CLIENT_SECRET:'fixture'};
+ const {encrypt}=await import('../security.mjs');
+ const stored=encrypt({access_token:'fixture',expires_at:Date.now()+3600000},env.APP_SECRET);
+ const googleCalls=[];
  assert.throws(()=>productionConfig(settings),/INITIAL_ACCESS_EMAIL_REQUIRED/);
  const queries=[];
  const db={async connect(){return {async query(sql){
@@ -76,12 +79,16 @@ test('Menu-only opening checks authentication storage and closes module routes',
   if(sql.includes('FROM users'))return {rows:[user]};
   if(sql.includes('information_schema')||sql.includes('pg_indexes'))throw Error('Unexpected module schema check');
   return {rows:[]};
- },release(){}};},async query(sql){
+ },release(){}};},async query(sql,[key]=[]){
   if(sql.startsWith('SELECT s.id AS session_id'))return {rows:[user]};
   if(sql.startsWith('SELECT links,revision'))return {rows:[]};
+  if(sql.startsWith('SELECT value FROM settings'))return {rows:[{value:key==='calendar_id'?'selected-calendar':stored}]};
   throw Error('Unexpected application query');
  }};
- const {app}=await createScalingoProductionApp(db,{...settings,SCALINGO_INITIAL_ACCESS_EMAIL:email});
+ const {app}=await createScalingoProductionApp(db,{...settings,SCALINGO_INITIAL_ACCESS_EMAIL:email},{fetch:async url=>{
+  googleCalls.push(String(url));
+  return {ok:true,json:async()=>({email:settings.GOOGLE_ACCOUNT_EMAIL,email_verified:true})};
+ }});
  assert.equal(queries.at(-1),'ROLLBACK');
  const server=app.listen(0,'127.0.0.1');
  t.after(()=>server.close());
@@ -104,7 +111,11 @@ test('Menu-only opening checks authentication storage and closes module routes',
  const session=await fetch(url+'/api/me',{headers});
  assert.equal(session.status,200);
  assert.equal((await session.json()).features.menuOnly,true);
- for(const path of ['/api/calendar','/API/USERS','/auth/google/callback']){
+ const verify=await fetch(url+'/api/google/verify-calendar',{method:'POST',headers:{...headers,origin:env.APP_URL,'x-csrf-token':user.csrf}});
+ assert.equal(verify.status,200);
+ assert.deepEqual(await verify.json(),{ok:true});
+ assert.deepEqual(googleCalls,['https://openidconnect.googleapis.com/v1/userinfo','https://www.googleapis.com/calendar/v3/calendars/selected-calendar/events?maxResults=1']);
+ for(const path of ['/api/google/calendars','/api/calendar','/API/USERS','/auth/google/callback']){
   assert.equal((await fetch(url+path,{headers})).status,503,path);
  }
  assert.equal((await fetch(url+'/api/invitations/accept',{method:'POST',headers})).status,503);

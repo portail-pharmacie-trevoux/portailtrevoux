@@ -163,8 +163,32 @@ function setUniverseHeading(name){
   }
   heading.append(node('span',displayUniverse(name)));
 }
+function openCalendarVerification(){
+  currentUniverse='Agenda';
+  q('#home').classList.add('hidden');
+  q('#detail').classList.remove('hidden');
+  q('#feedback').textContent='';
+  q('#global-message').textContent='';
+  q('#description').textContent='Vérifiez la connexion à l’agenda Google sélectionné.';
+  setUniverseHeading('Agenda');
+  const status=node('p','','status-line');
+  status.setAttribute('role','status');
+  const check=button('Tester la connexion Google Agenda',async()=>{
+    check.disabled=true;
+    status.textContent='Vérification en cours…';
+    try{
+      await api('/api/google/verify-calendar','POST',{});
+      status.textContent='Connexion vérifiée. Google autorise la lecture des événements de l’agenda sélectionné.';
+    }catch(error){status.textContent=error.message;}
+    finally{check.disabled=false;}
+  },'btn primary');
+  q('#content').replaceChildren(check,status);
+}
 async function openUniverse(name,{menuRoot=false}={}){
-  if(session?.features?.menuOnly)return;
+  if(session?.features?.menuOnly){
+    if(name==='Agenda'&&session.user.role==='admin')openCalendarVerification();
+    return;
+  }
   // A retired Scalingo tile cannot be reopened from stale navigation or console calls.
   if(name==='Outils de calculs rapides'&&!q('.grid [data-universe="Outils de calculs rapides"]'))return;
   const viewRequest=++universeViewRequest;

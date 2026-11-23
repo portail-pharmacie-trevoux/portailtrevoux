@@ -287,6 +287,20 @@ export function createApp(db,config) {
   const connectionHealth=createGoogleConnectionHealth({getSetting,setSetting,mailer,configured:!!(config.googleId&&config.googleSecret),readCalendar:async()=>({tokens:!!await getSetting('google_tokens'),calendarId:await getSetting('calendar_id'),error:await getSetting('sync_error')||'',syncedAt:(await db.query('SELECT synced_at FROM calendar_cache WHERE singleton=TRUE')).rows[0]?.synced_at})});
   app.get('/api/integrations/google-health',auth,ready,admin,async(req,res)=>{res.set('Cache-Control','no-store');res.json(await connectionHealth.status());});
   app.get('/api/google/status',auth,ready,admin,async(req,res)=>res.json({configured:!!(config.googleId&&config.googleSecret),connected:!!await getSetting('google_tokens'),calendarId:await getSetting('calendar_id')||'',calendarName:await getSetting('calendar_name')||'',error:await getSetting('sync_error')||'',callback}));
+  if(config.menuOnly)app.post('/api/google/verify-calendar',auth,ready,admin,csrf,async(req,res)=>{
+    const calendar=await getSetting('calendar_id');
+    if(!calendar)throw fail(409,'Aucun agenda Google n’est sélectionné.');
+    const tokens=await googleTokens();
+    const headers={Authorization:'Bearer '+tokens.access_token};
+    const identity=await config.oauthFetch('https://openidconnect.googleapis.com/v1/userinfo',{headers,signal:AbortSignal.timeout(20000)});
+    if(!identity.ok)throw fail(502,'Impossible de vérifier le compte Google associé à l’autorisation.');
+    const profile=await identity.json();
+    if(!profile.email_verified||profile.email?.toLowerCase()!==config.googleEmail.toLowerCase())throw fail(403,'L’autorisation Google correspond à un autre compte.');
+    const events=await calendarFetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calendar)+'/events?maxResults=1',{headers,signal:AbortSignal.timeout(20000)});
+    if(events.status===401)throw fail(409,'L’autorisation Google doit être renouvelée.');
+    if(!events.ok)throw fail(502,'Google ne permet pas de lire les événements de l’agenda sélectionné.');
+    res.set('Cache-Control','no-store').json({ok:true});
+  });
   app.get('/api/google/calendars',auth,ready,admin,async(req,res)=>{
     const items=[];let page;
     do{const d=await googleGet('users/me/calendarList?maxResults=250'+(page?'&pageToken='+encodeURIComponent(page):''));items.push(...(d.items||[]).map(c=>({id:c.id,name:c.summary})));page=d.nextPageToken;}while(page);
