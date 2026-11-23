@@ -101,8 +101,8 @@ async function api(path,method='GET',data){
 function error(e){q('#global-message').textContent=e.message;}
 function showLogin(){q('#portal-quick-links')?.remove();q('#google-connection-alert')?.remove();q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
-  const linksUserId=session.user.id,groupement=q('#bento-groupement');
-  if(groupement||!session.features?.menuOnly)void import('/portal-quick-links.js').then(module=>{if(session?.user.id===linksUserId&&!session.user.mustChange)void module.setupQuickLinks({api,userId:linksUserId,isAdmin:session.user.role==='admin',isCurrent:()=>session?.user.id===linksUserId&&!session.user.mustChange,trigger:groupement});}).catch(error);
+  const linksUserId=session.user.id,groupement=!!q('#home .bento-menu');
+  if(groupement||!session.features?.menuOnly)void import('/portal-quick-links.js').then(module=>{if(session?.user.id===linksUserId&&!session.user.mustChange)void module.setupQuickLinks({api,userId:linksUserId,isAdmin:session.user.role==='admin',isCurrent:()=>session?.user.id===linksUserId&&!session.user.mustChange,groupement});}).catch(error);
   if(!session.features?.menuOnly){
 
   const whatsappUserId=session.user.id;void import('/whatsapp.js').then(module=>{if(session?.user.id===whatsappUserId)module.setupWhatsApp({button:q('#whatsapp-button'),status:q('#whatsapp-status'),api,getUser:()=>session?.user});}).catch(error);
