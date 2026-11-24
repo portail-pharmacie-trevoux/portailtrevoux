@@ -244,7 +244,16 @@ const collaboratorJobIcons={
 function personName(p){return [p.firstName,p.lastName?.toLocaleUpperCase('fr-FR')].filter(Boolean).join(' ');}
 async function loadPeopleDirectory(){
   const directory=await api('/api/users');
-  if(!session?.features?.menuOnly||session.user.role!=='admin')return directory;
+  if(!session?.features?.menuOnly){
+    if(!session?.features?.scalingoAccountManagement)return directory;
+    try{
+      const capabilities=await api('/api/collaborateurs/capacities');
+      return directory.map(person=>({...person,capabilities:capabilities[person.id]??[]}));
+    }catch(error){
+      return directory.map(person=>({...person,capabilityStatus:person.active?'unavailable':undefined}));
+    }
+  }
+  if(session.user.role!=='admin')return directory;
   const keys=['canVaccinate','canPerformTrod','canPreparePillboxes','hasCqp','hasOncology'];
   return Promise.all(directory.map(async person=>{
     if(!person.active||person.role==='admin'&&!person.isSelf)return person;
@@ -299,7 +308,7 @@ function renderPeople(){
     workspace.append(manage);
     content.prepend(workspace,dialog);
   }else if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'){const link=node('a','Administration des droits Scalingo','btn primary');link.href='/staging-universal-rights';actions.append(link);}administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.prepend(administration);}
-  const bento=session.features?.menuOnly===true;
+  const bento=session.features?.scalingoAccountManagement===true||session.features?.menuOnly===true;
   const collator=new Intl.Collator('fr',{sensitivity:'base'});
   const families=[['green','Comptoir'],['purple','Parapharmacie'],['yellow','Back-office']];
   const skillIcons={canVaccinate:['💉','Vaccination'],canPerformTrod:['🧪','TROD'],canPreparePillboxes:['💊','Piluliers'],hasCqp:['💄','CQP cosmétiques'],hasOncology:['🎗️','Oncologie']};
