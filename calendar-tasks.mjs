@@ -8,11 +8,12 @@ export function validateTask(body,fail){
  return {title,description,date,icon};
 }
 export function taskEvent(row){const end=new Date(row.task_date+'T12:00:00Z');end.setUTCDate(end.getUTCDate()+1);return {id:'task-'+row.id,taskId:row.id,personalTask:true,title:row.title,description:row.description,icon:row.icon,remind:true,start:{date:row.task_date},end:{date:end.toISOString().slice(0,10)}};}
-export function registerCalendarTasks({app,db,auth,ready,csrf,viewUniverse,fail}){
+export function registerCalendarTasks({app,db,auth,ready,csrf,viewUniverse,fail,taskCompletion=false,personalOnly=false}){
  const guards=[auth,ready,viewUniverse('Agenda'),csrf];
  app.post('/api/calendar/tasks',...guards,async(req,res)=>{
   const v=validateTask(req.body,fail);
   if(req.body.sourceMessageId!==undefined){
+   if(personalOnly)throw fail(403,'Seules les tâches personnelles sont disponibles ici.');
    const source=Number(req.body.sourceMessageId);if(!Number.isSafeInteger(source)||source<1)throw fail(400,'Message invalide.');
    const message=(await db.query(`SELECT m.* FROM team_messages m JOIN team_message_recipients r ON r.message_id=m.id WHERE m.id=$1 AND r.user_id=$2 AND (r.archived OR ${newsDeadline()}>now())`,[source,req.auth.id])).rows[0];
    if(!message||!reminderTaskPreset(message))throw fail(404,'Rappel indisponible ou expiré.');
@@ -25,6 +26,17 @@ export function registerCalendarTasks({app,db,auth,ready,csrf,viewUniverse,fail}
    return res.status(row.already_exists?200:201).json({id:row.id,alreadyExists:row.already_exists});
   }
   const {rows}=await db.query('INSERT INTO calendar_tasks(user_id,title,description,task_date,icon) VALUES($1,$2,$3,$4,$5) RETURNING id',[req.auth.id,v.title,v.description,v.date,v.icon]);res.status(201).json({id:rows[0].id});
+ });
+ if(taskCompletion)app.patch('/api/calendar/tasks/:id/completion',...guards,async(req,res)=>{
+  const {completed}=req.body||{};
+  if(!/^[1-9]\d{0,9}$/.test(req.params.id)||Number(req.params.id)>2147483647||typeof completed!=='boolean')throw fail(400,'Tâche invalide.');
+  const key='calendar_task_done:'+req.auth.id+':'+req.params.id;
+  const sql=completed
+   ? "WITH owned AS (SELECT id FROM calendar_tasks WHERE id=$2 AND user_id=$3 FOR UPDATE), change AS (INSERT INTO settings(key,value) SELECT $1,'true' FROM owned ON CONFLICT(key) DO NOTHING) SELECT id FROM owned"
+   : "WITH owned AS (SELECT id FROM calendar_tasks WHERE id=$2 AND user_id=$3 FOR UPDATE), change AS (DELETE FROM settings WHERE key=$1 AND EXISTS(SELECT 1 FROM owned)) SELECT id FROM owned";
+  const {rows}=await db.query(sql,[key,req.params.id,req.auth.id]);
+  if(!rows.length)throw fail(404,'Tâche introuvable.');
+  res.json({completed});
  });
  app.put('/api/calendar/tasks/:id',...guards,async(req,res)=>{
   if(!/^\d+$/.test(req.params.id))throw fail(400,'Tâche invalide.');const v=validateTask(req.body,fail);

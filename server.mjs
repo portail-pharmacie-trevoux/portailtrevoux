@@ -210,7 +210,7 @@ export function createApp(db,config) {
         if(events.length>20000)throw fail(502,'Agenda trop volumineux pour la période sélectionnée.');
       }while(page);
       const previous=(await db.query('SELECT events FROM calendar_cache WHERE singleton=TRUE')).rows[0]?.events;
-      if(previous){
+      if(previous&&!config.menuOnly){
         const ids=new Set(previous.map(e=>e.id));
         const fresh=events.filter(e=>!ids.has(e.id)&&(e.end?.date||e.end?.dateTime||e.start?.date||e.start?.dateTime)>=new Date(now).toISOString().slice(0,10));
         for(const event of fresh)await publish('Agenda',event.title,'calendar:'+calendar+':'+event.id);
@@ -288,7 +288,7 @@ export function createApp(db,config) {
   const connectionHealth=createGoogleConnectionHealth({getSetting,setSetting,mailer,configured:!!(config.googleId&&config.googleSecret),readCalendar:async()=>({tokens:!!await getSetting('google_tokens'),calendarId:await getSetting('calendar_id'),error:await getSetting('sync_error')||'',syncedAt:(await db.query('SELECT synced_at FROM calendar_cache WHERE singleton=TRUE')).rows[0]?.synced_at})});
   app.get('/api/integrations/google-health',auth,ready,admin,async(req,res)=>{res.set('Cache-Control','no-store');res.json(await connectionHealth.status());});
   app.get('/api/google/status',auth,ready,admin,async(req,res)=>res.json({configured:!!(config.googleId&&config.googleSecret),connected:!!await getSetting('google_tokens'),calendarId:await getSetting('calendar_id')||'',calendarName:await getSetting('calendar_name')||'',error:await getSetting('sync_error')||'',callback}));
-  if(config.menuOnly)app.post('/api/google/verify-calendar',auth,ready,admin,csrf,async(req,res)=>{
+  if(config.bentoAgenda)app.post('/api/google/verify-calendar',auth,ready,admin,csrf,async(req,res)=>{
     const calendar=await getSetting('calendar_id');
     if(!calendar)throw fail(409,'Aucun agenda Google n’est sélectionné.');
     const tokens=await googleTokens();
@@ -323,12 +323,12 @@ export function createApp(db,config) {
     res.json({ok:true});
   });
   app.post('/api/google/sync',auth,ready,admin,csrf,async(req,res)=>{await sync();res.json({ok:true});});
-  registerCalendarTasks({app,db,auth,ready,csrf,viewUniverse,fail});
-  const personalCalendarEvents=registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,fail,getSetting});
+  registerCalendarTasks({app,db,auth,ready,csrf,viewUniverse,fail,taskCompletion:config.bentoAgenda,personalOnly:config.menuOnly});
+  const personalCalendarEvents=registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,fail,getSetting,taskCompletion:config.bentoAgenda});
   app.get('/api/calendar',auth,ready,async(req,res)=>{
     if(!canAccess(req.auth,'Agenda'))throw fail(403,'Vous n’avez pas accès à l’agenda.');
     const cached=(await db.query('SELECT * FROM calendar_cache WHERE singleton=TRUE')).rows[0];
-    if(config.calendarReadThrough!==false&&(!cached||Date.now()-new Date(cached.synced_at).getTime()>15*60000)){try{await sync();}catch{}}
+    if((config.calendarReadThrough!==false||config.menuOnly&&config.capabilities?.calendar)&&(!cached||Date.now()-new Date(cached.synced_at).getTime()>15*60000)){try{await sync();}catch{}}
     const current=(await db.query('SELECT * FROM calendar_cache WHERE singleton=TRUE')).rows[0];
     res.json({name:await getSetting('calendar_name')||'Agenda équipe',events:await personalCalendarEvents(req.auth.id,current?.events||[]),syncedAt:current?.synced_at||null,error:await getSetting('sync_error')||'',connected:!!await getSetting('google_tokens')});
   });

@@ -64,3 +64,29 @@
 .bento-groupement-rail .quick-links-list a{display:block;width:auto;height:auto;padding:12px;border-radius:10px;font-size:.9rem;line-height:1.4}
 .bento-groupement-rail .quick-links-list small{display:block;color:#635773}
 .bento-groupement-rail .quick-links-admin>summary{margin:0;font-size:.9rem}
+
+.week-task-panel,.week-agenda-search,.week-agenda-day{border:1px solid #dfe5ef;border-radius:15px;background:#fff;padding:14px}
+.week-task-panel h3,.week-agenda-search h3{margin:0 0 10px}
+.week-task-form,.week-agenda-search{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.week-task-form .field{margin:0}
+.week-task-form .field:first-child{flex:1;min-width:min(240px,100%)}
+.week-task-panel .status-line:empty{display:none}
+.week-agenda-navigation{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 12px}
+.week-agenda-navigation h3{margin:0;text-align:center}
+.week-agenda-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.week-agenda-day{padding:8px;min-width:0;background:#fbfcff}
+.week-agenda-day h4{margin:0 0 8px;border-radius:9px;padding:9px 6px;text-align:center;color:#fff;background:#5e3c98;font-size:.84rem}
+.week-agenda-day:nth-child(2) h4{background:#2566ad}.week-agenda-day:nth-child(3) h4{background:#087b91}.week-agenda-day:nth-child(4) h4{background:#087b65}.week-agenda-day:nth-child(5) h4{background:#934779}.week-agenda-day:nth-child(6) h4{background:#a65320}
+.week-agenda-day.today{border-color:#087b65}
+.week-agenda-entry{display:grid;gap:3px;margin:0 0 7px;padding:8px;border:1px solid #e5e6f0;border-radius:8px;background:#fff;overflow-wrap:anywhere;font-size:.84rem}
+.week-agenda-time,.week-agenda-empty{color:#526179;font-size:.77rem}
+.week-agenda-task{display:flex;align-items:flex-start;gap:6px;background:#e9f6f2;cursor:pointer}
+.week-agenda-task input{accent-color:#087b65}
+.week-agenda-task input:checked+span{text-decoration:line-through;color:#4f6761}
+.week-agenda-search{margin-top:14px}
+.week-agenda-search h3{flex-basis:100%}
+.week-agenda-search .field{margin:0;flex:1;min-width:min(180px,100%)}
+.bento-agenda-today{display:grid;gap:4px;margin-top:9px;font-size:.84rem;z-index:1;position:relative}
+.bento-agenda-today .completed{text-decoration:line-through}
+@media(max-width:1100px){.week-agenda-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:580px){.week-agenda-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.week-agenda-navigation{flex-wrap:wrap}.week-agenda-navigation h3{order:-1;width:100%}}

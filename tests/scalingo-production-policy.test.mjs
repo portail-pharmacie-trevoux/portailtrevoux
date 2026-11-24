@@ -73,6 +73,7 @@ test('Menu-only opening checks authentication storage and closes module routes',
  const googleCalls=[];
  assert.throws(()=>productionConfig(settings),/INITIAL_ACCESS_EMAIL_REQUIRED/);
  const queries=[];
+ let completed=false;
  const db={async connect(){return {async query(sql){
   queries.push(sql);
   if(sql.includes('current_database()'))return {rows:[{name:'portailplus_7495',tls:true}]};
@@ -80,9 +81,19 @@ test('Menu-only opening checks authentication storage and closes module routes',
   if(sql.includes('information_schema')||sql.includes('pg_indexes'))throw Error('Unexpected module schema check');
   return {rows:[]};
  },release(){}};},async query(sql,[key]=[]){
-  if(sql.startsWith('SELECT s.id AS session_id'))return {rows:[user]};
+  if(sql.startsWith('SELECT s.id AS session_id')||sql.startsWith('SELECT u.* FROM sessions'))return {rows:[user]};
+  if(sql.startsWith('SELECT * FROM calendar_cache'))return {rows:[{events:[],synced_at:new Date()}]};
+  if(sql.startsWith('SELECT event_id FROM calendar_reminders'))return {rows:[]};
+  if(sql.includes('FROM calendar_tasks WHERE user_id'))return {rows:[{id:7,title:'Fixture task',task_date:'2026-11-24',icon:'✅'}]};
+  if(sql.startsWith('SELECT key FROM settings'))return {rows:completed?[{key:key[0]}]:[]};
+  if(sql.startsWith('WITH owned AS')){
+   assert.match(sql,/user_id=\$3/);
+   if(key!=='calendar_task_done:1:7')return {rows:[]};
+   completed=sql.includes('INSERT INTO settings');
+   return {rows:[{id:7}]};
+  }
   if(sql.startsWith('SELECT links,revision'))return {rows:[]};
-  if(sql.startsWith('SELECT value FROM settings'))return {rows:[{value:key==='calendar_id'?'selected-calendar':stored}]};
+  if(sql.startsWith('SELECT value FROM settings'))return {rows:[{value:key==='calendar_id'?'selected-calendar':key==='google_tokens'?stored:''}]};
   throw Error('Unexpected application query');
  }};
  const {app}=await createScalingoProductionApp(db,{...settings,SCALINGO_INITIAL_ACCESS_EMAIL:email},{fetch:async url=>{
@@ -115,7 +126,15 @@ test('Menu-only opening checks authentication storage and closes module routes',
  assert.equal(verify.status,200);
  assert.deepEqual(await verify.json(),{ok:true});
  assert.deepEqual(googleCalls,['https://openidconnect.googleapis.com/v1/userinfo','https://www.googleapis.com/calendar/v3/calendars/selected-calendar/events?maxResults=1']);
- for(const path of ['/api/google/calendars','/api/calendar','/API/USERS','/auth/google/callback?state=mail_fixture','/auth/google/callback?state=youtube_fixture']){
+ const read=async()=>await (await fetch(url+'/api/calendar',{headers})).json();
+ assert.equal((await read()).events[0].completed,false);
+ const taskHeaders={...headers,origin:env.APP_URL,'x-csrf-token':user.csrf,'content-type':'application/json'};
+ const update=await fetch(url+'/api/calendar/tasks/7/completion',{method:'PATCH',headers:taskHeaders,body:JSON.stringify({completed:true})});
+ assert.equal(update.status,200);
+ assert.equal((await read()).events[0].completed,true);
+ assert.equal((await fetch(url+'/api/calendar/tasks/8/completion',{method:'PATCH',headers:taskHeaders,body:JSON.stringify({completed:true})})).status,404);
+ assert.equal((await fetch(url+'/api/calendar/tasks/7/completion',{method:'PATCH',headers})).status,403);
+ for(const path of ['/api/google/calendars','/api/calendar/tasks','/API/USERS','/auth/google/callback?state=mail_fixture','/auth/google/callback?state=youtube_fixture']){
   assert.equal((await fetch(url+path,{headers})).status,503,path);
  }
  assert.equal((await fetch(url+'/auth/google/callback')).status,401);

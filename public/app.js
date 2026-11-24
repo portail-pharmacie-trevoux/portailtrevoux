@@ -99,7 +99,7 @@ async function api(path,method='GET',data){
   }catch(error){operation?.failure(error);throw error;}
 }
 function error(e){q('#global-message').textContent=e.message;}
-function showLogin(){q('#portal-quick-links')?.remove();q('#google-connection-alert')?.remove();q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
+function showLogin(){q('.bento-agenda-today')?.remove();q('#portal-quick-links')?.remove();q('#google-connection-alert')?.remove();q('#whatsapp-button').disabled=true;q('#whatsapp-button').onclick=null;q('#whatsapp-status').textContent='';scheduleWeek='';scheduleScope='';scheduleData=null;scheduleRequest++;document.querySelectorAll('.tile-news,.tile-schedule,.tile-agenda,.daily-joke,.tile-celebrations,#universe-publications').forEach(e=>e.remove());q('#welcome-name').textContent='';session=null;currentUniverse=null;q('#home').classList.add('hidden');q('#detail').classList.add('hidden');q('#login').classList.remove('hidden');q('#logout').classList.add('hidden');q('#account').classList.add('hidden');q('#session-name').textContent='Espace sécurisé';document.querySelectorAll('dialog[open]').forEach(d=>d.close());q('#content').replaceChildren();people=[];}
 function showHome(){
   const linksUserId=session.user.id,groupement=!!q('#home .bento-menu');
   if(groupement||!session.features?.menuOnly)void import('/portal-quick-links.js').then(module=>{if(session?.user.id===linksUserId&&!session.user.mustChange)void module.setupQuickLinks({api,userId:linksUserId,isAdmin:session.user.role==='admin',isCurrent:()=>session?.user.id===linksUserId&&!session.user.mustChange,groupement});}).catch(error);
@@ -110,8 +110,9 @@ function showHome(){
   currentUniverse=null;q('#welcome-name').textContent=session.user.name;applyTileOrder();q('#login').classList.add('hidden');q('#detail').classList.add('hidden');q('#global-message').textContent='';q('#home').classList.remove('hidden');q('#logout').classList.remove('hidden');q('#account').classList.remove('hidden');
   q('#session-name').textContent=session.user.name+(session.user.role==='admin'?' · Administrateur':'');
   applyTileVisibility();
+  if(q('#home .bento-menu'))void refreshBentoAgendaHome();
   if(session.features?.menuOnly){
-    q('#global-message').textContent='Accès initial : menu principal uniquement.';
+    q('#global-message').textContent='Accès initial : menu principal et Agenda.';
     const week=q('#bento-week');
     if(week){
       const monday=mondayOf(parisDay());
@@ -163,13 +164,13 @@ function setUniverseHeading(name){
   }
   heading.append(node('span',displayUniverse(name)));
 }
-function openCalendarVerification(){
+async function openBentoAgenda(){
   currentUniverse='Agenda';
   q('#home').classList.add('hidden');
   q('#detail').classList.remove('hidden');
   q('#feedback').textContent='';
   q('#global-message').textContent='';
-  q('#description').textContent='Vérifiez la connexion à l’agenda Google sélectionné.';
+  q('#description').textContent='';
   setUniverseHeading('Agenda');
   const status=node('p','','status-line');
   status.setAttribute('role','status');
@@ -192,13 +193,22 @@ function openCalendarVerification(){
   const actions=node('div','','action-row');
   actions.append(check,reconnect);
   if(new URLSearchParams(location.search).get('google')==='connected')status.textContent='Autorisation renouvelée. Vous pouvez tester la connexion.';
-  q('#content').replaceChildren(actions,status);
+  const tools=node('details','','calendar-tools admin-menu');
+  tools.append(node('summary','Connexion Google Agenda'),actions,status);
+  const view=node('section','','bento-agenda-view');
+  view.append(node('p','Chargement de l’agenda…','status-line'));
+  const userId=session.user.id;
+  const isCurrent=()=>currentUniverse==='Agenda'&&session?.user.id===userId&&view.isConnected;
+  q('#content').replaceChildren(view,...(session.user.role==='admin'?[tools]:[]));
+  try{
+    const [data,module]=await Promise.all([api('/api/calendar'),import('/bento-agenda.js')]);
+    if(isCurrent())module.renderBentoAgenda({container:view,data,api,moveDay,eventDays,normalizeSearch,today:parisDay(),onChanged:()=>void refreshBentoAgendaHome(),isCurrent});
+  }catch(error){if(isCurrent())view.replaceChildren(node('p',error.message,'calendar-warning'));}
+
 }
 async function openUniverse(name,{menuRoot=false}={}){
-  if(session?.features?.menuOnly){
-    if(name==='Agenda'&&session.user.role==='admin')openCalendarVerification();
-    return;
-  }
+  if(name==='Agenda'&&q('#home .bento-menu')&&tileAllowed(name))return openBentoAgenda();
+  if(session?.features?.menuOnly)return;
   // A retired Scalingo tile cannot be reopened from stale navigation or console calls.
   if(name==='Outils de calculs rapides'&&!q('.grid [data-universe="Outils de calculs rapides"]'))return;
   const viewRequest=++universeViewRequest;
@@ -392,7 +402,7 @@ async function renderCalendar(){
   if(data.error)content.append(node('p',data.error+' Les événements affichés peuvent ne pas être à jour.','calendar-warning'));
   const results=node('section','','agenda-results');content.append(results);renderCalendarResults(data,results);
 }
-setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda')renderCalendar().catch(error);},15*60000);
+setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda'&&!q('#home .bento-menu')&&!session.features?.menuOnly)renderCalendar().catch(error);},15*60000);
 (async()=>{
  const invitation=location.hash.match(/^#invitation=([-\w]{43})$/)?.[1];
  if(invitation){history.replaceState(null,'',location.pathname);await Promise.resolve();showLogin();try{const module=await import('/invitation.js');await module.renderInvitation({container:q('#login'),token:invitation,api,onComplete:result=>{session=result;afterLogin();}});}catch(e){q('#global-message').textContent=e.message;}return;}
@@ -607,7 +617,7 @@ async function refreshHomeExtras(){
       badge.append(node('span',count?'●':'○','news-dot'),node('span',label));
       tile.append(badge);
     });
-    renderHomeAgenda(results[3].status==='fulfilled'?results[3].value:null);
+    if(!q('#home .bento-menu'))renderHomeAgenda(results[3].status==='fulfilled'?results[3].value:null);
     const planning=q('.grid [data-universe="Emplois du temps"]');
     if(planning){
       planning.querySelector('.bento-pending')?.remove();
@@ -774,6 +784,32 @@ function renderCelebrations(data){
 }
 
 
+let bentoAgendaHomeRequest=0;
+async function refreshBentoAgendaHome(){
+  const tile=q('#home .bento-menu [data-universe="Agenda"]');
+  if(!tile||!session||!tileAllowed('Agenda'))return;
+  const userId=session.user.id,request=++bentoAgendaHomeRequest;
+  try{
+    const [data,module]=await Promise.all([api('/api/calendar'),import('/bento-agenda.js')]);
+    if(request!==bentoAgendaHomeRequest||session?.user.id!==userId)return;
+    const today=parisDay();
+    const entries=module.dayEntries(data.events||[],today,eventDays);
+    const list=node('span','','bento-agenda-today');
+    const upcoming=(data.events||[]).filter(event=>event.personalTask&&!event.completed&&event.start?.date>today&&event.start.date<=moveDay(today,7)).sort((a,b)=>a.start.date.localeCompare(b.start.date));
+    for(const event of entries){
+      const label=event.personalTask?(event.completed?'✓ ':'☐ ')+event.title:module.agendaTime(event,today,eventDays)+' · '+event.title;
+      list.append(node('span',label,event.completed?'completed':''));
+    }
+    if(!entries.length)list.append(node('span',data.error?'Événements indisponibles':'Aucun événement ni tâche aujourd’hui'));
+    if(upcoming.length){
+      list.append(node('span','Tâches à venir','agenda-group-title'));
+      for(const task of upcoming)list.append(node('span',task.start.date.slice(5).split('-').reverse().join('/')+' · '+task.title));
+    }
+    tile.querySelector('.bento-agenda-today')?.remove();
+    tile.querySelector('.bento-pending')?.remove();
+    tile.append(list);
+  }catch(error){if(request===bentoAgendaHomeRequest&&session?.user.id===userId)tile.querySelector('.bento-pending')?.replaceChildren('Agenda momentanément indisponible');}
+}
 function homeAgendaEvents(events,today){
   const last=moveDay(today,7);
   const order=(a,b)=>eventDays(a).start.localeCompare(eventDays(b).start)||Number(!a.start.date)-Number(!b.start.date)||new Date(a.start.dateTime||a.start.date+'T00:00:00Z')-new Date(b.start.dateTime||b.start.date+'T00:00:00Z');

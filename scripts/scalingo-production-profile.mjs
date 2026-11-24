@@ -37,7 +37,7 @@ export function productionConfig(env,adapters={}){
  const youtubeFetch=permit(capabilities.youtube,(u,method)=>oauthDomain(u)||u.hostname==='www.googleapis.com'&&u.pathname.startsWith('/youtube/v3/'));
  const analysisFetch=permit(capabilities.analysis||capabilities.productWeb,u=>u.hostname==='api.openai.com');
  const youtrustFetch=permit(capabilities.signatures,u=>['api.yousign.app','api-sandbox.yousign.app'].includes(u.hostname));
- const config={origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:scalingoHomepage({bento:true}),scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,scalingoAccountCreation:true,scalingoAccountManagement:true,employeeImportConsentRequired:true,invitationSendingEnabled:capabilities.mailDelivery,messageAutomationAdminEnabled:true,trainingAttestationsEnabled:true,temperatureAssessmentCompatibility:true,purgeNewsOnRead:false,calendarReadThrough:false,enforceOAuthCanonicalOrigin:true,mailEmail:env.MAIL_SENDER_EMAIL||'',googleId:env.GOOGLE_CLIENT_ID||'',googleSecret:env.GOOGLE_CLIENT_SECRET||'',googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'',openaiKey:capabilities.analysis?env.OPENAI_API_KEY:'',youtrustKey:capabilities.signatures?env.YOUTRUST_API_KEY:'',youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailFetch,calendarFetch,oauthFetch,youtubeFetch,employeeScanFetch:analysisFetch,employeeImportFetch:analysisFetch,youtrustFetch,feastCalendar:async()=>({day:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),feasts:[],names:[],available:false}),capabilities};
+ const config={origin,allowedOrigins:scalingoAllowedOrigins,secret:env.APP_SECRET,homepageHTML:scalingoHomepage({bento:true}),bentoAgenda:true,scalingoChallengeDeletion:true,procedureAdminManagement:true,employeeAccountsReadOnly:true,scalingoEmployeeLifecycle:true,scalingoAccountCreation:true,scalingoAccountManagement:true,employeeImportConsentRequired:true,invitationSendingEnabled:capabilities.mailDelivery,messageAutomationAdminEnabled:true,trainingAttestationsEnabled:true,temperatureAssessmentCompatibility:true,purgeNewsOnRead:false,calendarReadThrough:false,enforceOAuthCanonicalOrigin:true,mailEmail:env.MAIL_SENDER_EMAIL||'',googleId:env.GOOGLE_CLIENT_ID||'',googleSecret:env.GOOGLE_CLIENT_SECRET||'',googleEmail:env.GOOGLE_ACCOUNT_EMAIL||'',openaiKey:capabilities.analysis?env.OPENAI_API_KEY:'',youtrustKey:capabilities.signatures?env.YOUTRUST_API_KEY:'',youtrustEnvironment:env.YOUTRUST_ENVIRONMENT,mailFetch,calendarFetch,oauthFetch,youtubeFetch,employeeScanFetch:analysisFetch,employeeImportFetch:analysisFetch,youtrustFetch,feastCalendar:async()=>({day:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),feasts:[],names:[],available:false}),capabilities};
  if(initialAccessEmail){
   config.initialAccessEmail=initialAccessEmail;
   config.menuOnly=menuOnly;
@@ -83,7 +83,8 @@ export async function createScalingoProductionApp(db,env,adapters={}){
    const pageOrAsset=['GET','HEAD'].includes(req.method)&&!/^\/(?:api|auth)(?:\/|$)/.test(path);
    const calendarCallback=request==='GET /auth/google/callback'&&!/^(?:mail_|youtube_)/.test(String(req.query.state||''));
    const calendarConnection=config.capabilities.calendar&&(['POST /api/google/verify-calendar','POST /api/google/connect'].includes(request)||calendarCallback);
-   if(!sessionRoute&&!pageOrAsset&&!calendarConnection)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
+   const personalAgenda=config.capabilities.calendar&&(['GET /api/calendar','HEAD /api/calendar','POST /api/calendar/tasks'].includes(request)||(req.method==='PATCH'&&/^\/api\/calendar\/tasks\/[1-9]\d*\/completion$/.test(path)));
+   if(!sessionRoute&&!pageOrAsset&&!calendarConnection&&!personalAgenda)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
   }
   if(req.path.startsWith('/staging-')||req.path.startsWith('/api/staging-')||req.path==='/api/collaborateurs/import')return res.status(403).json({error:'Outil de préparation indisponible en production.'});
   const p=req.path,cap=config.capabilities;
@@ -97,6 +98,12 @@ export async function createScalingoProductionApp(db,env,adapters={}){
  const universeBoundary=scalingoUniverseBoundary(db,config.allowsPortalUser);
  // Personal attestation uploads retain their own authenticated owner/admin ACL,
  // rather than requiring administrative edit rights on the whole Quality module.
+ // Personal tasks retain the user's own Agenda consultation rights.
+ gate.use((req,res,next)=>{
+  if(req.method==='POST'&&req.path==='/api/calendar/tasks')return app(req,res,next);
+  if(req.method==='PATCH'&&/^\/api\/calendar\/tasks\/[1-9]\d*\/completion$/.test(req.path))return app(req,res,next);
+  next();
+ });
  gate.use((req,res,next)=>req.method==='POST'&&(req.path==='/api/quality/training/imports/analyze'||/^\/api\/quality\/training\/imports\/[a-f0-9-]{36}\/confirm$/i.test(req.path))?next():universeBoundary(req,res,next));
  registerScalingoAccountManagement(gate,app);
  registerScalingoEmployeeRecords({gate,db,adminAuth:scalingoAdminAuth(db,config.allowsPortalUser),origin:config.origin,secret:config.secret,isAllowedOrigin:o=>scalingoAllowedOrigins.includes(o),accountManagement:true});
