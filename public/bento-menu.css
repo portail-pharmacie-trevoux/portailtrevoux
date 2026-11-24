@@ -168,3 +168,27 @@
 
 .people-table .person-job{position:relative;isolation:isolate;overflow:hidden;min-width:7rem}
 .person-job-watermark{position:absolute;z-index:-1;inset:auto .4rem 50% auto;transform:translateY(50%);font-size:2.5rem;line-height:1;opacity:.19;filter:grayscale(1);pointer-events:none}
+
+.people-family-green{--card-bg:#e5f6ed;--card-ink:#167254;--card-line:#b7decc}
+.people-family-purple{--card-bg:#f0e8fa;--card-ink:#673791;--card-line:#d7c3ea}
+.people-family-yellow{--card-bg:#fff4d2;--card-ink:#855715;--card-line:#ead397}
+.people-family-gray{--card-bg:#f0f3f7;--card-ink:#506176;--card-line:#dbe1e8}
+.people-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,245px),1fr));gap:14px;list-style:none;padding:0;margin:14px 0}
+.people-person-card{position:relative;isolation:isolate;overflow:hidden;min-height:190px;padding:17px;border:1px solid var(--card-line);border-radius:19px;background:var(--card-bg);transition:transform .2s,box-shadow .2s}
+.people-person-card[hidden]{display:none}
+.people-person-card:is(:hover,:focus-within){transform:translateY(-3px);box-shadow:0 10px 20px #41285717}
+.people-person-card .person-job-watermark{font-size:76px;inset:auto 10px 3px auto;transform:none;opacity:.16;transition:transform .25s}
+.people-person-card:hover .person-job-watermark{transform:rotate(-10deg) scale(1.12)}
+.people-person-card h4{margin:0 0 5px;font-size:20px}
+.people-card-job{color:var(--card-ink);font-weight:650}
+.people-card-phone{margin:8px 0 10px}
+.people-card-phone a{color:#124b47;text-underline-offset:3px}
+.people-card-skills{display:flex;gap:5px;min-height:26px;margin-top:10px;flex-wrap:wrap}
+.people-card-skills span{display:grid;place-items:center;background:#fff9;border:1px solid #21374724;border-radius:7px;width:27px;height:26px;font-size:14px}
+.people-card-legend,.people-card-filters{display:flex;gap:8px 16px;flex-wrap:wrap;margin-bottom:12px}
+.people-card-legend span::before{content:'';display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;background:var(--card-ink)}
+.people-card-filters [aria-pressed=true]{background:#613589;color:#fff}
+.people-card-key{font-size:.85rem;color:#425a6b}
+.people-card-management{margin-top:8px;overflow-wrap:anywhere}
+.people-card-management summary,.people-bento-directory>summary{cursor:pointer;font-weight:650}
+@media(prefers-reduced-motion:reduce){.people-person-card,.people-person-card .person-job-watermark{transition:none}.people-person-card:is(:hover,:focus-within),.people-person-card:hover .person-job-watermark{transform:none}}
