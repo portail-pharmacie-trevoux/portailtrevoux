@@ -165,3 +165,6 @@
 .people-workspace-admin-only>.people-workspace-manage .btn{padding:7px 12px}
 @media(min-width:901px){.people-workspace.people-workspace-admin-only{margin-top:-24px}}
 
+
+.people-table .person-job{position:relative;isolation:isolate;overflow:hidden;min-width:7rem}
+.person-job-watermark{position:absolute;z-index:-1;inset:auto .4rem 50% auto;transform:translateY(50%);font-size:2.5rem;line-height:1;opacity:.19;filter:grayscale(1);pointer-events:none}

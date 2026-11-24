@@ -51,18 +51,19 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   function section(title,fields,values,map,open=false){
     const area=el('details','','employee-record-section');area.open=open;area.append(el('summary',title));const table=el('table','','employee-record-table'),body=el('tbody');fields.forEach(f=>tableRow(body,f,values[f.key],map));table.append(body);area.append(table);form.append(area);accordion.push(area);return area;
   }
+  const standardJobs=['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste','Secrétaire','Responsable merch','Responsable parapharmacie'];
   section('Fiche du collaborateur',[
     {key:'firstName',label:'Prénom',required:true},{key:'lastName',label:'Nom de famille',required:true},
     {key:'birthday',label:'Date de naissance',type:'date'},{key:'phone',label:'Téléphone affiché dans l’annuaire',type:'tel'},
-    {key:'job',label:'Fonction prévue à la pharmacie',type:'select',options:['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste','Autres précisez']}
+    {key:'job',label:'Fonction prévue à la pharmacie',type:'select',options:[...standardJobs,'Autres précisez']}
   ],p,basicInputs,true);
   const job=basicInputs.get('job').input,otherGroup=el('div','','employee-job-other'),otherJob=el('input'),otherLabel=el('label','Précisez la fonction');otherJob.id='employee-job-other';otherJob.maxLength=100;otherLabel.htmlFor=otherJob.id;otherGroup.append(otherLabel,otherJob);job.after(otherGroup);
   job.lastElementChild.textContent='Autre';
-  const savedJob=p.job||'',standardJobs=['Pharmacien','Préparateur','Préparatrice','Apprenti','Apprentie','Rayonniste'];
+  const savedJob=p.job||'';
   const custom=savedJob&&!standardJobs.includes(savedJob)&&!['Autre','Autres précisez'].includes(savedJob)?savedJob:'';
   otherJob.value=custom||details.jobOther||'';
   if(savedJob&&!standardJobs.includes(savedJob))job.value='Autres précisez';
-  const toggleJob=()=>{const other=job.value==='Autres précisez';otherGroup.hidden=!other;otherGroup.style.display=other?'':'none';otherJob.required=other;};job.onchange=toggleJob;toggleJob();
+  const toggleJob=()=>{const other=job.value==='Autres précisez';otherGroup.hidden=!other;otherGroup.style.display=other?'':'none';otherJob.required=other;otherJob.disabled=!other;};job.onchange=toggleJob;toggleJob();
   employeeSections.forEach((s,index)=>section(s.title,s.fields,details,inputs,index===1));
   const account=section('Connexion personnelle au portail',[
     {key:'email',label:'Adresse e-mail de connexion',type:'email'},
@@ -107,7 +108,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     const value=({field,input})=>field.type==='checkbox'?input.checked:input.value;
     const data=Object.fromEntries([...basicInputs].filter(([,item])=>!item.input.disabled).map(([key,item])=>[key,value(item)]));
     if(data.job==='Autres précisez')data.job=otherJob.value.trim();
-    data.administratorRights=adminRights.checked;data.active=p.active!==false;data.details=Object.fromEntries([...inputs].map(([key,item])=>[key,value(item)]));data.detailsRevision=loaded.detailsRevision;if(otherJob.value.trim()||details.jobOther!==undefined)data.details.jobOther=otherJob.value.trim();
+    data.administratorRights=adminRights.checked;data.active=p.active!==false;data.details=Object.fromEntries([...inputs].map(([key,item])=>[key,value(item)]));data.detailsRevision=loaded.detailsRevision;if(otherJob.value.trim()||details.jobOther!==undefined)data.details.jobOther=otherJob.disabled?'':otherJob.value.trim();
     if(!isAdministrator){data.rights=[...rights].filter(([,check])=>check.checked).map(([key])=>key);data.editRights=[...editRights].filter(([,check])=>check.checked).map(([key])=>key);}
     if(restrictions?.accountReadOnly){
       delete data.email;delete data.password;delete data.administratorRights;
