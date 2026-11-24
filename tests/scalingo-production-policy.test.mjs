@@ -83,6 +83,8 @@ test('Menu-only opening checks authentication storage and closes module routes',
  },release(){}};},async query(sql,[key]=[]){
   if(sql.startsWith('SELECT u.id,u.email,u.role,u.active,u.must_change,s.csrf')||sql.startsWith('SELECT s.id AS session_id')||sql.startsWith('SELECT u.* FROM sessions'))return {rows:[user]};
   if(sql.startsWith('SELECT * FROM calendar_cache'))return {rows:[{events:[],synced_at:new Date()}]};
+  if(sql.includes("WHERE directory_key LIKE 'scalingo-new-directory:%'"))return {rows:[]};
+  if(sql.includes("AND directory_key LIKE 'scalingo-new-directory:%'"))return {rows:[]};
   if(sql.startsWith('SELECT event_id FROM calendar_reminders'))return {rows:[]};
   if(sql.includes('FROM calendar_tasks WHERE user_id'))return {rows:[{id:7,title:'Fixture task',task_date:'2026-11-24',icon:'✅'}]};
   if(sql.startsWith('SELECT key,value FROM settings'))return {rows:completed?[{key:key[0],value:'2026-11-24'}]:[]};
@@ -122,6 +124,13 @@ test('Menu-only opening checks authentication storage and closes module routes',
  const session=await fetch(url+'/api/me',{headers});
  assert.equal(session.status,200);
  assert.equal((await session.json()).features.menuOnly,true);
+ assert.equal((await fetch(url+'/api/users')).status,401);
+ assert.deepEqual(await (await fetch(url+'/api/users',{headers})).json(),[]);
+ assert.equal((await fetch(url+'/api/users/12/details',{headers})).status,404);
+ assert.equal((await fetch(url+'/api/users/12',{method:'DELETE',headers})).status,404);
+ assert.equal((await fetch(url+'/api/users',{method:'POST',headers})).status,403);
+ assert.equal((await fetch(url+'/api/collaborateurs/registration-form',{headers})).headers.get('content-type'),'application/pdf');
+
  const review='/api/review/merchandising/';
  assert.equal((await fetch(url+review+'zones')).status,401);
  const reviewZones=await fetch(url+review+'zones',{headers});

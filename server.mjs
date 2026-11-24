@@ -180,7 +180,7 @@ export function createApp(db,config) {
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
   registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeImportFetch??config.employeeScanFetch,requireConsent:config.employeeImportConsentRequired===true,previewRestrictions:config.employeeAccountsReadOnly?{accountReadOnly:config.scalingoAccountManagement!==true}:undefined,uploadParser:express.json({limit:'15mb'})});
-  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true,scalingoAccountManagement:config.scalingoAccountManagement===true});
+  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true,scalingoAccountManagement:config.scalingoAccountManagement===true,freshDirectory:config.menuOnly===true});
   const calendarFetch=config.calendarFetch||fetch;
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');

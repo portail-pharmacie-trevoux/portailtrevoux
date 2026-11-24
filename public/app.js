@@ -208,7 +208,7 @@ async function openBentoAgenda(){
 }
 async function openUniverse(name,{menuRoot=false}={}){
   if(name==='Agenda'&&q('#home .bento-menu')&&tileAllowed(name))return openBentoAgenda();
-  if(session?.features?.menuOnly){
+  if(session?.features?.menuOnly&&name!=='Collaborateurs'){
     if(session.user.role!=='admin'||!tileAllowed(name))return;
     const request=++universeViewRequest;
     currentUniverse=name;
@@ -226,6 +226,7 @@ async function openUniverse(name,{menuRoot=false}={}){
     }catch(error){if(currentUniverse===name&&session)q('#global-message').textContent=error.message;}
     return;
   }
+  if(session?.features?.menuOnly&&session.user.role!=='admin')return;
   // A retired Scalingo tile cannot be reopened from stale navigation or console calls.
   if(name==='Outils de calculs rapides'&&!q('.grid [data-universe="Outils de calculs rapides"]'))return;
   const viewRequest=++universeViewRequest;
@@ -243,7 +244,24 @@ function renderPeople(){
   employeeRecordRequest++;setPeopleAddActions(session.user.role==='admin');
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
   content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
-  if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'){const link=node('a','Administration des droits Scalingo','btn primary');link.href='/staging-universal-rights';actions.append(link);}administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.prepend(administration);}
+  if(isAdmin&&session.features?.menuOnly){
+    const dialog=node('dialog','','people-administration-dialog');
+    dialog.setAttribute('aria-label','Administration des collaborateurs');
+    const header=node('header');
+    header.append(node('h2','Administration'),button('Fermer',()=>dialog.close(),'btn'));
+    const actions=node('div','','people-admin-actions');
+    const start=()=>{dialog.close();openEditor();};
+    actions.append(button('Ajouter un collaborateur manuellement',start,'btn primary'),button('Saisir une fiche de renseignements',start,'btn primary'));
+    const imports=node('details','','people-import');
+    imports.append(node('summary','Importer une liste de collaborateurs'),node('p','La reprise commence par la création manuelle des fiches.','field-note'));
+    dialog.append(header,actions,imports);
+    renderEmployeeDocument(dialog);
+    renderInvitationMail(dialog);
+    const testers=node('details','','people-import');
+    testers.append(node('summary','Profils testeurs externes'),node('p','Les profils testeurs externes ne sont pas ouverts sur cet environnement.','field-note'));
+    dialog.append(testers);
+    content.prepend(button('Administration',()=>dialog.showModal(),'btn primary'),dialog);
+  }else if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'){const link=node('a','Administration des droits Scalingo','btn primary');link.href='/staging-universal-rights';actions.append(link);}administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.prepend(administration);}
   for(const active of [true,false]){
     const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
@@ -295,7 +313,7 @@ function renderPeople(){
                 else if(!confirm('Supprimer définitivement '+personName(p)+' ? Sa fiche confidentielle, ses accès et ses entrées de planning seront effacés du portail. Cette action est irréversible.'))return;
                 await api('/api/users/'+p.id+'/permanent','DELETE',body);await reloadPeople('Collaborateur supprimé définitivement.');
               }catch(e){if(session?.features?.employeeAccountsReadOnly)q('#feedback').textContent=e.message;else error(e);}finally{permanent.disabled=false;if(restore)restore.disabled=false;}
-            },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));actions.append(permanent);
+            },'btn small danger');permanent.setAttribute('aria-label','Supprimer définitivement '+personName(p));if(!session.features?.menuOnly)actions.append(permanent);
           }
         }
         tr.append(actions);

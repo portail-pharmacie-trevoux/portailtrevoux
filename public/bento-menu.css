@@ -131,3 +131,7 @@
 .merch-review-marker{position:absolute;transform:translate(-50%,-50%);padding:2px 3px;border:1px solid #734678;border-radius:4px;background:#fff;color:#522865;font-size:.63rem;font-weight:700;line-height:1.25;cursor:pointer}
 .merch-review-marker:is(:focus-visible,:hover){z-index:1;background:#522865;color:#fff}
 .schedule-review-slot{margin:10px 0;align-items:end}
+.people-administration-dialog{width:min(920px,calc(100% - 32px));max-height:80vh;overflow:auto;border:1px solid #e2d9ef;border-radius:18px;padding:24px;background:#faf7ff}
+.people-administration-dialog>header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+.people-administration-dialog>header h2{color:#563485;margin:0}
+.people-administration-dialog .people-admin-actions{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}

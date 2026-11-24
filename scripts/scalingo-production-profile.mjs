@@ -16,6 +16,16 @@ import {registerScalingoEmployeeRecords} from './scalingo-employee-records-previ
 import {registerScalingoAccountManagement} from './scalingo-accounts-preview.mjs';
 import {createWebProductSearch} from '../merchandising-web-identity.mjs';
 const refusal=(code,message=code)=>Object.assign(Error(message),{status:409,code});
+function freshDirectoryRoute(req){
+ const path=req.path;
+ const method=req.method;
+ if((method==='GET'||method==='HEAD')&&['/api/users','/api/collaborateurs/registration-form','/api/collaborateurs/me/payroll'].includes(path))return true;
+ if(method==='POST'&&path==='/api/users')return true;
+ const record=path.match(/^\/api\/users\/[1-9]\d*(?:\/(details|restore|invitation-preview))?$/);
+ if(!record)return false;
+ const action=record[1];
+ return action==='details'?method==='GET'||method==='HEAD':action?method==='POST':method==='PUT'||method==='DELETE';
+}
 export function productionCapabilities(env){
  const approved=env.SCALINGO_EXTERNAL_SERVICES_APPROVED==='true',flag=name=>approved&&env[name]==='true';
  return Object.freeze({calendar:env.SCALINGO_ENABLE_GOOGLE_CALENDAR==='true',mailOAuth:flag('SCALINGO_ENABLE_MAIL_OAUTH'),mailDelivery:flag('SCALINGO_ENABLE_MAIL_DELIVERY'),youtube:flag('SCALINGO_ENABLE_YOUTUBE'),signatures:flag('SCALINGO_ENABLE_SIGNATURES'),analysis:flag('SCALINGO_ENABLE_AI_ANALYSIS'),productWeb:flag('SCALINGO_ENABLE_PRODUCT_WEB')});
@@ -90,7 +100,7 @@ export async function createScalingoProductionApp(db,env,adapters={}){
    const calendarConnection=config.capabilities.calendar&&(['POST /api/google/verify-calendar','POST /api/google/connect'].includes(request)||calendarCallback);
    const personalAgenda=config.capabilities.calendar&&(['GET /api/calendar','HEAD /api/calendar','POST /api/calendar/tasks','POST /api/calendar/reminders'].includes(request)||(req.method==='PATCH'&&/^\/api\/calendar\/tasks\/[1-9]\d*\/completion$/.test(path)));
    const merchandisingReview=['GET','HEAD'].includes(req.method)&&['/api/review/merchandising/zones','/api/review/merchandising/plan','/api/review/merchandising/template.xlsx'].includes(path);
-   if(!sessionRoute&&!pageOrAsset&&!calendarConnection&&!personalAgenda&&!merchandisingReview)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
+   if(!sessionRoute&&!pageOrAsset&&!calendarConnection&&!personalAgenda&&!merchandisingReview&&!freshDirectoryRoute(req))return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
   }
   if(req.path.startsWith('/staging-')||req.path.startsWith('/api/staging-')||req.path==='/api/collaborateurs/import')return res.status(403).json({error:'Outil de préparation indisponible en production.'});
   const p=req.path,cap=config.capabilities;
@@ -122,6 +132,26 @@ export async function createScalingoProductionApp(db,env,adapters={}){
    const month=req.query.month;
    if(typeof month!=='string'||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return res.status(400).json({error:'Choisissez un mois valide.'});
    res.set('Cache-Control','private, no-store').attachment('merchandising-'+month+'.xlsx').send(exportMerchandising([],month));
+  });
+ }
+ if(config.menuOnly){
+  const admin=scalingoAdminAuth(db,config.allowsPortalUser);
+  gate.use((req,res,next)=>{
+   if(!freshDirectoryRoute(req))return next();
+   return admin(req,res,async error=>{
+    if(error)return next(error);
+    res.set('Cache-Control','private, no-store');
+    const record=req.path.match(/^\/api\/users\/([1-9]\d*)(?:\/|$)/i);
+    if(record){
+     try{
+      const id=Number(record[1]);
+      if(!Number.isSafeInteger(id)||id>2147483647)return res.status(404).json({error:'Fiche introuvable.'});
+      const found=await db.query("SELECT id FROM users WHERE id=$1 AND directory_key LIKE 'scalingo-new-directory:%'",[id]);
+      if(!found.rows.length)return res.status(404).json({error:'Fiche introuvable dans le nouvel annuaire.'});
+     }catch(error){return next(error);}
+    }
+    return app(req,res,next);
+   });
   });
  }
  const universeBoundary=scalingoUniverseBoundary(db,config.allowsPortalUser);

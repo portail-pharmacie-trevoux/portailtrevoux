@@ -51,12 +51,12 @@ export function createFeastCalendar({fetchImpl=fetch,now=()=>new Date()}={}) {
     })().finally(()=>{pending=null;});return pending;
   };
 }
-export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar(),scalingoAccountCreation=false,scalingoAccountManagement=false}) {
+export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar(),scalingoAccountCreation=false,scalingoAccountManagement=false,freshDirectory=false}) {
   app.get('/api/collaborateurs/registration-form',auth,ready,admin,async(req,res)=>{
     const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
     res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
   });
-  const all=async()=>(await db.query('SELECT * FROM users ORDER BY active DESC,last_name,first_name')).rows;
+  const all=async()=>(await db.query('SELECT * FROM users '+(freshDirectory?"WHERE directory_key LIKE 'scalingo-new-directory:%' ":'')+'ORDER BY active DESC,last_name,first_name')).rows;
   const view=(person,req)=>({...publicPerson(person,req.auth.role==='admin',req.auth.id),...(scalingoAccountCreation&&req.auth.role==='admin'?{temporaryPasswordRequired:!!person.password_hash&&person.must_change===true}:{})});
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
   app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all();if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
@@ -91,9 +91,9 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
   });
   async function checkAccountDuplicates(client,profile,email,excludedId=null){
     await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
-    const rows=(await client.query('SELECT id,email,first_name,last_name,name FROM users')).rows;
+    const rows=(await client.query('SELECT id,email,first_name,last_name,name,directory_key FROM users')).rows;
     if(email&&rows.some(p=>p.id!==excludedId&&p.email?.trim().toLowerCase()===email))throw fail(409,'Un compte utilise déjà cette adresse e-mail.');
-    if(rows.some(p=>p.id!==excludedId&&normalizeName(p.first_name&&p.last_name?p.first_name+' '+p.last_name:p.name)===normalizeName(profile.name)))throw fail(409,'Une fiche existe déjà pour cette identité. Aucun doublon créé.');
+    if(rows.some(p=>p.id!==excludedId&&(!freshDirectory||p.directory_key?.startsWith('scalingo-new-directory:'))&&normalizeName(p.first_name&&p.last_name?p.first_name+' '+p.last_name:p.name)===normalizeName(profile.name)))throw fail(409,'Une fiche existe déjà pour cette identité. Aucun doublon créé.');
   }
   async function transaction(work){
     const client=db.connect?await db.connect():db;
@@ -107,7 +107,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const person=await transaction(async client=>{
       if(scalingoAccountManagement)await checkAccountDuplicates(client,d,a.email);
       const {rows}=await client.query(`INSERT INTO users(name,first_name,last_name,phone,birthday,job,active,email,password_hash,rights,edit_rights,permissions_configured,role${scalingoAccountManagement?',directory_key':''})
-        VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13${scalingoAccountManagement?',$14':''}) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.rights),JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.editRights),a.configured,role,...(scalingoAccountManagement?['scalingo-manual:'+randomUUID()]:[])]);
+        VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13${scalingoAccountManagement?',$14':''}) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.rights),JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.editRights),a.configured,role,...(scalingoAccountManagement?[(freshDirectory?'scalingo-new-directory:':'scalingo-manual:')+randomUUID()]:[])]);
       if(details!==undefined)await saveEmployeeDetails(client,rows[0].id,details,0,secret,req.auth.id,fail);
       return rows[0];
     });res.status(201).json(view(person,req));
