@@ -83,7 +83,10 @@
 .week-agenda-task{display:flex;align-items:flex-start;gap:6px;background:#e9f6f2;cursor:pointer}
 .week-agenda-task input{accent-color:#087b65}
 .week-agenda-task input:checked+span{text-decoration:line-through;color:#4f6761}
-.week-agenda-search{margin-top:14px}
+.week-agenda-search{margin:14px 0}
+.week-agenda-results{flex-basis:100%;min-width:0}
+.week-agenda-results .status-line{margin:4px 0 8px}
+.week-agenda-result-list{list-style:none;margin:0;padding:0;max-height:22rem;overflow:auto;display:grid;gap:6px}
 .week-agenda-search h3{flex-basis:100%}
 .week-agenda-search .field{margin:0;flex:1;min-width:min(180px,100%)}
 .bento-agenda-today{display:grid;gap:4px;margin-top:9px;font-size:.84rem;z-index:1;position:relative}
