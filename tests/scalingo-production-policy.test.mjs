@@ -86,7 +86,7 @@ test('Menu-only opening checks authentication storage and closes module routes',
   if(sql.startsWith('SELECT * FROM users WHERE id='))return {rows:key===user.id?[{...user,name:'Nicolas Marchand',first_name:'Nicolas',last_name:'Marchand'}]:[]};
   if(sql.startsWith('SELECT payload,revision,updated_at FROM employee_details'))return {rows:[]};
   if(sql.includes("WHERE directory_key LIKE 'scalingo-new-directory:%'")){assert.equal(key,user.id);return {rows:[{...user,name:'Nicolas Marchand',first_name:'Nicolas',last_name:'Marchand',password_hash:'fixture'}]};}
-  if(sql.includes("AND directory_key LIKE 'scalingo-new-directory:%'"))return {rows:[]};
+  if(sql.includes("AND (directory_key LIKE 'scalingo-new-directory:%'"))return {rows:[]};
   if(sql.startsWith('SELECT event_id FROM calendar_reminders'))return {rows:[]};
   if(sql.includes('FROM calendar_tasks WHERE user_id'))return {rows:[{id:7,title:'Fixture task',task_date:'2026-11-24',icon:'✅'}]};
   if(sql.startsWith('SELECT key,value FROM settings'))return {rows:completed?[{key:key[0],value:'2026-11-24'}]:[]};

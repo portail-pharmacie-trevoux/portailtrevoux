@@ -56,7 +56,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
     res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
   });
-  const all=async(ownId=null)=>(await db.query('SELECT * FROM users '+(freshDirectory?"WHERE directory_key LIKE 'scalingo-new-directory:%' OR id=$1 ":'')+'ORDER BY active DESC,last_name,first_name',freshDirectory?[ownId]:[])).rows;
+  const all=async(ownId=null)=>(await db.query('SELECT * FROM users '+(freshDirectory?"WHERE directory_key LIKE 'scalingo-new-directory:%' OR id=$1 OR ($1 IS NOT NULL AND email='admin-test@portailplus.invalid' AND role='admin') ":'')+'ORDER BY active DESC,last_name,first_name',freshDirectory?[ownId]:[])).rows;
   const view=(person,req)=>({...publicPerson(person,req.auth.role==='admin',req.auth.id),...(scalingoAccountCreation&&req.auth.role==='admin'?{temporaryPasswordRequired:!!person.password_hash&&person.must_change===true}:{})});
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
   app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all(req.auth.role==='admin'?req.auth.id:null);if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
@@ -146,6 +146,16 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
   });
   app.delete('/api/users/:id',auth,ready,admin,csrf,async(req,res)=>{
     const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)throw fail(400,'Profil invalide.');
+    if(freshDirectory&&id!==req.auth.id){
+      const result=await db.query(`WITH retired AS (
+        UPDATE users SET active=FALSE
+        WHERE id=$1 AND email='admin-test@portailplus.invalid' AND role='admin' AND active
+          AND EXISTS (SELECT 1 FROM users WHERE id=$2 AND role='admin' AND active AND NOT must_change)
+        RETURNING id
+      ), revoked AS (DELETE FROM sessions WHERE user_id IN (SELECT id FROM retired))
+      SELECT id FROM retired`,[id,req.auth.id]);
+      if(result.rows.length)return res.json({ok:true});
+    }
     const {rows}=await db.query("UPDATE users SET active=FALSE WHERE id=$1 AND role='employee' RETURNING id",[id]);
     if(!rows[0])throw fail(404,'Collaborateur introuvable ou compte administrateur protégé.');
     await db.query('DELETE FROM sessions WHERE user_id=$1',[id]);res.json({ok:true});

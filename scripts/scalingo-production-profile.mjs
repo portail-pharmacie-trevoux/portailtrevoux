@@ -148,7 +148,8 @@ export async function createScalingoProductionApp(db,env,adapters={}){
       if(!Number.isSafeInteger(id)||id>2147483647)return res.status(404).json({error:'Fiche introuvable.'});
       const ownProfile=id===req.cleanupAdmin.id&&(req.path.endsWith('/details')||req.method==='PUT');
       if(ownProfile)return app(req,res,next);
-      const found=await db.query("SELECT id FROM users WHERE id=$1 AND directory_key LIKE 'scalingo-new-directory:%'",[id]);
+      const mayRetireTest=req.method==='DELETE'&&id!==req.cleanupAdmin.id;
+      const found=await db.query("SELECT id FROM users WHERE id=$1 AND (directory_key LIKE 'scalingo-new-directory:%' OR ($2 AND email='admin-test@portailplus.invalid' AND role='admin'))",[id,mayRetireTest]);
       if(!found.rows.length)return res.status(404).json({error:'Fiche introuvable dans le nouvel annuaire.'});
      }catch(error){return next(error);}
     }
