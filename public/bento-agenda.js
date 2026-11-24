@@ -31,6 +31,14 @@ export function dayEntries(events,day,eventDays){
     return kind(a)-kind(b)||Date.parse(a.start.dateTime||a.start.date)-Date.parse(b.start.dateTime||b.start.date);
   });
 }
+export function personalTaskDay(task,today,moveDay){
+  const original=task.start.date;
+  const last=task.completed
+    ?(/^\d{4}-\d{2}-\d{2}$/.test(task.completedAt||'')?task.completedAt:original)
+    :today;
+  const day=original>last?original:last;
+  return new Date(day+'T12:00:00Z').getUTCDay()===0&&day>original?moveDay(day,1):day;
+}
 export function agendaTime(event,day,eventDays){
   if(event.start.date)return 'Toute la journée';
   return eventDays(event).start<day?'En cours':timeLabel.format(new Date(event.start.dateTime));
@@ -93,6 +101,13 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
     const watermark=element('span',themes.find(([,pattern])=>pattern.test(eventText(event)))?.[2]||'📅','week-agenda-watermark');
     watermark.setAttribute('aria-hidden','true');
     row.append(checkbox,watermark,element('span',when,'week-agenda-time'),element('strong',event.title||'Événement'));
+    if(event.remind){
+      const bell=element('span','🔔','week-agenda-bell');
+      bell.setAttribute('role','img');
+      bell.setAttribute('aria-label','Ajouté à mes rappels');
+      bell.title='Ajouté à mes rappels';
+      row.append(bell);
+    }
     if(event.location)row.append(element('small',event.location));
     checkbox.onchange=async()=>{
       const enabled=checkbox.checked;
@@ -128,35 +143,55 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
       const card=element('section','','week-agenda-day');
       if(day===today)card.classList.add('today');
       card.append(element('h4',label+' '+dateLabel.format(new Date(day+'T12:00:00Z'))));
-      const rows=dayEntries(events,day,eventDays);
-      if(!rows.length)card.append(element('p','Aucun événement','week-agenda-empty'));
-      for(const event of rows){
-        if(event.personalTask){
-          const row=element('label','','week-agenda-entry week-agenda-task');
-          const check=element('input');
+      const google=element('section','','week-agenda-google'),personal=element('section','','week-agenda-personal');
+      google.append(element('h5','Agenda Google'));
+      personal.append(element('h5','Tâches personnelles'));
+      const googleRows=dayEntries(events,day,eventDays).filter(event=>!event.personalTask);
+      if(!googleRows.length)google.append(element('p','Aucun événement','week-agenda-empty'));
+      for(const event of googleRows){
+        const row=element('article','','week-agenda-entry');
+        appendEvent(row,event,agendaTime(event,day,eventDays));
+        google.append(row);
+      }
+      const personalRows=events.filter(event=>event.personalTask&&!event.sourceEventId&&event.start.date<=day&&day<=personalTaskDay(event,today,moveDay));
+      if(!personalRows.length)personal.append(element('p','Aucune tâche','week-agenda-empty'));
+      for(const event of personalRows){
+        const activeDay=personalTaskDay(event,today,moveDay);
+        const missed=day<activeDay;
+        const row=element('label','','week-agenda-entry week-agenda-task');
+        const name=element('span',event.title,'week-task-name');
+        row.append(name);
+        if(missed){
+          row.classList.add('missed');
+          const cross=element('span','✗','week-task-cross');
+          cross.setAttribute('role','img');
+          cross.setAttribute('aria-label','Non réalisée, reportée');
+          cross.title='Non réalisée, reportée';
+          row.append(cross);
+        }else{
+          const check=element('input','','week-task-check');
           check.type='checkbox';
           check.checked=event.completed===true;
-          row.append(check,element('span',event.title));
+          check.setAttribute('aria-label','Tâche réalisée · '+event.title);
+          const mark=element('span','✓','week-task-tick');
+          mark.setAttribute('aria-hidden','true');
+          row.append(check,mark);
           check.onchange=async()=>{
             check.disabled=true;
             try{
-              const result=event.sourceEventId
-                ?await api('/api/calendar/reminders','POST',{eventId:event.sourceEventId,enabled:true,completed:check.checked})
-                :await api('/api/calendar/tasks/'+event.taskId+'/completion','PATCH',{completed:check.checked});
+              const result=await api('/api/calendar/tasks/'+event.taskId+'/completion','PATCH',{completed:check.checked});
               event.completed=result.completed;
-              if(isCurrent())onChanged();
+              event.completedAt=result.completed?today:null;
+              if(isCurrent()){draw();onChanged();}
             }catch(error){
               check.checked=event.completed===true;
               if(isCurrent())feedback.textContent=error.message;
             }finally{check.disabled=false;}
           };
-          card.append(row);
-        }else{
-          const row=element('article','','week-agenda-entry');
-          appendEvent(row,event,agendaTime(event,day,eventDays));
-          card.append(row);
         }
+        personal.append(row);
       }
+      card.append(google,personal);
       return card;
     }));
   }
@@ -170,7 +205,7 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
     const matches=events.filter(event=>{
       if(!event.start?.date&&!event.start?.dateTime)return false;
       const text=eventText(event);
-      const themeMatch=selected==='tasks'?event.personalTask:!event.personalTask&&(!pattern||pattern.test(text));
+      const themeMatch=selected==='tasks'?event.personalTask&&!event.sourceEventId:!event.personalTask&&(!pattern||pattern.test(text));
       return themeMatch&&terms.every(term=>text.includes(term));
     }).sort((a,b)=>Date.parse(a.start.dateTime||a.start.date)-Date.parse(b.start.dateTime||b.start.date));
     resultCount.textContent=matches.length?matches.length+(matches.length===1?' résultat':' résultats'):'Aucun résultat dans les événements enregistrés.';

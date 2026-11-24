@@ -793,11 +793,13 @@ async function refreshBentoAgendaHome(){
     const [data,module]=await Promise.all([api('/api/calendar'),import('/bento-agenda.js')]);
     if(request!==bentoAgendaHomeRequest||session?.user.id!==userId)return;
     const today=parisDay();
-    const entries=module.dayEntries(data.events||[],today,eventDays);
+    const events=data.events||[];
+    const entries=module.dayEntries(events.filter(event=>!event.personalTask),today,eventDays);
+    entries.push(...events.filter(event=>event.personalTask&&!event.sourceEventId&&module.personalTaskDay(event,today,moveDay)===today));
     const list=node('span','','bento-agenda-today');
-    const upcoming=(data.events||[]).filter(event=>event.personalTask&&!event.completed&&event.start?.date>today&&event.start.date<=moveDay(today,7)).sort((a,b)=>a.start.date.localeCompare(b.start.date));
+    const upcoming=(data.events||[]).filter(event=>event.personalTask&&!event.sourceEventId&&!event.completed&&event.start?.date>today&&event.start.date<=moveDay(today,7)).sort((a,b)=>a.start.date.localeCompare(b.start.date));
     for(const event of entries){
-      const label=event.personalTask?(event.completed?'✓ ':'☐ ')+event.title:module.agendaTime(event,today,eventDays)+' · '+event.title;
+      const label=event.personalTask?(event.completed?'✓ ':'☐ ')+event.title:(event.remind?'🔔 ':'')+module.agendaTime(event,today,eventDays)+' · '+event.title;
       list.append(node('span',label,event.completed?'completed':''));
     }
     if(!entries.length)list.append(node('span',data.error?'Événements indisponibles':'Aucun événement ni tâche aujourd’hui'));

@@ -85,7 +85,7 @@ test('Menu-only opening checks authentication storage and closes module routes',
   if(sql.startsWith('SELECT * FROM calendar_cache'))return {rows:[{events:[],synced_at:new Date()}]};
   if(sql.startsWith('SELECT event_id FROM calendar_reminders'))return {rows:[]};
   if(sql.includes('FROM calendar_tasks WHERE user_id'))return {rows:[{id:7,title:'Fixture task',task_date:'2026-11-24',icon:'✅'}]};
-  if(sql.startsWith('SELECT key FROM settings'))return {rows:completed?[{key:key[0]}]:[]};
+  if(sql.startsWith('SELECT key,value FROM settings'))return {rows:completed?[{key:key[0],value:'2026-11-24'}]:[]};
   if(sql.startsWith('WITH owned AS')){
    assert.match(sql,/user_id=\$3/);
    if(key!=='calendar_task_done:1:7')return {rows:[]};

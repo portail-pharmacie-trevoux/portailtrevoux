@@ -80,9 +80,19 @@
 .week-agenda-day.today{border-color:#087b65}
 .week-agenda-entry{display:grid;gap:3px;margin:0 0 7px;padding:8px;border:1px solid #e5e6f0;border-radius:8px;background:#fff;overflow-wrap:anywhere;font-size:.84rem}
 .week-agenda-time,.week-agenda-empty{color:#526179;font-size:.77rem}
-.week-agenda-task{display:flex;align-items:flex-start;gap:6px;background:#e9f6f2;cursor:pointer}
-.week-agenda-task input{accent-color:#087b65}
-.week-agenda-task input:checked+span{text-decoration:line-through;color:#4f6761}
+.week-agenda-google h5,.week-agenda-personal h5{margin:0 0 7px;font-size:.73rem;color:#47566c}
+.week-agenda-personal{margin-top:10px;padding-top:9px;border-top:1px dashed #99b8ac}
+.week-agenda-task{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 22px;align-items:center;gap:6px;background:#e9f6f2;cursor:pointer}
+.week-task-name{font:600 1.02rem/1.2 'Segoe Print','Bradley Hand','Comic Sans MS',cursive}
+.week-task-check{grid-column:2;grid-row:1;width:19px;height:19px;margin:0;accent-color:#087b65;cursor:pointer}
+.week-task-tick{display:none;grid-column:2;grid-row:1;color:#087b43;font:bold 1.45rem/1 cursive;pointer-events:none}
+.week-task-check:checked{opacity:0}
+.week-task-check:checked+.week-task-tick{display:block}
+.week-agenda-task:focus-within{outline:2px solid #087b65;outline-offset:2px}
+.week-agenda-task.missed{background:#fff4f3;cursor:default}
+.week-task-cross{color:#be2424;font:bold 1.35rem/1 cursive}
+.week-agenda-bell{position:absolute;top:6px;right:7px;font-size:.8rem}
+.week-agenda-google-event:has(.week-agenda-bell) .week-agenda-time{padding-right:17px}
 .week-agenda-search{margin:14px 0}
 .week-agenda-results{flex-basis:100%;min-width:0}
 .week-agenda-results .status-line{margin:4px 0 8px}

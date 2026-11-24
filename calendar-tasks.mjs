@@ -32,7 +32,7 @@ export function registerCalendarTasks({app,db,auth,ready,csrf,viewUniverse,fail,
   if(!/^[1-9]\d{0,9}$/.test(req.params.id)||Number(req.params.id)>2147483647||typeof completed!=='boolean')throw fail(400,'Tâche invalide.');
   const key='calendar_task_done:'+req.auth.id+':'+req.params.id;
   const sql=completed
-   ? "WITH owned AS (SELECT id FROM calendar_tasks WHERE id=$2 AND user_id=$3 FOR UPDATE), change AS (INSERT INTO settings(key,value) SELECT $1,'true' FROM owned ON CONFLICT(key) DO NOTHING) SELECT id FROM owned"
+   ? "WITH owned AS (SELECT id FROM calendar_tasks WHERE id=$2 AND user_id=$3 FOR UPDATE), change AS (INSERT INTO settings(key,value) SELECT $1,to_char(now() AT TIME ZONE 'Europe/Paris','YYYY-MM-DD') FROM owned ON CONFLICT(key) DO NOTHING) SELECT id FROM owned"
    : "WITH owned AS (SELECT id FROM calendar_tasks WHERE id=$2 AND user_id=$3 FOR UPDATE), change AS (DELETE FROM settings WHERE key=$1 AND EXISTS(SELECT 1 FROM owned)) SELECT id FROM owned";
   const {rows}=await db.query(sql,[key,req.params.id,req.auth.id]);
   if(!rows.length)throw fail(404,'Tâche introuvable.');

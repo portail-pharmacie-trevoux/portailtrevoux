@@ -41,12 +41,12 @@ export function registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,f
    ...tasks.map(task=>'calendar_task_done:'+userId+':'+task.id),
    ...selected.map(event=>completionKey(userId,calendarId,event.id))
   ];
-  const completed=taskCompletion&&completionKeys.length?(await db.query("SELECT key FROM settings WHERE key = ANY($1::text[]) AND value='true'",[completionKeys])).rows:[];
-  const keys=new Set(completed.map(row=>row.key));
+  const completed=taskCompletion&&completionKeys.length?(await db.query("SELECT key,value FROM settings WHERE key = ANY($1::text[])",[completionKeys])).rows:[];
+  const keys=new Map(completed.map(row=>[row.key,row.value]));
   return [
    ...events.map(e=>({...e,remind:ids.has(e.id)})),
-   ...tasks.map(task=>taskCompletion?{...taskEvent(task),completed:keys.has('calendar_task_done:'+userId+':'+task.id)}:taskEvent(task)),
-   ...selected.map(event=>eventTask(event,keys.has(completionKey(userId,calendarId,event.id))))
+   ...tasks.map(task=>taskCompletion?{...taskEvent(task),completed:keys.has('calendar_task_done:'+userId+':'+task.id),completedAt:keys.get('calendar_task_done:'+userId+':'+task.id)}:taskEvent(task)),
+   ...selected.map(event=>eventTask(event,keys.get(completionKey(userId,calendarId,event.id))==='true'))
   ];
  };
 }
