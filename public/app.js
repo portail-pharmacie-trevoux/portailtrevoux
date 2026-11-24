@@ -243,7 +243,7 @@ function setPeopleAddActions(show){q('#people-add-actions').classList.add('hidde
 function renderPeople(){
   employeeRecordRequest++;setPeopleAddActions(session.user.role==='admin');
   const content=q('#content'),isAdmin=session.user.role==='admin';content.replaceChildren();
-  content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
+  if(!session.features?.menuOnly)content.append(node('p','Cliquez sur votre propre fiche pour accéder à vos bulletins de paie sur mySilae.','field-note'));
   if(isAdmin&&session.features?.menuOnly){
     const dialog=node('dialog','','people-administration-dialog');
     dialog.setAttribute('aria-label','Administration des collaborateurs');
@@ -254,16 +254,26 @@ function renderPeople(){
     actions.append(button('Ajouter un collaborateur manuellement',start,'btn primary'),button('Saisir une fiche de renseignements',start,'btn primary'));
     const imports=node('details','','people-import');
     imports.append(node('summary','Importer une liste de collaborateurs'),node('p','La reprise commence par la création manuelle des fiches.','field-note'));
-    dialog.append(header,actions,imports);
-    renderEmployeeDocument(dialog);
-    renderInvitationMail(dialog);
+    const options=node('div','','people-admin-tiles');
+    options.append(imports);
+    renderEmployeeDocument(options);
+    renderInvitationMail(options);
     const testers=node('details','','people-import');
     testers.append(node('summary','Profils testeurs externes'),node('p','Les profils testeurs externes ne sont pas ouverts sur cet environnement.','field-note'));
-    dialog.append(testers);
-    content.prepend(button('Administration',()=>dialog.showModal(),'btn primary'),dialog);
+    options.append(testers);
+    dialog.append(header,actions,options);
+    const workspace=node('div','','people-workspace');
+    const add=node('section','','people-workspace-add');
+    add.append(node('h3','Nouvelle fiche'),node('p','Renseignez les informations du collaborateur et ses accès.','field-note'),button('Ajouter un collaborateur',openNewPerson,'btn primary'));
+    const manage=node('section','','people-workspace-manage');
+    manage.append(node('h3','Administration'),node('p','Fiche de renseignements et invitations.','field-note'),button('Ouvrir l’administration',()=>dialog.showModal(),'btn'));
+    workspace.append(add,manage);
+    content.prepend(workspace,dialog);
+    function openNewPerson(){openEditor();}
+
   }else if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'){const link=node('a','Administration des droits Scalingo','btn primary');link.href='/staging-universal-rights';actions.append(link);}administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.prepend(administration);}
   for(const active of [true,false]){
-    const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':''));
+    const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':'')+(session.features?.menuOnly?' people-bento-directory':''));
     section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
     if(!list.length){section.append(node('p',active?'Aucun collaborateur actif.':'Aucun collaborateur inactif.','empty'));content.append(section);continue;}
     const wrap=node('div','','tablewrap'),table=node('table','','people-table'),head=node('thead'),header=node('tr');

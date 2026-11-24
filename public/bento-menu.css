@@ -135,3 +135,14 @@
 .people-administration-dialog>header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
 .people-administration-dialog>header h2{color:#563485;margin:0}
 .people-administration-dialog .people-admin-actions{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.people-workspace,.people-admin-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.people-workspace{grid-template-columns:3fr 2fr;margin-bottom:14px}
+.people-workspace>section,.people-bento-directory{border:1px solid #e2d9ef;border-radius:16px;padding:16px;background:#fff}
+.people-workspace .people-workspace-add{background:#eaf7f1;border-color:#c6e4d5}
+.people-workspace .people-workspace-manage{background:#f4eefa;border-color:#e3d5f0}
+.people-workspace h3,.people-bento-directory h3{margin-top:0;color:#493264}
+.people-bento-directory{margin-block:12px}
+.people-bento-directory.inactive-people{background:#f8f6fb}
+.people-admin-tiles>details{margin:0;min-width:0;padding:13px;background:#fff;border:1px solid #e4dbed;border-radius:12px}
+.people-admin-tiles>details[open]{grid-column:1/-1}
+@media(max-width:640px){.people-workspace,.people-admin-tiles{grid-template-columns:1fr}}
