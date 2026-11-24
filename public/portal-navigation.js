@@ -20,7 +20,19 @@
   };
   configure(homeButton,'Retour aux univers',true);homeButton.onclick=()=>onHome();
   parent.id='portal-universe-back';parent.hidden=true;parent.onclick=()=>{if(universe)onUniverse(parentOf(universe));};
-  bar.append(homeButton,parent);detail.prepend(bar);
+  const save=doc.createElement('button');
+  save.type='button';save.className='btn portal-navigation-tab portal-navigation-save';
+  save.title='Enregistrer les modifications';save.setAttribute('aria-label',save.title);
+  save.setAttribute('data-ux-stay','');
+  save.innerHTML='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h13l4 4v14H3V3h1Z"/><path d="M7 3v6h9V3M7 21v-8h10v8M13 5v2"/></svg>';
+  save.onclick=()=>global.PortalUX?.savePage(detail);
+  const updateSaving=event=>{
+   const busy=event.detail.saving;
+   save.disabled=busy;
+   save.setAttribute('aria-busy',String(busy));
+  };
+  doc.addEventListener('portal-save-state',updateSaving);
+  bar.append(homeButton,save,parent);detail.prepend(bar);
   function scan(){
    let subpage=universe==='Procédures'||[...content.querySelectorAll('[data-portal-subpage],.employee-record,.lab-form,.contact-form,.contact-document-upload,.hr-signature-form,.training-rename-form')].some(node=>!node.closest('dialog,.hidden,[hidden]'));
    for(const button of content.querySelectorAll('button[data-portal-back],button')){
@@ -40,7 +52,7 @@
    parent.hidden=!shown;
   }
   const observer=new MutationObserver(scan);observer.observe(content,{childList:true,subtree:true});
-  return {setUniverse(value){universe=value;scan();},refresh:scan,destroy(){observer.disconnect();homeButton.className='btn';homeButton.textContent='Retour aux univers';detail.prepend(homeButton);bar.remove();for(const b of content.querySelectorAll('.portal-legacy-back'))b.classList.remove('portal-legacy-back');}};
+  return {setUniverse(value){universe=value;scan();},refresh:scan,destroy(){observer.disconnect();doc.removeEventListener('portal-save-state',updateSaving);homeButton.className='btn';homeButton.textContent='Retour aux univers';detail.prepend(homeButton);bar.remove();for(const b of content.querySelectorAll('.portal-legacy-back'))b.classList.remove('portal-legacy-back');}};
  }
  global.PortalNavigation={create,parentOf,labels};
 })(typeof window!=='undefined'?window:globalThis);

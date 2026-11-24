@@ -83,9 +83,12 @@ async function renderOrderTable({container,api,canEdit,isCurrent}){
   try{const response=await fetch('/api/order-planning/export.xlsx',{credentials:'same-origin'});if(!response.ok){const error=await response.json().catch(()=>({}));if(error.code==='MFA_REQUIRED')await api('/api/order-mfa/touch','POST',{});throw Error(error.error||'Impossible d’exporter le tableau.');}const blob=await response.blob();if(!isCurrent())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=response.headers.get('content-disposition')?.match(/filename=([^;]+)/)?.[1]||'commandes-programmees.xlsx';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);exportStatus.textContent='Fichier Excel téléchargé.';}catch(error){if(isCurrent())exportStatus.textContent=error.message;}finally{exportButton.disabled=false;}
  };if(canManage)managementActions.append(exportButton,exportStatus);
  rows.forEach(addRow);const top=node('div','','universe-toolbar order-universe-toolbar');toolbar.classList.add('universe-actions');top.append(toolbar);if(canManage)root.append(management);root.append(notice,top,searchBox,empty,wrap);container.replaceChildren(root);updateEmpty();
- return {saveBeforeExit:async()=>{
+ const saveChanges=async()=>{
   if(body.querySelector('.order-plan-busy')||document.querySelector('.order-import-dialog[open],.order-plan-dialog[open]'))throw Error('Terminez l’opération ou fermez la fenêtre ouverte avant de quitter.');
   root.inert=true;
   try{for(const row of [...body.children]){if(!row.classList.contains('order-plan-dirty'))continue;if(!await rowSavers.get(row)?.())throw Error('Une ligne n’a pas été enregistrée. Vérifiez les champs et le message affiché sur cette ligne.');}}finally{root.inert=false;}
- }};
+ };
+ root.dataset.portalPageSaver='';
+ window.PortalUX?.registerPageSaver?.(root,saveChanges);
+ return {saveBeforeExit:saveChanges};
 }

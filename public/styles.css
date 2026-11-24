@@ -638,6 +638,10 @@ body>header .account-actions .btn:focus-visible,body>header #portal-home:focus-v
 .portal-navigation>.portal-navigation-tab{display:inline-flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;min-height:44px;margin:0;padding:10px 16px;border-radius:10px;font:600 14px/20px system-ui,sans-serif;max-width:100%;text-align:left}
 .portal-navigation>.portal-navigation-home{color:#fff;background:#6d429c;border-color:#593185}
 .portal-navigation>.portal-navigation-home:hover{background:#593185}
+.portal-navigation>.portal-navigation-save{width:44px;padding:0;color:#593185}
+.portal-navigation-save[aria-busy="true"] svg{animation:portal-save-spin .8s linear infinite}
+@keyframes portal-save-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.portal-navigation-save[aria-busy="true"] svg{animation:none}}
 .portal-navigation>.portal-navigation-tab:focus-visible{outline:3px solid #34204b;outline-offset:3px}
 .portal-navigation-arrow{display:inline-flex;align-items:center;justify-content:center;flex:0 0 18px;width:18px;height:20px;font-size:20px;line-height:1}
 .portal-navigation>[hidden],.portal-legacy-back{display:none!important}

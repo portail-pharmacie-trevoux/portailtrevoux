@@ -51,6 +51,17 @@ for(const [width,height]of [[1920,1080],[1024,768]])test('Navigation commune '+w
   window.scrollTo({top:0,behavior:'instant'});const first=home().getBoundingClientRect(),second=parent().getBoundingClientRect(),bar=document.querySelector('.portal-navigation').getBoundingClientRect(),header=detail.querySelector('header').getBoundingClientRect();
   check(Math.abs(first.left-bar.left)<2&&second.left>first.right&&Math.abs(first.top-second.top)<2,'Return order or alignment wrong');check(first.height>=44&&Math.abs(first.height-second.height)<2,'Button heights differ');check(second.bottom<header.top,'Navigation overlaps title/Admin');check(getComputedStyle(home()).backgroundColor==='rgb(109, 66, 156)','Portal purple missing');check(document.documentElement.scrollWidth<=innerWidth,'Horizontal overflow');
   check(![...content.querySelectorAll('button')].some(b=>/^retour/i.test(b.textContent.trim())&&getComputedStyle(b).display!=='none'),'Duplicate return remains');
+  const savePage=home().nextElementSibling;
+  check(savePage.getAttribute('aria-label')==='Enregistrer les modifications','Page save button missing');
+  const editable=document.createElement('form');editable.innerHTML='<input required><button type="submit">Enregistrer</button>';
+  content.append(editable);await settle();
+  let request;
+  editable.onsubmit=event=>{event.preventDefault();request=PortalUX.beginRequest('/api/example','PUT');};
+  const field=editable.querySelector('input');field.value='Nouvelle valeur';field.dispatchEvent(new Event('input',{bubbles:true}));
+  savePage.click();
+  check(request&&savePage.disabled&&savePage.getAttribute('aria-busy')==='true','Page save did not start');
+  request.success();
+  check(!savePage.disabled&&!PortalUX.hasUnsavedChanges(),'Page save did not finish');
   document.body.dataset.result='passed';
  }catch(e){document.body.dataset.result='failed';document.body.dataset.error=e.message;}
  </script></body></html>`));

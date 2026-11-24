@@ -7,7 +7,7 @@
  }
  const api={createEditState};global.PortalUX=api;
  if(!global.document)return;
- const doc=global.document,records=new Map();let intent=null,sequence=0,pending=0,message='',kind='',messageTimer;
+ const doc=global.document,records=new Map(),pageSavers=new WeakMap();let intent=null,sequence=0,pending=0,savingPage=false,message='',kind='',messageTimer;
  const notice=doc.createElement('div');notice.id='portal-save-feedback';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');notice.hidden=true;doc.body.append(notice);
  const fieldValue=n=>n.type==='checkbox'||n.type==='radio'?String(n.checked):n.type==='file'?[...(n.files||[])].map(f=>[f.name,f.size,f.lastModified].join(':')).join('|'):n.tagName==='SELECT'&&n.multiple?JSON.stringify([...n.selectedOptions].map(o=>o.value)):n.value;
  const live=form=>form.isConnected&&!form.closest('.hidden,[hidden]')&&(!form.closest('dialog')||form.closest('dialog').open);
@@ -18,7 +18,7 @@
  function dirtyRecords(){return [...records.values()].filter(r=>live(r.form)&&refresh(r));}
  const dirtyOrders=()=>[...doc.querySelectorAll('.order-plan-dirty')].some(n=>!n.closest('.hidden,[hidden]'));
  function local(record,text,state){if(!record||!record.form.isConnected)return;if(!record.hint){record.hint=doc.createElement('p');record.hint.setAttribute('role','status');record.hint.setAttribute('aria-live','polite');record.form.append(record.hint);}record.hint.className='ux-save-state '+state;record.hint.textContent=text;}
- function show(){const dirty=dirtyRecords().length||dirtyOrders();notice.hidden=!pending&&!message&&!dirty;notice.className='portal-save-feedback '+(pending?'saving':message?kind:'dirty');notice.textContent=pending?'Enregistrement…':message||(dirty?'Modifications non enregistrées':'');notice.setAttribute('role',kind==='failure'&&!pending?'alert':'status');}
+ function show(){const dirty=dirtyRecords().length||dirtyOrders();notice.hidden=!pending&&!message&&!dirty;notice.className='portal-save-feedback '+(pending?'saving':message?kind:'dirty');notice.textContent=pending?'Enregistrement…':message||(dirty?'Modifications non enregistrées':'');notice.setAttribute('role',kind==='failure'&&!pending?'alert':'status');updateSaveState();}
  function announce(text,state){clearTimeout(messageTimer);message=text;kind=state;show();if(state==='success')messageTimer=setTimeout(()=>{message='';show();},5000);}
  function normalize(form){
   const submits=[...form.querySelectorAll('button[type="submit"]')];
@@ -37,7 +37,7 @@
  doc.addEventListener('reset',e=>{const r=records.get(e.target);if(!r)return;if(!r.justSaved&&refresh(r)&&!canLeave(e.target)){e.preventDefault();return;}queueMicrotask(()=>{refresh(r);r.state.commit(r.state.capture());r.justSaved=false;show();});},true);
  doc.addEventListener('submit',e=>{const r=register(e.target);if(r)refresh(r);rememberIntent(e.target);},true);
  function canLeave(target,escape=false){
-  const active=dirtyRecords().filter(r=>!escape||target.contains(r.form)),orders=!escape&&dirtyOrders(),saving=[...records.values()].some(r=>live(r.form)&&r.pending)||!!doc.querySelector('.order-plan-busy');
+  const active=dirtyRecords().filter(r=>!escape||target.contains(r.form)),orders=!escape&&dirtyOrders(),saving=savingPage||[...records.values()].some(r=>live(r.form)&&r.pending)||!!doc.querySelector('.order-plan-busy');
   if(!active.length&&!orders&&(!saving||escape))return true;
   // This existing action saves all edited order rows before locking the space.
   if(!escape&&/quitter et enregistrer/i.test(target?.textContent||''))return true;
@@ -61,5 +61,25 @@
   return{success(){if(finished)return;finished=true;pending--;if(record){record.pending--;if(method!=='DELETE'){record.state.commit(snapshot);record.justSaved=true;}}local(record,method==='DELETE'?'Suppression effectuée':'Enregistré','success');if(id===sequence||!pending)announce(method==='DELETE'?'Suppression effectuée':'Enregistré','success');else show();},failure(error){if(finished)return;finished=true;pending--;if(record)record.pending--;local(record,'Échec de l’enregistrement : '+(error?.message||'Réessayez.'),'failure');announce('Échec de l’enregistrement : '+(error?.message||'Réessayez.'),'failure');}};
  };
  api.hasUnsavedChanges=()=>!!dirtyRecords().length||dirtyOrders();
+ api.registerPageSaver=(element,save)=>{pageSavers.set(element,save);};
+ function updateSaveState(){doc.dispatchEvent(new CustomEvent('portal-save-state',{detail:{saving:pending>0||savingPage}}));}
+ api.savePage=async scope=>{
+  if(pending||savingPage)return;
+  const dirty=dirtyRecords().filter(({form})=>scope.contains(form));
+  if(dirty.length>1){announce('Plusieurs formulaires sont modifiés. Enregistrez-les séparément.','failure');return;}
+  if(dirty.length){
+   const {form}=dirty[0];
+   const submitters=[...form.querySelectorAll('button[type="submit"]')].filter(button=>!button.disabled&&/^enregistrer\b|^sauvegarder\b/i.test(button.getAttribute('aria-label')||button.textContent.trim()));
+   if(submitters.length===1){form.requestSubmit(submitters[0]);return;}
+   announce('Utilisez le bouton d’enregistrement du formulaire.','failure');return;
+  }
+  const orders=scope.querySelector('.order-plan-dirty');
+  if(!orders){announce('Aucune modification à enregistrer.','success');return;}
+  const save=pageSavers.get(orders.closest('[data-portal-page-saver]'));
+  if(!save){announce('Utilisez le bouton d’enregistrement de la page.','failure');return;}
+  savingPage=true;updateSaveState();
+  try{await save();}catch(error){announce(error.message,'failure');}
+  finally{savingPage=false;updateSaveState();}
+ };
  api.scan=scan;
 })(typeof window!=='undefined'?window:globalThis);
