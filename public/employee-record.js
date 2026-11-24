@@ -68,7 +68,7 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   capabilityTitle.scope='row';
   const capabilityFields=el('div');capabilityFields.setAttribute('role','group');capabilityFields.setAttribute('aria-label','Capacités particulières');
   capabilityFields.style.cssText='display:flex;flex-wrap:wrap;gap:8px 20px';
-  for(const [key,label] of [["canVaccinate","Vaccination"],["canPerformTrod","TROD"],["canPreparePillboxes","Piluliers"],["hasCqp","CQP"]]){
+  for(const [key,label] of [["canVaccinate","Vaccination"],["canPerformTrod","TROD"],["canPreparePillboxes","Piluliers"],["hasCqp","CQP"],["hasOncology","Oncologie"]]){
     const item=el('label'),input=el('input');input.type='checkbox';input.checked=details[key]===true;
     item.append(input,' '+label);capabilityFields.append(item);inputs.set(key,{field:{type:'checkbox'},input});
   }
