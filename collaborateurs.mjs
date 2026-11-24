@@ -56,10 +56,10 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
     res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
   });
-  const all=async()=>(await db.query('SELECT * FROM users '+(freshDirectory?"WHERE directory_key LIKE 'scalingo-new-directory:%' ":'')+'ORDER BY active DESC,last_name,first_name')).rows;
+  const all=async(ownId=null)=>(await db.query('SELECT * FROM users '+(freshDirectory?"WHERE directory_key LIKE 'scalingo-new-directory:%' OR id=$1 ":'')+'ORDER BY active DESC,last_name,first_name',freshDirectory?[ownId]:[])).rows;
   const view=(person,req)=>({...publicPerson(person,req.auth.role==='admin',req.auth.id),...(scalingoAccountCreation&&req.auth.role==='admin'?{temporaryPasswordRequired:!!person.password_hash&&person.must_change===true}:{})});
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
-  app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all();if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
+  app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all(req.auth.role==='admin'?req.auth.id:null);if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
   app.get('/api/collaborateurs/celebrations',auth,ready,directoryAccess,async(req,res)=>{
     const calendar=await feastCalendar(),day=calendar.day,people=(await all()).filter(p=>p.active);
     res.json({day,feasts:calendar.feasts,feastsAvailable:calendar.available,
@@ -89,11 +89,11 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const person=(await db.query('SELECT * FROM users WHERE id=$1',[id])).rows[0];if(!person)throw fail(404,'Collaborateur introuvable.');
     res.json({person:view(person,req),...await readEmployeeDetails(db,id,secret)});
   });
-  async function checkAccountDuplicates(client,profile,email,excludedId=null){
+  async function checkAccountDuplicates(client,profile,email,excludedId=null,ownId=null){
     await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
     const rows=(await client.query('SELECT id,email,first_name,last_name,name,directory_key FROM users')).rows;
     if(email&&rows.some(p=>p.id!==excludedId&&p.email?.trim().toLowerCase()===email))throw fail(409,'Un compte utilise déjà cette adresse e-mail.');
-    if(rows.some(p=>p.id!==excludedId&&(!freshDirectory||p.directory_key?.startsWith('scalingo-new-directory:'))&&normalizeName(p.first_name&&p.last_name?p.first_name+' '+p.last_name:p.name)===normalizeName(profile.name)))throw fail(409,'Une fiche existe déjà pour cette identité. Aucun doublon créé.');
+    if(rows.some(p=>p.id!==excludedId&&(!freshDirectory||p.id===ownId||p.directory_key?.startsWith('scalingo-new-directory:'))&&normalizeName(p.first_name&&p.last_name?p.first_name+' '+p.last_name:p.name)===normalizeName(profile.name)))throw fail(409,'Une fiche existe déjà pour cette identité. Aucun doublon créé.');
   }
   async function transaction(work){
     const client=db.connect?await db.connect():db;
@@ -105,7 +105,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const d=validatePerson(req.body,fail),a=await account(req.body),role=requestedEmployeeRole(req.body,null,fail),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);
     if(role==='admin'&&(!d.active||!a.email))throw fail(400,'Pour donner les droits administrateur, renseignez une adresse de connexion et gardez le collaborateur actif.');
     const person=await transaction(async client=>{
-      if(scalingoAccountManagement)await checkAccountDuplicates(client,d,a.email);
+      if(scalingoAccountManagement)await checkAccountDuplicates(client,d,a.email,null,req.auth.id);
       const {rows}=await client.query(`INSERT INTO users(name,first_name,last_name,phone,birthday,job,active,email,password_hash,rights,edit_rights,permissions_configured,role${scalingoAccountManagement?',directory_key':''})
         VALUES($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13${scalingoAccountManagement?',$14':''}) RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.rights),JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.editRights),a.configured,role,...(scalingoAccountManagement?[(freshDirectory?'scalingo-new-directory:':'scalingo-manual:')+randomUUID()]:[])]);
       if(details!==undefined)await saveEmployeeDetails(client,rows[0].id,details,0,secret,req.auth.id,fail);
@@ -135,7 +135,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
         return (await client.query('UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6 WHERE id=$7 RETURNING *',[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,id])).rows[0];
       }
       const a=await account(req.body,existing);
-      if(scalingoAccountManagement){if(req.body.active!==undefined&&d.active!==existing.active)throw fail(400,'Utilisez Désactiver ou Réactiver pour changer le statut.');await checkAccountDuplicates(client,d,a.email,id);}
+      if(scalingoAccountManagement){if(req.body.active!==undefined&&d.active!==existing.active)throw fail(400,'Utilisez Désactiver ou Réactiver pour changer le statut.');await checkAccountDuplicates(client,d,a.email,id,req.auth.id);}
       if(role==='admin'&&(!d.active||!a.email))throw fail(400,'Pour donner les droits administrateur, renseignez une adresse de connexion et gardez le collaborateur actif.');
       const {rows}=await client.query(`UPDATE users SET name=$1,first_name=$2,last_name=$3,phone=$4,birthday=$5::date,job=$6,active=$7,email=$8,password_hash=$9,rights=$10::jsonb,
         edit_rights=$11::jsonb,permissions_configured=$12,must_change=CASE WHEN $13 THEN TRUE ELSE must_change END,role=$15 WHERE id=$14 RETURNING *`,[d.name,d.firstName,d.lastName,d.phone,d.birthday||null,d.job,d.active,a.email,a.hash,JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.rights),JSON.stringify(scalingoAccountManagement&&role==='admin'?universes:a.editRights),a.configured,!!req.body.password,id,role]);
