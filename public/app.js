@@ -233,7 +233,7 @@ async function openUniverse(name,{menuRoot=false}={}){
   q('#hr-import-action')?.remove();
   q('#universe-publications')?.remove();
   currentUniverse=name;portalNavigation?.setUniverse(name);q('#home').classList.add('hidden');q('#detail').classList.remove('hidden');q('#global-message').textContent='';setUniverseHeading(name);q('#description').textContent=descriptions[name];q('#feedback').textContent='';setPeopleAddActions(name==='Collaborateurs'&&session.user.role==='admin');q('#content').replaceChildren(node('div','Chargement…','empty'));
-  try{if(name==='Collaborateurs'){people=await api('/api/users');if(currentUniverse===name)renderPeople();}else if(name==='Actualités'){const userId=session.user.id,module=await import('/news.js');if(currentUniverse===name)await module.renderNews({container:q('#content'),api,isAdmin:session.user.role==='admin',isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId,onChanged:()=>void refreshHomeExtras(),onOpenOrders:()=>void openUniverse("Outils d'aide aux commandes"),onOpenMerchandising:month=>{merchandisingReminderMonth=month;void openUniverse("Outils d'aide au merchandising");},onOpenPlanning:week=>{scheduleView='week';scheduleTemplatesView=false;if(week){scheduleWeek=week;scheduleDay=week;}void openUniverse('Emplois du temps');}});}else if(name==='Challenges'){const userId=session.user.id,module=await import('/challenges.js');if(currentUniverse===name)await module.renderChallenges({container:q('#content'),api,isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==='Laboratoires'){const userId=session.user.id,module=await import('/laboratories.js?v=20261103-documents-conditions');if(currentUniverse===name)await module.renderLaboratories({container:q('#content'),api,isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==='Ressources humaines'){const userId=session.user.id,module=await import('/hr-documents.js');if(currentUniverse===name)await module.renderHRDocuments({container:q('#content'),heading:q('#detail .top'),api,isAdmin:session.user.role==='admin',isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==="Outils d'aide aux commandes"){const userId=session.user.id,module=await import('/order-planning.js');if(currentUniverse===name)await module.renderOrderPlanning({container:q('#content'),api,canEdit:canEditUniverse(name),isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==="Outils d'aide au merchandising"){const userId=session.user.id,module=await import('/merchandising.js?v=20261029-v12-scalingo');if(currentUniverse===name)await module.renderMerchandisingHub({container:q('#content'),api,initialMonth:menuRoot?null:merchandisingReminderMonth||'2026-11',isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});merchandisingReminderMonth=null;}else if(name==="Outils d'aide à la démarche qualité"){const module=await import("/quality.js");if(currentUniverse===name)module.renderQuality({container:q("#content"),api,canAccessProcedures:tileAllowed('Procédures'),onOpenProcedures:()=>void openUniverse('Procédures'),isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name});}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Procédures'){const module=await import('/procedures.js');if(currentUniverse===name)await module.renderProcedures({container:q('#content'),api,canEdit:canEditUniverse('Procédures')});}else if(name==='Formations'){const module=await import('/training-documents.js');if(currentUniverse===name)await module.renderTrainingDocuments({container:q('#content'),api,canEdit:canEditUniverse('Formations'),isCurrent:()=>currentUniverse===name&&!!session});}else if(name==='Contacts utiles'){const module=await import('/contacts.js');if(currentUniverse===name)await module.renderContacts({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
+  try{if(name==='Collaborateurs'){people=await loadPeopleDirectory();if(currentUniverse===name)renderPeople();}else if(name==='Actualités'){const userId=session.user.id,module=await import('/news.js');if(currentUniverse===name)await module.renderNews({container:q('#content'),api,isAdmin:session.user.role==='admin',isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId,onChanged:()=>void refreshHomeExtras(),onOpenOrders:()=>void openUniverse("Outils d'aide aux commandes"),onOpenMerchandising:month=>{merchandisingReminderMonth=month;void openUniverse("Outils d'aide au merchandising");},onOpenPlanning:week=>{scheduleView='week';scheduleTemplatesView=false;if(week){scheduleWeek=week;scheduleDay=week;}void openUniverse('Emplois du temps');}});}else if(name==='Challenges'){const userId=session.user.id,module=await import('/challenges.js');if(currentUniverse===name)await module.renderChallenges({container:q('#content'),api,isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==='Laboratoires'){const userId=session.user.id,module=await import('/laboratories.js?v=20261103-documents-conditions');if(currentUniverse===name)await module.renderLaboratories({container:q('#content'),api,isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==='Ressources humaines'){const userId=session.user.id,module=await import('/hr-documents.js');if(currentUniverse===name)await module.renderHRDocuments({container:q('#content'),heading:q('#detail .top'),api,isAdmin:session.user.role==='admin',isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==="Outils d'aide aux commandes"){const userId=session.user.id,module=await import('/order-planning.js');if(currentUniverse===name)await module.renderOrderPlanning({container:q('#content'),api,canEdit:canEditUniverse(name),isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});}else if(name==="Outils d'aide au merchandising"){const userId=session.user.id,module=await import('/merchandising.js?v=20261029-v12-scalingo');if(currentUniverse===name)await module.renderMerchandisingHub({container:q('#content'),api,initialMonth:menuRoot?null:merchandisingReminderMonth||'2026-11',isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name&&session?.user.id===userId});merchandisingReminderMonth=null;}else if(name==="Outils d'aide à la démarche qualité"){const module=await import("/quality.js");if(currentUniverse===name)module.renderQuality({container:q("#content"),api,canAccessProcedures:tileAllowed('Procédures'),onOpenProcedures:()=>void openUniverse('Procédures'),isCurrent:()=>viewRequest===universeViewRequest&&currentUniverse===name});}else if(name==='Outils de calculs rapides'){const module=await import('/promoflash.js');if(currentUniverse===name)module.renderPromoFlash({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Procédures'){const module=await import('/procedures.js');if(currentUniverse===name)await module.renderProcedures({container:q('#content'),api,canEdit:canEditUniverse('Procédures')});}else if(name==='Formations'){const module=await import('/training-documents.js');if(currentUniverse===name)await module.renderTrainingDocuments({container:q('#content'),api,canEdit:canEditUniverse('Formations'),isCurrent:()=>currentUniverse===name&&!!session});}else if(name==='Contacts utiles'){const module=await import('/contacts.js');if(currentUniverse===name)await module.renderContacts({container:q('#content'),api,isAdmin:session.user.role==='admin'});}else if(name==='Emplois du temps')await renderSchedule();else if(name==='Fun')await renderMusic();else if(name==='Agenda'){calendarDay=parisDay();calendarQuery='';await renderCalendar();}else{await api('/api/universes/'+encodeURIComponent(name));if(currentUniverse===name)q('#content').replaceChildren(node('div','Cet espace est prêt à accueillir vos informations. Aucun contenu ajouté pour le moment.','empty'));}}catch(e){if(currentUniverse===name)q('#content').replaceChildren(node('div',e.message,'empty'));}
   if(currentUniverse===name)void renderPublications(name);
 }
 function button(label,action,cls='btn small'){const b=node('button',label,cls);b.type='button';b.onclick=action;return b;}
@@ -242,7 +242,21 @@ const collaboratorJobIcons={
   rayonniste:'📦',secretaire:'🗂', 'responsable merch':'🛍', 'responsable parapharmacie':'🧴'
 };
 function personName(p){return [p.firstName,p.lastName?.toLocaleUpperCase('fr-FR')].filter(Boolean).join(' ');}
-async function reloadPeople(message=''){people=await api('/api/users');if(currentUniverse==='Collaborateurs'){renderPeople();q('#feedback').textContent=message;}}
+async function loadPeopleDirectory(){
+  const directory=await api('/api/users');
+  if(!session?.features?.menuOnly||session.user.role!=='admin')return directory;
+  const keys=['canVaccinate','canPerformTrod','canPreparePillboxes','hasCqp','hasOncology'];
+  return Promise.all(directory.map(async person=>{
+    if(!person.active||person.role==='admin'&&!person.isSelf)return person;
+    try{
+      const {details}=await api('/api/users/'+person.id+'/details');
+      return {...person,capabilities:keys.filter(key=>details?.[key]===true)};
+    }catch(error){
+      return {...person,capabilityStatus:'unavailable'};
+    }
+  }));
+}
+async function reloadPeople(message=''){people=await loadPeopleDirectory();if(currentUniverse==='Collaborateurs'){renderPeople();q('#feedback').textContent=message;}}
 function setPeopleAddActions(show){q('#people-add-actions').classList.add('hidden');}
 function renderPeople(){
   employeeRecordRequest++;setPeopleAddActions(session.user.role==='admin');
@@ -285,9 +299,37 @@ function renderPeople(){
     workspace.append(manage);
     content.prepend(workspace,dialog);
   }else if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'){const link=node('a','Administration des droits Scalingo','btn primary');link.href='/staging-universal-rights';actions.append(link);}administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.prepend(administration);}
+  const bento=session.features?.menuOnly===true;
+  const collator=new Intl.Collator('fr',{sensitivity:'base'});
+  const families=[['green','Comptoir'],['purple','Parapharmacie'],['yellow','Back-office']];
+  const skillIcons={canVaccinate:['💉','Vaccination'],canPerformTrod:['🧪','TROD'],canPreparePillboxes:['💊','Piluliers'],hasCqp:['💄','CQP cosmétiques'],hasOncology:['🎗️','Oncologie']};
+  const familyOf=job=>{
+    const key=(job||'').trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+    if(/^(pharmaci(en|enne)|preparat(eur|rice)|apprentie?)$/.test(key))return 'green';
+    if(key==='responsable parapharmacie')return 'purple';
+    if(['responsable merch','secretaire','rayonniste'].includes(key))return 'yellow';
+    return 'gray';
+  };
   for(const active of [true,false]){
-    const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':'')+(session.features?.menuOnly?' people-bento-directory':''));
-    section.append(node('h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length));
+    const list=people.filter(p=>p.active===active),section=node(bento&&!active?'details':'section','','people-section'+(!active?' inactive-people':'')+(session.features?.menuOnly?' people-bento-directory':''));
+    if(bento)list.sort((a,b)=>collator.compare(a.lastName,b.lastName)||collator.compare(a.firstName,b.firstName));
+    const title=node(bento&&!active?'summary':'h3',(active?'Collaborateurs actifs':'Collaborateurs inactifs')+' · '+list.length);
+    section.append(title);
+    const cards=node('ul','','people-card-grid');
+    if(bento&&active){
+      const legend=node('div','','people-card-legend'),filters=node('div','','people-card-filters');
+      filters.setAttribute('aria-label','Filtrer les collaborateurs');
+      for(const [key,label] of families)legend.append(node('span',label,'people-family-'+key));
+      section.prepend(legend);title.after(filters);
+      for(const [key,label] of [['all','Tous'],...families]){
+        const filter=button(label,()=>{
+          for(const card of cards.children)card.hidden=key!=='all'&&card.dataset.family!==key;
+          title.textContent='Collaborateurs actifs · '+cards.querySelectorAll('li:not([hidden])').length;
+          for(const item of filters.children)item.setAttribute('aria-pressed',String(item===filter));
+        },'btn small');
+        filter.setAttribute('aria-pressed',String(key==='all'));filters.append(filter);
+      }
+    }
     if(!list.length){section.append(node('p',active?'Aucun collaborateur actif.':'Aucun collaborateur inactif.','empty'));content.append(section);continue;}
     const wrap=node('div','','tablewrap'),table=node('table','','people-table'),head=node('thead'),header=node('tr');
     ['Prénom','Nom','Fonction','Téléphone',...(isAdmin?['Connexion','Gestion']:[])].forEach(text=>{const th=node('th',text);th.scope='col';header.append(th);});head.append(header);table.append(head);
@@ -351,9 +393,39 @@ function renderPeople(){
         }
         tr.append(actions);
       }
-      body.append(tr);
+      if(!bento){body.append(tr);continue;}
+      const family=active?familyOf(p.job):'gray';
+      const card=node('li','','people-person-card people-family-'+family);
+      card.dataset.family=family;card.dataset.personId=p.id;
+      const name=node('h4');name.append(...first.childNodes,' ',...last.childNodes);
+      const watermark=job.querySelector('.person-job-watermark')||node('span','👤','person-job-watermark');
+      watermark.setAttribute('aria-hidden','true');
+      const contact=node('p','Téléphone à renseigner','people-card-phone');
+      if(p.phone){
+        const telephone=node('a',p.phone);telephone.href='tel:'+p.phone.replace(/[^+\d]/g,'');contact.replaceChildren(telephone);
+      }
+      card.append(watermark,name,node('div',p.job||'Fonction à renseigner','people-card-job'),contact);
+      if(isAdmin){
+        const connection=node('div');connection.append(...tr.children[4].childNodes);card.append(connection);
+      }
+      const skills=node('div','','people-card-skills');
+      for(const key of p.capabilities??[]){
+        if(!Object.hasOwn(skillIcons,key))continue;
+        const [icon,label]=skillIcons[key],badge=node('span',icon);badge.title=label;badge.setAttribute('role','img');badge.setAttribute('aria-label',label);skills.append(badge);
+      }
+      if(p.capabilityStatus==='unavailable')skills.append(node('small','Capacités indisponibles'));
+      card.append(skills);
+      if(isAdmin&&tr.children[5]?.childElementCount){
+        const management=node('details','','people-card-management');
+        management.append(node('summary','Gestion'),...tr.children[5].childNodes);card.append(management);
+      }
+      cards.append(card);
     }
-    table.append(body);wrap.append(table);section.append(wrap);content.append(section);
+    if(bento){
+      section.append(cards);
+      if(active)section.append(node('p','💉 Vaccination · 🧪 TROD · 💊 Piluliers · 💄 CQP cosmétiques · 🎗️ Oncologie','people-card-key'));
+    }else{table.append(body);wrap.append(table);section.append(wrap);}
+    content.append(section);
   }
 }
 
