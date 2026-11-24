@@ -123,3 +123,5 @@
 .module-review-table th{background:#f4effa;white-space:nowrap}
 .module-review-zones{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}
 .module-review-zones li{border-radius:8px;background:#f4effa;padding:6px 10px}
+.module-review-admin{margin:0 0 16px}
+.module-review-admin-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
