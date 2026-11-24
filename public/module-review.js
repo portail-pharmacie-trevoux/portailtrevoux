@@ -19,9 +19,10 @@ const modules = {
     'Publication': ['Semaine@week', 'État:Brouillon|Publié']
   },
   "Outils d'aide au merchandising": {
-    'Plan des zones': ['Mois@month', 'Famille:Têtes de gondole|Intercomptoirs|Bacs soldeurs|Saisonnier|Événement|Déstockage'],
+    'Plan des zones': ['Mois@month', 'Famille:Toutes|TG|IC|BS|SA|EV|DS'],
     'Fiche zone': ['Repère', 'Nom', 'Consignes@textarea'],
-    'Opération': ['Zone', 'Intitulé', 'Début@date', 'Fin@date', 'Produit', 'Prix@number', 'Stock@number', 'Documents@file']
+    'Opération': ['Mois@month', 'Catégorie:TG|IC|BS|SA|EV|DS', 'Zone', 'Intitulé', 'Laboratoire', 'EAN (un par ligne)@textarea', 'Prix avant promotion@number', 'Prix après promotion@number', 'Stock avant promotion@number', 'Documents@file'],
+    'Suivi de l’impact': ['Mois@month', 'Zone', 'Début de référence@date', 'Fin de référence@date', 'Début de promotion@date', 'Fin de promotion@date', 'Unités de référence@number', 'Unités en promotion@number', 'Chiffre d’affaires de référence@number', 'Chiffre d’affaires en promotion@number', 'Conclusion:À analyser|Succès|À améliorer|Échec', 'Notes@textarea']
   },
   Laboratoires: {
     'Annuaire': ['Rechercher@search', 'Initiale'],
@@ -80,9 +81,10 @@ const administration = {
     'Publication': ['Enregistrer le brouillon', 'Publier le planning']
   },
   "Outils d'aide au merchandising": {
-    'Plan des zones': ['Fiche zone', 'Opération', 'Exporter le plan et les affectations'],
+    'Plan des zones': ['Fiche zone', 'Opération', 'Suivi de l’impact'],
     'Fiche zone': ['Enregistrer la zone', 'Paramétrer l’emplacement'],
-    'Opération': ['Gérer les documents', 'Gérer les prix et les stocks', 'Valider l’opération', 'Supprimer l’opération']
+    'Opération': ['Gérer les documents', 'Gérer les prix et les stocks', 'Valider l’opération', 'Supprimer l’opération'],
+    'Suivi de l’impact': ['Enregistrer le suivi']
   },
   Laboratoires: {
     'Annuaire': ['Fiche laboratoire', 'Importer des laboratoires', 'Exporter la liste'],
@@ -124,7 +126,6 @@ const columns = {
   Collaborateurs: ['Nom', 'Fonction', 'Statut'],
   Actualités: ['Titre', 'Correspondants', 'Date', 'Statut'],
   'Emplois du temps': ['Collaborateur', 'Début', 'Fin', 'Poste'],
-  "Outils d'aide au merchandising": ['Repère', 'Zone', 'Mois', 'Disponibilité'],
   Laboratoires: ['Laboratoire', 'Responsable', 'Mode de commande'],
   Formations: ['Document', 'Catégorie', 'Date'],
   'Ressources humaines': ['Document', 'Catégorie', 'Date'],
@@ -152,6 +153,7 @@ function field(spec) {
     control.type = type;
     if (type === 'number') control.step = 'any';
   }
+  control.dataset.field = name;
   wrapper.append(control);
   return wrapper;
 }
@@ -212,10 +214,6 @@ export function renderModuleReview(container, universe) {
     panel.append(element('h3', name), admin, form);
     if (universe === 'Emplois du temps' && ['Jour', 'Semaine', 'Mois'].includes(name)) {
       panel.append(scheduleGrid(name));
-    } else if (universe === "Outils d'aide au merchandising" && name === 'Plan des zones') {
-      const zoneList = element('ul', '', 'module-review-zones');
-      zoneList.append(...['TG · Têtes de gondole', 'IC · Intercomptoirs', 'BS · Bacs soldeurs', 'SA · Zones saisonnières', 'EV · Zone événement', 'DS · Déstockage'].map(zone => element('li', zone)));
-      panel.append(zoneList, emptyTable(columns[universe], 'Aucune affectation mensuelle.'));
     } else if ((columns[universe] && name === Object.keys(sections)[0]) ||
       ['Envoyés', 'Archives', 'Documents personnels', 'Challenges'].includes(name)) {
       panel.append(emptyTable(columns[universe] || ['Intitulé', 'Statut'], 'Aucune donnée à afficher.'));
@@ -234,5 +232,10 @@ export function renderModuleReview(container, universe) {
   const root = element('div', '', 'module-review');
   root.append(heading, navigation, content);
   container.replaceChildren(root);
+  if (universe === "Outils d'aide au merchandising") {
+    void import('/merchandising-review.js').then(({mountMerchandisingReview}) => mountMerchandisingReview(panels, select)).catch(() => {
+      panels[0].panel.append(element('p', 'Le plan est momentanément indisponible.', 'status-line'));
+    });
+  }
   return true;
 }

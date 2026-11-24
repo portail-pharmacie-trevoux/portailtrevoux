@@ -126,3 +126,7 @@
 .module-review-zones li{border-radius:8px;background:#f4effa;padding:6px 10px}
 .module-review-admin{margin:0 0 16px}
 .module-review-admin-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.merch-review-plan{position:relative;min-width:650px}
+.merch-review-plan img{display:block;width:100%;height:auto}
+.merch-review-marker{position:absolute;transform:translate(-50%,-50%);padding:2px 3px;border:1px solid #734678;border-radius:4px;background:#fff;color:#522865;font-size:.63rem;font-weight:700;line-height:1.25;cursor:pointer}
+.merch-review-marker:is(:focus-visible,:hover){z-index:1;background:#522865;color:#fff}

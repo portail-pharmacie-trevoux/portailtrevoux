@@ -1,5 +1,10 @@
 // Opt-in production preparation. No initialize(), DDL, import, purge, timer or account creation.
 import express from 'express';
+import {readFile} from 'node:fs/promises';
+import {zonePositions} from '../merchandising.mjs';
+import {promotionCategory} from '../merchandising-promotions.mjs';
+import {zoneGuidelines} from '../public/merchandising-rules.js';
+import {exportMerchandising} from '../merchandising-export.mjs';
 import {createApp} from '../server.mjs';
 import {hashPassword,token} from '../security.mjs';
 import {scalingoAllowedOrigins} from './scalingo-origins-preview.mjs';
@@ -84,7 +89,8 @@ export async function createScalingoProductionApp(db,env,adapters={}){
    const calendarCallback=request==='GET /auth/google/callback'&&!/^(?:mail_|youtube_)/.test(String(req.query.state||''));
    const calendarConnection=config.capabilities.calendar&&(['POST /api/google/verify-calendar','POST /api/google/connect'].includes(request)||calendarCallback);
    const personalAgenda=config.capabilities.calendar&&(['GET /api/calendar','HEAD /api/calendar','POST /api/calendar/tasks','POST /api/calendar/reminders'].includes(request)||(req.method==='PATCH'&&/^\/api\/calendar\/tasks\/[1-9]\d*\/completion$/.test(path)));
-   if(!sessionRoute&&!pageOrAsset&&!calendarConnection&&!personalAgenda)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
+   const merchandisingReview=['GET','HEAD'].includes(req.method)&&['/api/review/merchandising/zones','/api/review/merchandising/plan','/api/review/merchandising/template.xlsx'].includes(path);
+   if(!sessionRoute&&!pageOrAsset&&!calendarConnection&&!personalAgenda&&!merchandisingReview)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
   }
   if(req.path.startsWith('/staging-')||req.path.startsWith('/api/staging-')||req.path==='/api/collaborateurs/import')return res.status(403).json({error:'Outil de préparation indisponible en production.'});
   const p=req.path,cap=config.capabilities;
@@ -95,6 +101,29 @@ export async function createScalingoProductionApp(db,env,adapters={}){
  gate.get('/api/google/status',(req,res,next)=>{const json=res.json;res.json=function(data){return json.call(this,{...data,configured:config.capabilities.calendar&&data.configured,calendarEnabled:config.capabilities.calendar,environment:'scalingo'});};app(req,res,next);});
  gate.get('/api/mail/status',(req,res,next)=>{const json=res.json;res.json=function(data){return json.call(this,{...data,configured:config.capabilities.mailOAuth&&data.configured,deliveryEnabled:config.capabilities.mailDelivery});};app(req,res,next);});
  registerScalingoTrevouxEntry(gate,app);registerScalingoRetiredCalculations(gate);
+ if(config.menuOnly){
+  const admin=scalingoAdminAuth(db,config.allowsPortalUser);
+  gate.get('/api/review/merchandising/zones',admin,(req,res)=>{
+   const counters={};
+   const zones=zonePositions.map(([x,y],index)=>{
+    const id=index+1,category=promotionCategory(id);
+    const number=counters[category]=(counters[category]||0)+1;
+    const offsetX=category==='BS'?((number%2)?-5:5):0;
+    const offsetY=category==='BS'&&number<=2?-4:id===24?4:0;
+    return {id,category,code:category==='EV'?'EV':category+number,x:x+offsetX,y:y+offsetY,consignes:zoneGuidelines(id)||''};
+   });
+   res.set('Cache-Control','private, no-store').json(zones);
+  });
+  gate.get('/api/review/merchandising/plan',admin,async(req,res)=>{
+   const plan=await readFile(new URL('../merchandising-plan.b64',import.meta.url),'utf8');
+   res.set('Cache-Control','private, no-store').type('jpeg').send(Buffer.from(plan,'base64'));
+  });
+  gate.get('/api/review/merchandising/template.xlsx',admin,(req,res)=>{
+   const month=req.query.month;
+   if(typeof month!=='string'||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return res.status(400).json({error:'Choisissez un mois valide.'});
+   res.set('Cache-Control','private, no-store').attachment('merchandising-'+month+'.xlsx').send(exportMerchandising([],month));
+  });
+ }
  const universeBoundary=scalingoUniverseBoundary(db,config.allowsPortalUser);
  // Personal attestation uploads retain their own authenticated owner/admin ACL,
  // rather than requiring administrative edit rights on the whole Quality module.

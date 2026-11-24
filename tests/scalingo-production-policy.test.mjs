@@ -39,7 +39,7 @@ test('Initial opening limits logins, existing sessions and invitation activation
  const owner={id:1,email,role:'admin',active:true,must_change:false,password_hash};
  const other={...owner,id:2,email:'other@example.invalid'};
  const db={async query(sql,[key]=[]){
-  if(sql.startsWith('SELECT s.id AS session_id'))return {rows:[key===digest('a'.repeat(43))?owner:other]};
+  if(sql.startsWith('SELECT u.id,u.email,u.role,u.active,u.must_change,s.csrf')||sql.startsWith('SELECT s.id AS session_id'))return {rows:[key===digest('a'.repeat(43))?owner:other]};
   if(sql.startsWith('INSERT INTO login_attempts'))return {rows:[{count:1}]};
   if(sql.startsWith('SELECT * FROM users WHERE email'))return {rows:[key===email?owner:other]};
   if(sql.startsWith('INSERT INTO sessions')&&key)return {rows:[]};
@@ -81,7 +81,7 @@ test('Menu-only opening checks authentication storage and closes module routes',
   if(sql.includes('information_schema')||sql.includes('pg_indexes'))throw Error('Unexpected module schema check');
   return {rows:[]};
  },release(){}};},async query(sql,[key]=[]){
-  if(sql.startsWith('SELECT s.id AS session_id')||sql.startsWith('SELECT u.* FROM sessions'))return {rows:[user]};
+  if(sql.startsWith('SELECT u.id,u.email,u.role,u.active,u.must_change,s.csrf')||sql.startsWith('SELECT s.id AS session_id')||sql.startsWith('SELECT u.* FROM sessions'))return {rows:[user]};
   if(sql.startsWith('SELECT * FROM calendar_cache'))return {rows:[{events:[],synced_at:new Date()}]};
   if(sql.startsWith('SELECT event_id FROM calendar_reminders'))return {rows:[]};
   if(sql.includes('FROM calendar_tasks WHERE user_id'))return {rows:[{id:7,title:'Fixture task',task_date:'2026-11-24',icon:'✅'}]};
@@ -122,6 +122,24 @@ test('Menu-only opening checks authentication storage and closes module routes',
  const session=await fetch(url+'/api/me',{headers});
  assert.equal(session.status,200);
  assert.equal((await session.json()).features.menuOnly,true);
+ const review='/api/review/merchandising/';
+ assert.equal((await fetch(url+review+'zones')).status,401);
+ const reviewZones=await fetch(url+review+'zones',{headers});
+ assert.equal(reviewZones.status,200);
+ const zones=await reviewZones.json();
+ assert.equal(zones.length,30);
+ assert.equal(new Set(zones.map(zone=>zone.code)).size,30);
+ assert.equal(zones.find(zone=>zone.id===24).code,'TG11');
+ assert.equal(zones.filter(zone=>zone.category==='DS').length,2);
+ assert.match(zones[0].consignes,/monoproduit/);
+ const plan=await fetch(url+review+'plan',{headers});
+ assert.equal(plan.headers.get('content-type'),'image/jpeg');
+ assert.equal(Buffer.from(await plan.arrayBuffer()).readUInt16BE(),0xffd8);
+ const workbook=await fetch(url+review+'template.xlsx?month=2026-11',{headers});
+ assert.match(workbook.headers.get('content-disposition'),/merchandising-2026-11.xlsx/);
+ assert.equal(Buffer.from(await workbook.arrayBuffer()).subarray(0,2).toString(),'PK');
+ assert.equal((await fetch(url+review+'zones',{method:'POST',headers})).status,503);
+
  const verify=await fetch(url+'/api/google/verify-calendar',{method:'POST',headers:{...headers,origin:env.APP_URL,'x-csrf-token':user.csrf}});
  assert.equal(verify.status,200);
  assert.deepEqual(await verify.json(),{ok:true});
