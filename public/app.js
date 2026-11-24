@@ -252,7 +252,23 @@ function renderPeople(){
     const options=node('div','','people-admin-tiles');
     const add=node('details');
     add.append(node('summary','Ajouter un collaborateur'),button('Ouvrir le formulaire',()=>{dialog.close();openEditor();},'btn'));
-    options.append(add,renderPeopleExcelImport(dialog));
+    const editPanel=node('details');
+    const label=node('label','Collaborateur');
+    const picker=node('select');picker.id='people-admin-edit-person';label.htmlFor=picker.id;
+    const placeholder=node('option','Choisir un collaborateur');placeholder.value='';picker.append(placeholder);
+    for(const person of people){
+      if(person.role==='admin'&&person.email==='admin-test@portailplus.invalid')continue;
+      const option=node('option',personName(person)+(person.active?'':' · Inactif'));
+      option.value=person.id;picker.append(option);
+    }
+    const open=button('Ouvrir la fiche',()=>{
+      const person=people.find(person=>String(person.id)===picker.value);
+      if(!person)return;
+      dialog.close();void openEmployeeRecord(person);
+    },'btn');
+    open.disabled=true;picker.onchange=()=>{open.disabled=!picker.value;};
+    editPanel.append(node('summary','Modifier / inactiver un collaborateur'),label,picker,open);
+    options.append(add,renderPeopleExcelImport(dialog),editPanel);
     renderEmployeeDocument(options);
     renderInvitationMail(options);
     const testers=node('details','','people-import');
@@ -280,7 +296,7 @@ function renderPeople(){
       else if(p.isSelf){const mine=button(p.firstName+' · Ma fiche',()=>openMyPayroll(),'person-self');mine.setAttribute('aria-label','Ouvrir ma fiche, '+personName(p));first.append(mine);}else first.textContent=p.firstName;
       tr.append(first,last,phone);if(isAdmin){const state=!p.active?'Sans accès':p.passwordConfigured?'Accès activé':p.temporaryPasswordRequired?'Mot de passe provisoire':p.invitationSentAt?'Invitation envoyée':'Sans accès';const cell=node('td'),badge=node('span',state,'access-state '+(state==='Accès activé'?'active':state==='Invitation envoyée'?'pending':''));cell.append(badge);if(p.active&&!p.passwordConfigured&&p.invitationSentAt&&Date.now()-new Date(p.invitationSentAt).getTime()>72*3600000)cell.append(node('small','Lien expiré · renvoyer une invitation','field-note'));tr.append(cell);}
       if(isAdmin){
-        const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));if(!testAdmin)actions.append(edit);
+        const actions=node('td','','actions');const edit=button('Modifier',()=>openEmployeeRecord(p));edit.setAttribute('aria-label','Modifier '+personName(p));if(!session.features?.menuOnly&&!testAdmin)actions.append(edit);
         if(active&&!p.passwordConfigured&&!testAdmin){
           const sendStatus=node('small','','invitation-status');sendStatus.setAttribute('role','status');sendStatus.setAttribute('aria-live','polite');
           const invite=button('Envoyer demande de connexion',async()=>{
@@ -306,7 +322,7 @@ function renderPeople(){
         }
         if(p.role!=='admin'||testAdmin&&active){
           const canRetire=(session.features?.menuOnly===true&&p.role==='employee')||!session.features?.employeeAccountsReadOnly||session.features?.scalingoEmployeeLifecycle===true||p.previewManualRecord;
-          if(active&&canRetire){const remove=button(session.features?.scalingoEmployeeLifecycle?'Désactiver':'Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
+          if(active&&canRetire&&!session.features?.menuOnly){const remove=button(session.features?.scalingoEmployeeLifecycle?'Désactiver':'Retirer',()=>{removeId=p.id;q('#removeText').textContent=personName(p)+' sera déplacé dans les collaborateurs inactifs. Son accès au portail sera désactivé. Vous pourrez le réactiver.';q('#removeDialog').showModal();},'btn small danger');remove.setAttribute('aria-label','Retirer '+personName(p));actions.append(remove);}
           else if(!active){
             let restore=null;if(canRetire){restore=button('Réactiver',async()=>{restore.disabled=true;try{await api('/api/users/'+p.id+'/restore','POST');await reloadPeople('Collaborateur réactivé.');}catch(e){error(e);restore.disabled=false;}});restore.setAttribute('aria-label','Réactiver '+personName(p));actions.append(restore);}
             const permanent=button('Supprimer définitivement',async()=>{
@@ -400,7 +416,7 @@ async function openEmployeeRecord(person){
   if(session?.user.role!=='admin')return;
   const request=++employeeRecordRequest,userId=session.user.id;const valid=()=>request===employeeRecordRequest&&currentUniverse==='Collaborateurs'&&session?.user.id===userId;
   setPeopleAddActions(false);q('#feedback').textContent='';q('#content').replaceChildren(node('p','Chargement de la fiche…','field-note'));
-  try{const module=await import('/employee-record.js');if(!valid())return;await module.renderEmployeeRecord({isAdmin:session?.user.role==='admin',container:q('#content'),api,person,onClose:()=>reloadPeople(),onSaved:async(result,message)=>{await reloadPeople(message);},onPayroll:openMyPayroll,universes:[...initialTileOrder,'Procédures'],isCurrent:valid});}
+  try{const module=await import('/employee-record.js');if(!valid())return;await module.renderEmployeeRecord({isAdmin:session?.user.role==='admin',container:q('#content'),api,person,allowLifecycle:session.features?.menuOnly===true&&person.role==='employee',onClose:()=>reloadPeople(),onSaved:async(result,message)=>{await reloadPeople(message);},onPayroll:openMyPayroll,universes:[...initialTileOrder,'Procédures'],isCurrent:valid});}
   catch(e){if(valid()){q('#content').replaceChildren(node('p',e.message,'error'),button('Retour à l’annuaire',()=>reloadPeople()));}}
 }
 async function openMyPayroll(){

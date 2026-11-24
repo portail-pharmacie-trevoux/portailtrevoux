@@ -1,7 +1,7 @@
 import {employeeSections} from './employee-fields.js';
 const el=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;};
 const control=(text,click,cls='btn small')=>{const b=el('button',text,cls);b.type='button';b.onclick=click;return b;};
-export async function renderEmployeeRecord({container,api,person,onClose,onSaved,onPayroll,universes,draft=null,isCurrent=()=>true,isAdmin=false}) {
+export async function renderEmployeeRecord({container,api,person,onClose,onSaved,onPayroll,universes,draft=null,isCurrent=()=>true,isAdmin=false,allowLifecycle=false}) {
   const loaded=person.id?await api('/api/users/'+person.id+'/details'):{person,details:{},detailsRevision:0,previewRestrictions:person.previewRestrictions};if(!isCurrent())return;
   const restrictions=loaded.previewRestrictions;
   const p={...loaded.person},details={...loaded.details},inputs=new Map(),basicInputs=new Map(),isAdministrator=p.role==='admin';
@@ -21,14 +21,14 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
     adminMenu.onkeydown=e=>{if(e.key==='Escape'){adminMenu.open=false;summary.focus();e.preventDefault();}};
     root.addEventListener('click',e=>{if(adminMenu.open&&!adminMenu.contains(e.target))adminMenu.open=false;});
   }
-  if(p.id&&restrictions?.lifecycleAllowed&&!isAdministrator&&adminMenu){
+  if(p.id&&(restrictions?.lifecycleAllowed||allowLifecycle)&&!isAdministrator&&adminMenu){
     const lifecycleStatus=adminStatus;
-    const state=control(p.active===false?'Réactiver le collaborateur':'Désactiver le collaborateur',async()=>{
+    const state=control(p.active===false?'Réactiver le collaborateur':allowLifecycle?'Inactiver':'Désactiver le collaborateur',async()=>{
       adminMenu.open=false;
       if(!confirm((p.active===false?'Réactiver ':'Désactiver ')+[p.firstName,p.lastName].join(' ')+' ? Les informations et historiques seront conservés.'))return;
       state.disabled=true;try{const result=await api('/api/users/'+p.id+(p.active===false?'/restore':''),p.active===false?'POST':'DELETE');await onSaved(result,p.active===false?'Collaborateur réactivé.':'Collaborateur désactivé.');}catch(e){lifecycleStatus.textContent=e.message;adminMenu.open=true;state.disabled=false;}
     },'btn small');adminActions.append(state);
-    if(p.active===false){const remove=control('Supprimer le collaborateur',async()=>{
+    if(p.active===false&&restrictions?.lifecycleAllowed){const remove=control('Supprimer le collaborateur',async()=>{
       adminMenu.open=false;
       const module=await import('/employee-delete-dialog.js');const word=await module.confirmEmployeeDeletion([p.firstName,p.lastName].join(' '));if(word===null)return;
       remove.disabled=true;try{const result=await api('/api/users/'+p.id+'/permanent','DELETE',{confirmation:p.id,confirmationText:word});await onSaved(result,'Collaborateur supprimé définitivement.');}catch(e){lifecycleStatus.textContent=e.message;adminMenu.open=true;remove.disabled=false;}
