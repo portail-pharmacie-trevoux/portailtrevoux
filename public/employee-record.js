@@ -64,6 +64,15 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   otherJob.value=custom||details.jobOther||'';
   if(savedJob&&!standardJobs.includes(savedJob))job.value='Autres précisez';
   const toggleJob=()=>{const other=job.value==='Autres précisez';otherGroup.hidden=!other;otherGroup.style.display=other?'':'none';otherJob.required=other;otherJob.disabled=!other;};job.onchange=toggleJob;toggleJob();
+  const capabilityRow=el('tr'),capabilityTitle=el('th','Capacités particulières'),capabilityCell=el('td');
+  capabilityTitle.scope='row';
+  const capabilityFields=el('div');capabilityFields.setAttribute('role','group');capabilityFields.setAttribute('aria-label','Capacités particulières');
+  capabilityFields.style.cssText='display:flex;flex-wrap:wrap;gap:8px 20px';
+  for(const [key,label] of [["canVaccinate","Vaccination"],["canPerformTrod","TROD"],["canPreparePillboxes","Piluliers"]]){
+    const item=el('label'),input=el('input');input.type='checkbox';input.checked=details[key]===true;
+    item.append(input,' '+label);capabilityFields.append(item);inputs.set(key,{field:{type:'checkbox'},input});
+  }
+  capabilityCell.append(capabilityFields);capabilityRow.append(capabilityTitle,capabilityCell);job.closest('tr').after(capabilityRow);
   employeeSections.forEach((s,index)=>section(s.title,s.fields,details,inputs,index===1));
   const account=section('Connexion personnelle au portail',[
     {key:'email',label:'Adresse e-mail de connexion',type:'email'},
