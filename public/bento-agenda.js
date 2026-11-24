@@ -1,10 +1,14 @@
+const leaveTheme=['Congé',/conge|absen[ct]|vacances/,'🌴'];
 const themes=[
   ['Formation',/formation|webinaire|atelier/,'🎓'],
   ['Réunion',/reunion|brief|point d'equipe/,'💬'],
   ['Rendez-vous',/\brdv\b|rendez[ -]vous/,'🕒'],
   ['Livraison',/livraison|reception/,'📦'],
-  ['Congé',/conge|absence|vacances/,'🌴']
+  leaveTheme
 ];
+export function isLeaveEvent(event,normalizeSearch){
+  return leaveTheme[1].test(normalizeSearch([event.title,event.location,event.description].filter(Boolean).join(' ')));
+}
 const dayLabels=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 const dateLabel=new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'short',timeZone:'Europe/Paris'});
 const resultDateLabel=new Intl.DateTimeFormat('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Paris'});

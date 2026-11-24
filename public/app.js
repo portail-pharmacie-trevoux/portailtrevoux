@@ -794,7 +794,7 @@ async function refreshBentoAgendaHome(){
     if(request!==bentoAgendaHomeRequest||session?.user.id!==userId)return;
     const today=parisDay();
     const events=data.events||[];
-    const entries=module.dayEntries(events.filter(event=>!event.personalTask),today,eventDays);
+    const entries=module.dayEntries(events.filter(event=>!event.personalTask&&!module.isLeaveEvent(event,normalizeSearch)),today,eventDays);
     entries.push(...events.filter(event=>event.personalTask&&!event.sourceEventId&&module.personalTaskDay(event,today,moveDay)===today));
     const list=node('span','','bento-agenda-today');
     const upcoming=(data.events||[]).filter(event=>event.personalTask&&!event.sourceEventId&&!event.completed&&event.start?.date>today&&event.start.date<=moveDay(today,7)).sort((a,b)=>a.start.date.localeCompare(b.start.date));
