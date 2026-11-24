@@ -83,6 +83,8 @@ test('Menu-only opening checks authentication storage and closes module routes',
  },release(){}};},async query(sql,[key]=[]){
   if(sql.startsWith('SELECT u.id,u.email,u.role,u.active,u.must_change,s.csrf')||sql.startsWith('SELECT s.id AS session_id')||sql.startsWith('SELECT u.* FROM sessions'))return {rows:[user]};
   if(sql.startsWith('SELECT * FROM calendar_cache'))return {rows:[{events:[],synced_at:new Date()}]};
+  if(sql.startsWith('SELECT * FROM users WHERE id='))return {rows:key===user.id?[{...user,name:'Nicolas Marchand',first_name:'Nicolas',last_name:'Marchand'}]:[]};
+  if(sql.startsWith('SELECT payload,revision,updated_at FROM employee_details'))return {rows:[]};
   if(sql.includes("WHERE directory_key LIKE 'scalingo-new-directory:%'")){assert.equal(key,user.id);return {rows:[{...user,name:'Nicolas Marchand',first_name:'Nicolas',last_name:'Marchand',password_hash:'fixture'}]};}
   if(sql.includes("AND directory_key LIKE 'scalingo-new-directory:%'"))return {rows:[]};
   if(sql.startsWith('SELECT event_id FROM calendar_reminders'))return {rows:[]};
@@ -128,6 +130,11 @@ test('Menu-only opening checks authentication storage and closes module routes',
  const directory=await (await fetch(url+'/api/users',{headers})).json();
  assert.deepEqual(directory.map(row=>row.id),[user.id]);
  assert.equal(directory[0].isSelf,true);
+ const ownDetails=await fetch(url+'/api/users/'+user.id+'/details',{headers});
+ assert.equal(ownDetails.status,200);
+ assert.equal((await ownDetails.json()).person.id,user.id);
+ assert.equal((await fetch(url+'/api/users/'+user.id,{method:'PUT',headers})).status,403);
+ assert.equal((await fetch(url+'/api/users/'+user.id,{method:'DELETE',headers})).status,404);
  assert.equal((await fetch(url+'/api/users/12/details',{headers})).status,404);
  assert.equal((await fetch(url+'/api/users/12',{method:'DELETE',headers})).status,404);
  assert.equal((await fetch(url+'/api/users',{method:'POST',headers})).status,403);
