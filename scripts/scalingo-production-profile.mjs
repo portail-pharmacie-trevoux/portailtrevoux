@@ -81,8 +81,9 @@ export async function createScalingoProductionApp(db,env,adapters={}){
    const request=req.method+' '+path;
    const sessionRoute=['GET /api/me','HEAD /api/me','POST /api/login','POST /api/logout','GET /api/quick-links','HEAD /api/quick-links','PUT /api/quick-links'].includes(request);
    const pageOrAsset=['GET','HEAD'].includes(req.method)&&!/^\/(?:api|auth)(?:\/|$)/.test(path);
-   const calendarVerification=config.capabilities.calendar&&request==='POST /api/google/verify-calendar';
-   if(!sessionRoute&&!pageOrAsset&&!calendarVerification)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
+   const calendarCallback=request==='GET /auth/google/callback'&&!/^(?:mail_|youtube_)/.test(String(req.query.state||''));
+   const calendarConnection=config.capabilities.calendar&&(['POST /api/google/verify-calendar','POST /api/google/connect'].includes(request)||calendarCallback);
+   if(!sessionRoute&&!pageOrAsset&&!calendarConnection)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
   }
   if(req.path.startsWith('/staging-')||req.path.startsWith('/api/staging-')||req.path==='/api/collaborateurs/import')return res.status(403).json({error:'Outil de préparation indisponible en production.'});
   const p=req.path,cap=config.capabilities;

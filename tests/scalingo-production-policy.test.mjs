@@ -115,8 +115,10 @@ test('Menu-only opening checks authentication storage and closes module routes',
  assert.equal(verify.status,200);
  assert.deepEqual(await verify.json(),{ok:true});
  assert.deepEqual(googleCalls,['https://openidconnect.googleapis.com/v1/userinfo','https://www.googleapis.com/calendar/v3/calendars/selected-calendar/events?maxResults=1']);
- for(const path of ['/api/google/calendars','/api/calendar','/API/USERS','/auth/google/callback']){
+ for(const path of ['/api/google/calendars','/api/calendar','/API/USERS','/auth/google/callback?state=mail_fixture','/auth/google/callback?state=youtube_fixture']){
   assert.equal((await fetch(url+path,{headers})).status,503,path);
  }
+ assert.equal((await fetch(url+'/auth/google/callback')).status,401);
+ assert.equal((await fetch(url+'/api/google/connect',{method:'POST',headers:{...headers,origin:env.APP_URL}})).status,403);
  assert.equal((await fetch(url+'/api/invitations/accept',{method:'POST',headers})).status,503);
 });

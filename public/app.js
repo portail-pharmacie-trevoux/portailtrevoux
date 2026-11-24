@@ -182,7 +182,17 @@ function openCalendarVerification(){
     }catch(error){status.textContent=error.message;}
     finally{check.disabled=false;}
   },'btn primary');
-  q('#content').replaceChildren(check,status);
+  const reconnect=button('Renouveler l’autorisation Google Agenda',async()=>{
+    reconnect.disabled=true;
+    try{
+      const authorization=await api('/api/google/connect','POST',{});
+      window.location.assign(authorization.url);
+    }catch(error){status.textContent=error.message;reconnect.disabled=false;}
+  },'btn');
+  const actions=node('div','','action-row');
+  actions.append(check,reconnect);
+  if(new URLSearchParams(location.search).get('google')==='connected')status.textContent='Autorisation renouvelée. Vous pouvez tester la connexion.';
+  q('#content').replaceChildren(actions,status);
 }
 async function openUniverse(name,{menuRoot=false}={}){
   if(session?.features?.menuOnly){
@@ -386,7 +396,7 @@ setInterval(()=>{if(session&&!session.user.mustChange&&currentUniverse==='Agenda
 (async()=>{
  const invitation=location.hash.match(/^#invitation=([-\w]{43})$/)?.[1];
  if(invitation){history.replaceState(null,'',location.pathname);await Promise.resolve();showLogin();try{const module=await import('/invitation.js');await module.renderInvitation({container:q('#login'),token:invitation,api,onComplete:result=>{session=result;afterLogin();}});}catch(e){q('#global-message').textContent=e.message;}return;}
- try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('mail=')){await openUniverse('Collaborateurs');q('#feedback').textContent=location.search.includes('refused')?'Autorisation Gmail annulée.':'Gmail connecté. Vous pouvez envoyer les demandes de connexion.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('youtube=')){await openUniverse('Fun');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation YouTube annulée.';else q('#feedback').textContent='YouTube connecté. Cliquez sur son logo pour choisir votre playlist.';history.replaceState(null,'','/');}}catch{showLogin();}})();
+ try{session=await api('/api/me');afterLogin();if(!session.user.mustChange&&location.search.includes('google=')){await openUniverse('Agenda');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation Google annulée.';history.replaceState(null,'',session.features?.menuOnly?'/trevoux':'/');}else if(!session.user.mustChange&&location.search.includes('mail=')){await openUniverse('Collaborateurs');q('#feedback').textContent=location.search.includes('refused')?'Autorisation Gmail annulée.':'Gmail connecté. Vous pouvez envoyer les demandes de connexion.';history.replaceState(null,'','/');}else if(!session.user.mustChange&&location.search.includes('youtube=')){await openUniverse('Fun');if(location.search.includes('refused'))q('#feedback').textContent='Autorisation YouTube annulée.';else q('#feedback').textContent='YouTube connecté. Cliquez sur son logo pour choisir votre playlist.';history.replaceState(null,'','/');}}catch{showLogin();}})();
 
 const initialTileOrder=[...document.querySelectorAll('.grid [data-universe]')].map(b=>b.dataset.universe);
 let draftTileOrder=[],draftHiddenTiles=new Set();

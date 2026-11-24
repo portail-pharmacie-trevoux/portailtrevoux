@@ -263,7 +263,8 @@ export function createApp(db,config) {
     const {rows}=await db.query('UPDATE sessions SET oauth_state=NULL,oauth_expires=NULL,oauth_verifier=NULL WHERE id=$1 AND oauth_state=$2 AND oauth_expires>now() RETURNING $3::text AS verifier',[req.auth.session_id,digest(state),(await db.query('SELECT oauth_verifier FROM sessions WHERE id=$1',[req.auth.session_id])).rows[0]?.oauth_verifier]);
     if(!state||!rows[0])throw fail(400,'Autorisation expirée. Relancez la connexion Google.');
     const forYouTube=state.startsWith('youtube_'),forMail=state.startsWith('mail_');
-    if(req.query.error)return res.redirect(forMail?'/?mail=refused':forYouTube?'/?youtube=refused':'/?google=refused');
+    const calendarReturn=config.menuOnly?'/trevoux':'/';
+    if(req.query.error)return res.redirect(forMail?'/?mail=refused':forYouTube?'/?youtube=refused':calendarReturn+'?google=refused');
     if(typeof req.query.code!=='string')throw fail(400,'Autorisation Google invalide.');
     const oauthFetch=config.oauthFetch||calendarFetch;
     const result=await oauthFetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({client_id:config.googleId,client_secret:config.googleSecret,code:req.query.code,grant_type:'authorization_code',redirect_uri:callback,code_verifier:rows[0].verifier}),signal:AbortSignal.timeout(20000)});
@@ -282,7 +283,7 @@ export function createApp(db,config) {
     if(!scopes.has('https://www.googleapis.com/auth/calendar.events.readonly')||!scopes.has('https://www.googleapis.com/auth/calendar.calendarlist.readonly'))throw fail(400,'Autorisez la lecture des agendas et des événements.');
     if(!tokens.refresh_token)throw fail(400,'Autorisation automatique absente. Relancez la connexion Google.');
     tokens.expires_at=Date.now()+tokens.expires_in*1000;
-    await setSetting('google_tokens',encrypt(tokens,secret));res.redirect('/?google=connected');
+    await setSetting('google_tokens',encrypt(tokens,secret));res.redirect(calendarReturn+'?google=connected');
   });
   const connectionHealth=createGoogleConnectionHealth({getSetting,setSetting,mailer,configured:!!(config.googleId&&config.googleSecret),readCalendar:async()=>({tokens:!!await getSetting('google_tokens'),calendarId:await getSetting('calendar_id'),error:await getSetting('sync_error')||'',syncedAt:(await db.query('SELECT synced_at FROM calendar_cache WHERE singleton=TRUE')).rows[0]?.synced_at})});
   app.get('/api/integrations/google-health',auth,ready,admin,async(req,res)=>{res.set('Cache-Control','no-store');res.json(await connectionHealth.status());});
