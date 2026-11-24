@@ -158,3 +158,10 @@
 .module-review-panel>div:not([hidden])>h3:first-child{grid-column:1;grid-row:1}
 .module-review-panel>div:not([hidden])>.module-review-admin{grid-column:2;grid-row:1;max-width:min(100%,420px)}
 @media(max-width:640px){.people-workspace.people-workspace-admin-only{grid-template-columns:1fr}.people-workspace-admin-only>.people-workspace-manage{grid-column:1}.module-review-panel>div:not([hidden]){grid-template-columns:minmax(0,1fr)}.module-review-panel>div:not([hidden])>h3:first-child,.module-review-panel>div:not([hidden])>.module-review-admin{grid-column:1;grid-row:auto}.module-review-panel>div:not([hidden])>.module-review-admin{justify-self:end}}
+
+/* Tuile Administration compacte, rapprochée de l’en-tête. */
+.people-workspace-admin-only>.people-workspace-manage{padding:10px 14px}
+.people-workspace-admin-only>.people-workspace-manage h3{margin:0 0 6px;font-size:1rem;line-height:1.25}
+.people-workspace-admin-only>.people-workspace-manage .btn{padding:7px 12px}
+@media(min-width:901px){.people-workspace.people-workspace-admin-only{margin-top:-24px}}
+
