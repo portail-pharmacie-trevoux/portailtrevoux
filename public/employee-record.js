@@ -110,7 +110,12 @@ export async function renderEmployeeRecord({container,api,person,onClose,onSaved
   permissions.append(el('p',isAdministrator?'Ce compte administrateur conserve l’accès et la gestion de tous les univers.':'Les données des collaborateurs et les connexions Google restent gérées par l’administrateur. Les droits de modification s’appliquent aux outils de contenu disponibles ; les autres univers sont prêts à recevoir leurs futurs éditeurs.','field-note'));form.append(permissions);
   const status=el('p','','error');status.id='employee-record-status';status.setAttribute('role','alert');
   if(draft){const label=el('label'),confirmed=el('input');confirmed.type='checkbox';confirmed.required=true;label.append(confirmed,' J’ai vérifié l’identité du salarié et les informations importées sur le document original.');form.append(label);}
-  const actions=el('div','','employee-record-save');const save=el('button','Enregistrer la fiche','btn primary');save.type='submit';if(restrictions?.profileReadOnly){save.disabled=true;form.append(el('p','Ce compte administrateur est protégé et reste en consultation seule.','field-note'));}actions.append(control('Annuler',onClose),save);form.append(status,actions);root.append(form);container.append(root);
+  const actions=el('div','','employee-record-save');const save=el('button','Enregistrer la fiche','btn primary');save.type='submit';
+  if(window.PortalUX?.savePage&&container.closest('#detail')?.querySelector('.portal-navigation-save')){
+    save.hidden=true;
+    save.style.display='none';
+  }
+  if(restrictions?.profileReadOnly){save.disabled=true;form.append(el('p','Ce compte administrateur est protégé et reste en consultation seule.','field-note'));}actions.append(control('Annuler',onClose),save);form.append(status,actions);root.append(form);container.append(root);
   if(restrictions?.profileReadOnly)form.querySelectorAll('input,select,textarea').forEach(input=>input.disabled=true);
   form.onsubmit=async e=>{
     e.preventDefault();status.textContent='';save.disabled=true;
