@@ -3,7 +3,7 @@
 #home .bento-menu .tile-group+.tile-group{margin-top:12px}
 #home .bento-menu .primary-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
 #home .bento-menu .medium-tiles{grid-template-columns:repeat(5,minmax(0,1fr))}
-#home .bento-menu .small-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+#home .bento-menu .small-tiles{grid-template-columns:repeat(5,minmax(0,1fr))}
 #home .bento-menu .tile{--accent:#5e3c98;--tint:#f0e8fa;isolation:isolate;position:relative;display:block;align-content:start;width:100%;min-width:0;min-height:0;overflow:hidden;text-align:left;border:1px solid color-mix(in srgb,var(--accent) 22%,white);border-radius:15px;padding:14px 16px;background:linear-gradient(125deg,var(--tint),#fff);color:#28213b;box-shadow:none;transition:transform .18s,box-shadow .18s,border-color .18s}
 #home .bento-menu .tile.hidden{display:none}
 #home .bento-menu .tile:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 9px 22px color-mix(in srgb,var(--accent) 18%,transparent)}
@@ -30,6 +30,7 @@
 #home .bento-menu :is(.planning,.people,.orders){--accent:#2566ad;--tint:#e9f2fe}
 #home .bento-menu :is(.messages,.docs){--accent:#7150b7;--tint:#f0e8fa}
 #home .bento-menu :is(.lab,.contacts){--accent:#087b91;--tint:#e7f6f9}
+#home .bento-menu .challenges{--accent:#805618;--tint:#fff4d9}
 #home .bento-menu :is(.merch,.fun){--accent:#a65320;--tint:#fff0e5}
 #home .bento-menu .hr{--accent:#a33368;--tint:#faeaf1}
 @media(max-width:1050px),(max-aspect-ratio:4/3){

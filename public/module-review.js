@@ -52,7 +52,9 @@ const modules = {
     'Fiche contact': ['Nom', 'Catégorie', 'Organisme', 'Téléphone@tel', 'Adresse e-mail@email', 'Adresse@textarea', 'Site web@url', 'Document@file']
   },
   Fun: {
-    'Musique': ['Rechercher@search', 'Titre', 'Artiste'],
+    'Musique': ['Rechercher@search', 'Titre', 'Artiste']
+  },
+  Challenges: {
     'Challenges': ['Intitulé', 'Laboratoire', 'Mois@month', 'Objectif', 'Participants', 'Modalités@textarea', 'Document@file']
   }
 };
@@ -111,7 +113,9 @@ const administration = {
     'Fiche contact': ['Enregistrer le contact', 'Gérer les pièces jointes', 'Supprimer le contact']
   },
   Fun: {
-    'Musique': ['Importer des morceaux (CSV)', 'Exporter les titres sélectionnés en CSV', 'Configurer YouTube'],
+    'Musique': ['Importer des morceaux (CSV)', 'Exporter les titres sélectionnés en CSV', 'Configurer YouTube']
+  },
+  Challenges: {
     'Challenges': ['Créer un challenge', 'Gérer les participants', 'Consulter les résultats', 'Supprimer un challenge']
   }
 };
