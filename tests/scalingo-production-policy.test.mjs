@@ -141,19 +141,27 @@ test('Menu-only opening checks authentication storage and closes module routes',
  assert.equal((await fetch(url+'/api/collaborateurs/registration-form',{headers})).headers.get('content-type'),'application/pdf');
 
  const {zip}=await import('../order-export.mjs');
- const makeWorkbook=(email)=>zip({'xl/worksheets/sheet1.xml':'<worksheet><sheetData>'+[
-  ['Nom','Prénom','Téléphone','E-mail'],['Exemple','Camille','0612345678',email]
+ const makeWorkbook=(email,mixed=false)=>zip({'xl/worksheets/sheet1.xml':'<worksheet><sheetData>'+[
+  ['Nom','Prénom','Téléphone','E-mail'],['Exemple','Camille','0612345678',email],...(mixed?[['Nouvelle','Lou','0612345679','lou@example.invalid'],['Nouvelle','Lou','0612345679','lou@example.invalid']]:[])
  ].map((values,i)=>'<row>'+values.map((value,j)=>'<c r="'+String.fromCharCode(65+j)+(i+1)+'" t="inlineStr"><is><t>'+value+'</t></is></c>').join('')+'</row>').join('')+'</sheetData></worksheet>'});
  const excel=(mode,body)=>fetch(url+'/api/collaborateurs/import-excel?mode='+mode,{method:'POST',headers:{...headers,origin:env.APP_URL,'x-csrf-token':user.csrf,'content-type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},body});
  const workbookPreview=await excel('preview',makeWorkbook('camille@example.invalid'));
  assert.equal(workbookPreview.status,200);
  assert.deepEqual((await workbookPreview.json()).people,[{lastName:'Exemple',firstName:'Camille',phone:'0612345678',email:'camille@example.invalid'}]);
  assert.equal(queries.some(sql=>sql.includes('INSERT INTO users')),false);
- assert.equal((await excel('import',makeWorkbook(email))).status,409);
+ const allDuplicates=await excel('import',makeWorkbook(email));
+ assert.equal(allDuplicates.status,200);
+ assert.equal((await allDuplicates.json()).count,0);
  assert.equal(queries.some(sql=>sql.includes('INSERT INTO users')),false);
- const imported=await excel('import',makeWorkbook('camille@example.invalid'));
+ const mixedPreview=await (await excel('preview',makeWorkbook(email,true))).json();
+ assert.equal(mixedPreview.people.length,1);
+ assert.deepEqual(mixedPreview.skipped.map(row=>row.reason),['Adresse e-mail déjà utilisée','Doublon dans le fichier']);
+ const imported=await excel('import',makeWorkbook(email,true));
  assert.equal(imported.status,200);
- assert.deepEqual(await imported.json(),{count:1});
+ const outcome=await imported.json();
+ assert.equal(outcome.count,1);
+ assert.equal(outcome.skipped.length,2);
+ assert.equal(queries.filter(sql=>sql.includes('INSERT INTO users')).length,1);
  const review='/api/review/merchandising/';
  assert.equal((await fetch(url+review+'zones')).status,401);
  const reviewZones=await fetch(url+review+'zones',{headers});

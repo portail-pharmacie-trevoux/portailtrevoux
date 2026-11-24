@@ -120,21 +120,28 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const result=await transaction(async client=>{
       if(req.query.mode==='import')await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
       const existing=(await client.query('SELECT id,email,first_name,last_name,name,directory_key FROM users')).rows;
-      const emails=new Set(existing.map(row=>row.email?.trim().toLowerCase()).filter(Boolean));
-      const names=new Set(existing.filter(row=>row.id===req.auth.id||row.directory_key?.startsWith('scalingo-new-directory:')).map(row=>normalizeName(row.first_name&&row.last_name?row.first_name+' '+row.last_name:row.name)));
+      const normalizeIdentity=row=>normalizeName(row.first_name&&row.last_name?row.first_name+' '+row.last_name:row.name);
+      const existingEmails=new Set(existing.map(row=>row.email?.trim().toLowerCase()).filter(Boolean));
+      const existingNames=new Set(existing.filter(row=>row.id===req.auth.id||row.directory_key?.startsWith('scalingo-new-directory:')).map(normalizeIdentity));
+      const names=new Set(),emails=new Set(),pending=[],skipped=[];
       for(const row of rows){
         const name=normalizeName(row.name);
-        if(names.has(name)||row.email&&emails.has(row.email))throw fail(409,'Fiche '+(row.line-1)+' : nom ou e-mail déjà utilisé. Aucun import effectué.');
+        const reason=row.email&&existingEmails.has(row.email)?'Adresse e-mail déjà utilisée':
+          existingNames.has(name)?'Fiche déjà présente dans l’annuaire':
+          names.has(name)||row.email&&emails.has(row.email)?'Doublon dans le fichier':null;
+        if(reason){skipped.push({...row,reason});continue;}
         names.add(name);
         if(row.email)emails.add(row.email);
+        pending.push(row);
       }
-      if(req.query.mode==='preview')return {people:rows.map(({firstName,lastName,phone,email})=>({firstName,lastName,phone,email}))};
-      for(const row of rows){
+      const format=({firstName,lastName,phone,email,reason})=>({firstName,lastName,phone,email,...(reason?{reason}:{})});
+      if(req.query.mode==='preview')return {people:pending.map(format),skipped:skipped.map(format)};
+      for(const row of pending){
         await client.query(`INSERT INTO users(name,first_name,last_name,phone,email,active,role,rights,edit_rights,permissions_configured,directory_key)
           VALUES($1,$2,$3,$4,$5,TRUE,'employee',$6::jsonb,$7::jsonb,TRUE,$8)`,
           [row.name,row.firstName,row.lastName,row.phone,row.email,JSON.stringify(['Agenda','Actualités']),JSON.stringify(['Actualités']),'scalingo-new-directory:'+randomUUID()]);
       }
-      return {count:rows.length};
+      return {count:pending.length,skipped:skipped.map(format)};
     });
     res.set('Cache-Control','private, no-store').json(result);
   });

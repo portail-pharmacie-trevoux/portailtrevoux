@@ -355,21 +355,21 @@ function renderPeopleExcelImport(dialog){
       if(!response.ok)throw Error(result.error||'Import impossible.');
       if(mode==='import'){
         selected=null;confirmImport.hidden=true;dialog.close();
-        await reloadPeople(result.count+' fiche(s) importée(s).');
+        await reloadPeople(result.count+' fiche(s) importée(s) · '+result.skipped.length+' doublon(s) exclu(s).');
         return;
       }
       selected=workbook;
       const table=node('table','','people-table');
       const header=table.createTHead().insertRow();
-      for(const title of ['Nom','Prénom','Téléphone','E-mail'])header.append(node('th',title));
+      for(const title of ['Nom','Prénom','Téléphone','E-mail','Statut'])header.append(node('th',title));
       const body=table.createTBody();
-      for(const person of result.people){
+      for(const person of [...result.people,...result.skipped]){
         const row=body.insertRow();
-        for(const value of [person.lastName,person.firstName,person.phone,person.email])row.append(node('td',value||'—'));
+        for(const value of [person.lastName,person.firstName,person.phone,person.email,person.reason?'Exclu · '+person.reason:'À importer'])row.append(node('td',value||'—'));
       }
       preview.replaceChildren(table);
-      status.textContent=result.people.length+' fiche(s) prête(s) à importer.';
-      confirmImport.hidden=false;
+      status.textContent=result.people.length+' fiche(s) à importer · '+result.skipped.length+' doublon(s) exclu(s).';
+      confirmImport.hidden=result.people.length===0;
     }catch(error){status.textContent=error.message;}
     finally{file.disabled=confirmImport.disabled=false;validate.disabled=!file.files[0];}
   }
