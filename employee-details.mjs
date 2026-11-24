@@ -32,3 +32,15 @@ export async function saveEmployeeDetails(db,id,details,revision,secret,actor,fa
   await db.query(`INSERT INTO employee_details(user_id,payload,revision,updated_by) VALUES($1,$2,1,$3)
     ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,revision=employee_details.revision+1,updated_by=EXCLUDED.updated_by,updated_at=now()`,[id,encrypt(details,secret),actor]);
 }
+
+export function registerDirectoryCapabilities({app,db,secret,auth,ready,directoryAccess}){
+  const keys=['canVaccinate','canPerformTrod','canPreparePillboxes','hasCqp','hasOncology'];
+  app.get('/api/collaborateurs/capacities',auth,ready,directoryAccess,async(req,res)=>{
+    const {rows}=await db.query('SELECT d.user_id,d.payload FROM employee_details d JOIN users u ON u.id=d.user_id WHERE u.active=TRUE');
+    const capabilities=Object.fromEntries(rows.map(({user_id,payload})=>{
+      const details=decrypt(payload,secret);
+      return [user_id,keys.filter(key=>details?.[key]===true)];
+    }));
+    res.set('Cache-Control','private, no-store').json(capabilities);
+  });
+}
