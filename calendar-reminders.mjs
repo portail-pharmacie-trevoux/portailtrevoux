@@ -19,7 +19,7 @@ export function registerCalendarReminders({app,db,auth,ready,csrf,viewUniverse,f
   if(enabled){
    const cached=(await db.query('SELECT events FROM calendar_cache WHERE singleton=TRUE')).rows[0];
    const event=cached?.events?.find(e=>e.id===eventId);
-   if(!event?.start?.date&&!event?.start?.dateTime)throw fail(404,'Cet événement n’est plus disponible. Actualisez l’agenda.');
+   if(!event||taskCompletion&&!event.start?.date&&!event.start?.dateTime)throw fail(404,'Cet événement n’est plus disponible. Actualisez l’agenda.');
    if(completed!==undefined){
     const {rows}=await db.query(
      "INSERT INTO settings(key,value) SELECT $4,$5 WHERE EXISTS (SELECT 1 FROM calendar_reminders WHERE user_id=$1 AND calendar_id=$2 AND event_id=$3) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value RETURNING value",
