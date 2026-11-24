@@ -83,7 +83,7 @@ export async function createScalingoProductionApp(db,env,adapters={}){
    const pageOrAsset=['GET','HEAD'].includes(req.method)&&!/^\/(?:api|auth)(?:\/|$)/.test(path);
    const calendarCallback=request==='GET /auth/google/callback'&&!/^(?:mail_|youtube_)/.test(String(req.query.state||''));
    const calendarConnection=config.capabilities.calendar&&(['POST /api/google/verify-calendar','POST /api/google/connect'].includes(request)||calendarCallback);
-   const personalAgenda=config.capabilities.calendar&&(['GET /api/calendar','HEAD /api/calendar','POST /api/calendar/tasks'].includes(request)||(req.method==='PATCH'&&/^\/api\/calendar\/tasks\/[1-9]\d*\/completion$/.test(path)));
+   const personalAgenda=config.capabilities.calendar&&(['GET /api/calendar','HEAD /api/calendar','POST /api/calendar/tasks','POST /api/calendar/reminders'].includes(request)||(req.method==='PATCH'&&/^\/api\/calendar\/tasks\/[1-9]\d*\/completion$/.test(path)));
    if(!sessionRoute&&!pageOrAsset&&!calendarConnection&&!personalAgenda)return res.status(503).json({error:'Seul le menu principal est disponible pour le moment.'});
   }
   if(req.path.startsWith('/staging-')||req.path.startsWith('/api/staging-')||req.path==='/api/collaborateurs/import')return res.status(403).json({error:'Outil de préparation indisponible en production.'});
@@ -100,7 +100,7 @@ export async function createScalingoProductionApp(db,env,adapters={}){
  // rather than requiring administrative edit rights on the whole Quality module.
  // Personal tasks retain the user's own Agenda consultation rights.
  gate.use((req,res,next)=>{
-  if(req.method==='POST'&&req.path==='/api/calendar/tasks')return app(req,res,next);
+  if(req.method==='POST'&&['/api/calendar/tasks','/api/calendar/reminders'].includes(req.path))return app(req,res,next);
   if(req.method==='PATCH'&&/^\/api\/calendar\/tasks\/[1-9]\d*\/completion$/.test(req.path))return app(req,res,next);
   next();
  });

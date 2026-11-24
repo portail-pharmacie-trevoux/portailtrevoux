@@ -1,9 +1,9 @@
 const themes=[
-  ['Formation',/formation|webinaire|atelier/],
-  ['Réunion',/reunion|brief|point d'equipe/],
-  ['Rendez-vous',/\brdv\b|rendez[ -]vous/],
-  ['Livraison',/livraison|reception/],
-  ['Congé',/conge|absence|vacances/]
+  ['Formation',/formation|webinaire|atelier/,'🎓'],
+  ['Réunion',/reunion|brief|point d'equipe/,'💬'],
+  ['Rendez-vous',/\brdv\b|rendez[ -]vous/,'🕒'],
+  ['Livraison',/livraison|reception/,'📦'],
+  ['Congé',/conge|absence|vacances/,'🌴']
 ];
 const dayLabels=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 const dateLabel=new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'short',timeZone:'Europe/Paris'});
@@ -81,6 +81,46 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
   const notice=data.error?element('p',data.error+' Les événements affichés peuvent ne pas être à jour.','calendar-warning'):null;
   container.replaceChildren(tasks,...(notice?[notice]:[]),filters,nav,grid);
 
+  const eventText=event=>normalizeSearch([event.title,event.location,event.description].filter(Boolean).join(' '));
+  function appendEvent(row,event,when){
+    row.classList.add('week-agenda-google-event');
+    const checkbox=element('input','','week-agenda-pin');
+    checkbox.type='checkbox';
+    checkbox.checked=event.remind===true;
+    const label='Ajouter aux tâches personnelles · '+(event.title||'Événement');
+    checkbox.setAttribute('aria-label',label);
+    checkbox.title=label;
+    const watermark=element('span',themes.find(([,pattern])=>pattern.test(eventText(event)))?.[2]||'📅','week-agenda-watermark');
+    watermark.setAttribute('aria-hidden','true');
+    row.append(checkbox,watermark,element('span',when,'week-agenda-time'),element('strong',event.title||'Événement'));
+    if(event.location)row.append(element('small',event.location));
+    checkbox.onchange=async()=>{
+      const enabled=checkbox.checked;
+      for(const control of container.querySelectorAll('.week-agenda-pin')){
+        if(control.dataset.eventId===event.id)control.disabled=true;
+      }
+      try{
+        const {task,remind}=await api('/api/calendar/reminders','POST',{eventId:event.id,enabled});
+        if(!isCurrent())return;
+        event.remind=remind;
+        const index=events.findIndex(entry=>entry.sourceEventId===event.id);
+        if(index!==-1)events.splice(index,1);
+        if(task)events.push(task);
+        draw();
+        drawResults();
+        onChanged();
+      }catch(error){if(isCurrent())feedback.textContent=error.message;}
+      finally{
+        for(const control of container.querySelectorAll('.week-agenda-pin')){
+          if(control.dataset.eventId!==event.id)continue;
+          control.disabled=false;
+          control.checked=event.remind===true;
+        }
+      }
+    };
+    checkbox.dataset.eventId=event.id;
+  }
+
   function draw(){
     heading.textContent=dateLabel.format(new Date(week+'T12:00:00Z'))+' – '+dateLabel.format(new Date(moveDay(week,5)+'T12:00:00Z'));
     grid.replaceChildren(...dayLabels.map((label,index)=>{
@@ -100,7 +140,9 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
           check.onchange=async()=>{
             check.disabled=true;
             try{
-              const result=await api('/api/calendar/tasks/'+event.taskId+'/completion','PATCH',{completed:check.checked});
+              const result=event.sourceEventId
+                ?await api('/api/calendar/reminders','POST',{eventId:event.sourceEventId,enabled:true,completed:check.checked})
+                :await api('/api/calendar/tasks/'+event.taskId+'/completion','PATCH',{completed:check.checked});
               event.completed=result.completed;
               if(isCurrent())onChanged();
             }catch(error){
@@ -111,8 +153,7 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
           card.append(row);
         }else{
           const row=element('article','','week-agenda-entry');
-          row.append(element('span',agendaTime(event,day,eventDays),'week-agenda-time'),element('strong',event.title||'Événement'));
-          if(event.location)row.append(element('small',event.location));
+          appendEvent(row,event,agendaTime(event,day,eventDays));
           card.append(row);
         }
       }
@@ -128,7 +169,7 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
     const pattern=themes.find(([name])=>name===selected)?.[1];
     const matches=events.filter(event=>{
       if(!event.start?.date&&!event.start?.dateTime)return false;
-      const text=normalizeSearch([event.title,event.location,event.description].filter(Boolean).join(' '));
+      const text=eventText(event);
       const themeMatch=selected==='tasks'?event.personalTask:!event.personalTask&&(!pattern||pattern.test(text));
       return themeMatch&&terms.every(term=>text.includes(term));
     }).sort((a,b)=>Date.parse(a.start.dateTime||a.start.date)-Date.parse(b.start.dateTime||b.start.date));
@@ -137,8 +178,9 @@ export function renderBentoAgenda({container,data,api,moveDay,eventDays,normaliz
       const day=eventDays(event).start;
       const row=element('li','','week-agenda-entry');
       const date=resultDateLabel.format(new Date(day+'T12:00:00Z'));
-      row.append(element('span',date+' · '+agendaTime(event,day,eventDays),'week-agenda-time'),element('strong',event.title||'Événement'));
-      if(event.location)row.append(element('small',event.location));
+      const when=date+' · '+agendaTime(event,day,eventDays);
+      if(event.personalTask)row.append(element('span',when,'week-agenda-time'),element('strong',event.title));
+      else appendEvent(row,event,when);
       resultList.append(row);
     }
   }
