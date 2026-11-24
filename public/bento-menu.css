@@ -146,3 +146,5 @@
 .people-admin-tiles>details{margin:0;min-width:0;padding:13px;background:#fff;border:1px solid #e4dbed;border-radius:12px}
 .people-admin-tiles>details[open]{grid-column:1/-1}
 @media(max-width:640px){.people-workspace,.people-admin-tiles{grid-template-columns:1fr}}
+.people-workspace.people-workspace-admin-only{grid-template-columns:1fr}
+.people-admin-tiles .tablewrap{max-height:280px;overflow:auto;margin-block:10px}

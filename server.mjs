@@ -69,7 +69,7 @@ export function createApp(db,config) {
   });
   const jsonBody=express.json({limit:'16kb'});
   // Parse larger file uploads only after checking their session and edit rights.
-  app.use((req,res,next)=>req.method==='POST'&&(['/api/music/import','/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/hr/documents/import','/api/quality/training/imports/analyze'].includes(req.path)||/^\/api\/merchandising\/promotions\/[1-9]\d*\/documents$/.test(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
+  app.use((req,res,next)=>req.method==='POST'&&(['/api/music/import','/api/merchandising/documents/import','/api/quality/tiers-payant/import','/api/quality/temperatures/import','/api/news','/api/training/documents/import','/api/procedures/import','/api/collaborateurs/scan','/api/collaborateurs/import-excel','/api/hr/documents/import','/api/quality/training/imports/analyze'].includes(req.path)||/^\/api\/merchandising\/promotions\/[1-9]\d*\/documents$/.test(req.path)||/^\/api\/quality\/services\/\d+\/icon$/.test(req.path)||/^\/api\/contacts\/\d+\/documents$/.test(req.path)||/^\/api\/laboratories\/\d+\/(logo|documents)$/.test(req.path)||/^\/api\/challenges\/\d+\/reports$/.test(req.path))?next():jsonBody(req,res,next));
   app.use((req,res,next)=>{
     if(['POST','PUT','PATCH','DELETE'].includes(req.method) && !allowedOrigins.has(req.get('origin')))return next(fail(403,'Origine de la demande refusée.'));
     next();
@@ -180,7 +180,7 @@ export function createApp(db,config) {
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
   registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeImportFetch??config.employeeScanFetch,requireConsent:config.employeeImportConsentRequired===true,previewRestrictions:config.employeeAccountsReadOnly?{accountReadOnly:config.scalingoAccountManagement!==true}:undefined,uploadParser:express.json({limit:'15mb'})});
-  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true,scalingoAccountManagement:config.scalingoAccountManagement===true,freshDirectory:config.menuOnly===true});
+  registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true,scalingoAccountManagement:config.scalingoAccountManagement===true,freshDirectory:config.menuOnly===true,workbookParser:express.raw({type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',limit:'1mb'})});
   const calendarFetch=config.calendarFetch||fetch;
   async function googleTokens(){
     const stored=await getSetting('google_tokens');if(!stored)throw fail(409,'Google Agenda n’est pas connecté.');

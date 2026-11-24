@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {parseContactsWorkbook} from './contacts-xlsx.mjs';
 import {invitationAddress} from './invitations.mjs';
 import { readFile } from 'node:fs/promises';
 import { readEmployeeDetails, saveEmployeeDetails, validateEmployeeDetails } from './employee-details.mjs';
@@ -51,7 +52,7 @@ export function createFeastCalendar({fetchImpl=fetch,now=()=>new Date()}={}) {
     })().finally(()=>{pending=null;});return pending;
   };
 }
-export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar(),scalingoAccountCreation=false,scalingoAccountManagement=false,freshDirectory=false}) {
+export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar=createFeastCalendar(),scalingoAccountCreation=false,scalingoAccountManagement=false,freshDirectory=false,workbookParser}) {
   app.get('/api/collaborateurs/registration-form',auth,ready,admin,async(req,res)=>{
     const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
     res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
@@ -100,6 +101,43 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     try{await client.query('BEGIN');const result=await work(client);await client.query('COMMIT');return result;}
     catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}
   }
+  if(freshDirectory&&workbookParser)app.post('/api/collaborateurs/import-excel',auth,ready,admin,csrf,workbookParser,async(req,res)=>{
+    if(!['preview','import'].includes(req.query.mode)||!Buffer.isBuffer(req.body))throw fail(400,'Choisissez un fichier Excel .xlsx.');
+    let sheet;
+    try{sheet=parseContactsWorkbook(req.body);}catch(error){throw fail(400,'Fichier Excel illisible. Utilisez un classeur .xlsx de 1 Mo maximum et 100 fiches au plus.');}
+    const columns=sheet[0].map(value=>normalizeName(value).replace(/[^a-z0-9]/g,''));
+    const indices=[['nom','noms'],['prenom','prenoms'],['telephone','tel'],['mail','email','courriel','adressemail','adresseemail','adresseelectronique']].map(names=>columns.findIndex(column=>names.includes(column)));
+    if(indices.includes(-1))throw fail(400,'La première feuille doit contenir Nom, Prénom, Téléphone et E-mail.');
+    const rows=[];
+    for(const [index,cells] of sheet.slice(1).entries()){
+      const [lastName,firstName,phone,email]=indices.map(column=>(cells[column]||'').trim());
+      try{
+        const person=validatePerson({firstName,lastName,phone},fail);
+        const access=await account({email});
+        rows.push({...person,email:access.email,line:index+2});
+      }catch(error){throw fail(400,'Fiche '+(index+1)+' : '+error.message);}
+    }
+    const result=await transaction(async client=>{
+      if(req.query.mode==='import')await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
+      const existing=(await client.query('SELECT id,email,first_name,last_name,name,directory_key FROM users')).rows;
+      const emails=new Set(existing.map(row=>row.email?.trim().toLowerCase()).filter(Boolean));
+      const names=new Set(existing.filter(row=>row.id===req.auth.id||row.directory_key?.startsWith('scalingo-new-directory:')).map(row=>normalizeName(row.first_name&&row.last_name?row.first_name+' '+row.last_name:row.name)));
+      for(const row of rows){
+        const name=normalizeName(row.name);
+        if(names.has(name)||row.email&&emails.has(row.email))throw fail(409,'Fiche '+(row.line-1)+' : nom ou e-mail déjà utilisé. Aucun import effectué.');
+        names.add(name);
+        if(row.email)emails.add(row.email);
+      }
+      if(req.query.mode==='preview')return {people:rows.map(({firstName,lastName,phone,email})=>({firstName,lastName,phone,email}))};
+      for(const row of rows){
+        await client.query(`INSERT INTO users(name,first_name,last_name,phone,email,active,role,rights,edit_rights,permissions_configured,directory_key)
+          VALUES($1,$2,$3,$4,$5,TRUE,'employee',$6::jsonb,$7::jsonb,TRUE,$8)`,
+          [row.name,row.firstName,row.lastName,row.phone,row.email,JSON.stringify(['Agenda','Actualités']),JSON.stringify(['Actualités']),'scalingo-new-directory:'+randomUUID()]);
+      }
+      return {count:rows.length};
+    });
+    res.set('Cache-Control','private, no-store').json(result);
+  });
   app.post('/api/users',auth,ready,admin,csrf,async(req,res)=>{
     managedBody(req.body);
     const d=validatePerson(req.body,fail),a=await account(req.body),role=requestedEmployeeRole(req.body,null,fail),details=req.body.details===undefined?undefined:validateEmployeeDetails(req.body.details,fail);

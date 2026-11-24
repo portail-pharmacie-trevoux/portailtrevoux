@@ -249,28 +249,21 @@ function renderPeople(){
     dialog.setAttribute('aria-label','Administration des collaborateurs');
     const header=node('header');
     header.append(node('h2','Administration'),button('Fermer',()=>dialog.close(),'btn'));
-    const actions=node('div','','people-admin-actions');
-    const start=()=>{dialog.close();openEditor();};
-    actions.append(button('Ajouter un collaborateur manuellement',start,'btn primary'),button('Saisir une fiche de renseignements',start,'btn primary'));
-    const imports=node('details','','people-import');
-    imports.append(node('summary','Importer une liste de collaborateurs'),node('p','La reprise commence par la création manuelle des fiches.','field-note'));
     const options=node('div','','people-admin-tiles');
-    options.append(imports);
+    const add=node('details');
+    add.append(node('summary','Ajouter un collaborateur'),button('Ouvrir le formulaire',()=>{dialog.close();openEditor();},'btn'));
+    options.append(add,renderPeopleExcelImport(dialog));
     renderEmployeeDocument(options);
     renderInvitationMail(options);
     const testers=node('details','','people-import');
     testers.append(node('summary','Profils testeurs externes'),node('p','Les profils testeurs externes ne sont pas ouverts sur cet environnement.','field-note'));
     options.append(testers);
-    dialog.append(header,actions,options);
-    const workspace=node('div','','people-workspace');
-    const add=node('section','','people-workspace-add');
-    add.append(node('h3','Nouvelle fiche'),node('p','Renseignez les informations du collaborateur et ses accès.','field-note'),button('Ajouter un collaborateur',openNewPerson,'btn primary'));
+    dialog.append(header,options);
     const manage=node('section','','people-workspace-manage');
-    manage.append(node('h3','Administration'),node('p','Fiche de renseignements et invitations.','field-note'),button('Ouvrir l’administration',()=>dialog.showModal(),'btn'));
-    workspace.append(add,manage);
+    manage.append(node('h3','Administration'),button('Ouvrir l’administration',()=>dialog.showModal(),'btn'));
+    const workspace=node('div','','people-workspace people-workspace-admin-only');
+    workspace.append(manage);
     content.prepend(workspace,dialog);
-    function openNewPerson(){openEditor();}
-
   }else if(isAdmin){const administration=node('details','','people-administration calendar-tools admin-menu'),body=node('div'),actions=node('div','','people-admin-actions');if(location.hostname==='portailplus-hds.osc-fr1.scalingo.io'){const link=node('a','Administration des droits Scalingo','btn primary');link.href='/staging-universal-rights';actions.append(link);}administration.append(node('summary','Administration'),body);actions.append(button('Ajouter un collaborateur manuellement',()=>openEditor(),'btn primary'),button('Ajouter à partir d’une fiche de renseignements',()=>q('#add-from-sheet').click(),'btn primary'));body.append(actions,node('p','Complétez les téléphones et les accès personnels depuis les fiches. Retirer un collaborateur le place dans les inactifs et désactive sa connexion.','field-note'));renderEmployeeScan(body);renderPeopleImport(body);renderEmployeeDocument(body);renderInvitationMail(body);content.prepend(administration);}
   for(const active of [true,false]){
     const list=people.filter(p=>p.active===active),section=node('section','','people-section'+(!active?' inactive-people':'')+(session.features?.menuOnly?' people-bento-directory':''));
@@ -335,6 +328,54 @@ function renderPeople(){
   }
 }
 
+function renderPeopleExcelImport(dialog){
+  const panel=node('details','','people-import');
+  const label=node('label','Fichier Excel (.xlsx)','field');
+  const file=node('input');file.type='file';file.accept='.xlsx';label.append(file);
+  const status=node('p','','field-note');status.setAttribute('role','status');
+  const preview=node('div','','tablewrap');
+  let selected=null;
+  const validate=button('Prévisualiser',()=>processWorkbook('preview'),'btn');
+  const confirmImport=button('Importer les fiches',()=>processWorkbook('import'),'btn primary');
+  validate.disabled=true;confirmImport.hidden=true;
+  file.onchange=()=>{
+    selected=null;preview.replaceChildren();status.textContent='';
+    confirmImport.hidden=true;validate.disabled=!file.files[0];
+  };
+  async function processWorkbook(mode){
+    const workbook=mode==='preview'?file.files[0]:selected;
+    if(!workbook)return;
+    if(workbook.size>1024*1024){status.textContent='Le fichier doit faire au maximum 1 Mo.';return;}
+    file.disabled=validate.disabled=confirmImport.disabled=true;
+    try{
+      const response=await fetch('/api/collaborateurs/import-excel?mode='+mode,{method:'POST',headers:{
+        'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','X-CSRF-Token':session.csrf
+      },body:workbook});
+      const result=await response.json();
+      if(!response.ok)throw Error(result.error||'Import impossible.');
+      if(mode==='import'){
+        selected=null;confirmImport.hidden=true;dialog.close();
+        await reloadPeople(result.count+' fiche(s) importée(s).');
+        return;
+      }
+      selected=workbook;
+      const table=node('table','','people-table');
+      const header=table.createTHead().insertRow();
+      for(const title of ['Nom','Prénom','Téléphone','E-mail'])header.append(node('th',title));
+      const body=table.createTBody();
+      for(const person of result.people){
+        const row=body.insertRow();
+        for(const value of [person.lastName,person.firstName,person.phone,person.email])row.append(node('td',value||'—'));
+      }
+      preview.replaceChildren(table);
+      status.textContent=result.people.length+' fiche(s) prête(s) à importer.';
+      confirmImport.hidden=false;
+    }catch(error){status.textContent=error.message;}
+    finally{file.disabled=confirmImport.disabled=false;validate.disabled=!file.files[0];}
+  }
+  panel.append(node('summary','Importer une liste de collaborateurs'),node('p','Première feuille avec les colonnes Nom, Prénom, Téléphone et E-mail. Formatez le téléphone en texte pour conserver le zéro initial.','field-note'),label,validate,status,preview,confirmImport);
+  return panel;
+}
 function renderInvitationMail(content){
   const panel=node('details','','invitation-mail');panel.id='invitation-mail';panel.append(node('summary','Messagerie des invitations'),node('p','Expéditeur : pharmacie.trevoux@gmail.com','field-note'));
   const state=node('p','Vérification de la connexion Gmail…','field-note'),controls=node('div','','news-selection-actions');panel.append(state,controls);content.append(panel);
