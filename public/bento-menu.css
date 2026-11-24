@@ -107,3 +107,19 @@
 .week-agenda-google-event{position:relative;isolation:isolate;overflow:hidden;padding-left:32px}
 .week-agenda-pin{position:absolute;top:9px;left:9px;margin:0;accent-color:#176d64;cursor:pointer;z-index:1}
 .week-agenda-watermark{position:absolute;right:8px;bottom:-5px;font-size:36px;opacity:.17;z-index:-1;pointer-events:none}
+
+.module-review{display:grid;gap:16px}
+.module-review-note{margin:0;color:#48566a}
+.module-review-nav{display:flex;flex-wrap:wrap;gap:8px}
+.module-review-nav [aria-pressed="true"]{background:#603b8a;border-color:#603b8a;color:#fff}
+.module-review-panel{padding:clamp(12px,3vw,24px);border:1px solid #dce2f0;border-radius:16px;background:#fff}
+.module-review-panel h3{margin:0 0 16px}
+.module-review-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px}
+.module-review-form .field{margin:0;min-width:0}
+.module-review-form :is(select,input,textarea){max-width:100%}
+.module-review-table{overflow:auto;margin-top:18px}
+.module-review-table table{width:100%;border-collapse:collapse}
+.module-review-table :is(th,td){padding:10px;border-bottom:1px solid #dce2f0;text-align:left}
+.module-review-table th{background:#f4effa;white-space:nowrap}
+.module-review-zones{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}
+.module-review-zones li{border-radius:8px;background:#f4effa;padding:6px 10px}

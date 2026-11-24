@@ -112,7 +112,7 @@ function showHome(){
   applyTileVisibility();
   if(q('#home .bento-menu'))void refreshBentoAgendaHome();
   if(session.features?.menuOnly){
-    q('#global-message').textContent='Accès initial : menu principal et Agenda.';
+    q('#global-message').textContent='Revue des modules · Agenda Google connecté.';
     const week=q('#bento-week');
     if(week){
       const monday=mondayOf(parisDay());
@@ -208,7 +208,24 @@ async function openBentoAgenda(){
 }
 async function openUniverse(name,{menuRoot=false}={}){
   if(name==='Agenda'&&q('#home .bento-menu')&&tileAllowed(name))return openBentoAgenda();
-  if(session?.features?.menuOnly)return;
+  if(session?.features?.menuOnly){
+    if(session.user.role!=='admin'||!tileAllowed(name))return;
+    const request=++universeViewRequest;
+    currentUniverse=name;
+    try{
+      const {renderModuleReview}=await import('/module-review.js');
+      if(request!==universeViewRequest||currentUniverse!==name||!session||!renderModuleReview(q('#content'),name))return;
+      portalNavigation?.setUniverse(name);
+      q('#home').classList.add('hidden');
+      q('#detail').classList.remove('hidden');
+      q('#global-message').textContent='';
+      q('#feedback').textContent='';
+      q('#description').textContent='';
+      setPeopleAddActions(false);
+      setUniverseHeading(name);
+    }catch(error){if(currentUniverse===name&&session)q('#global-message').textContent=error.message;}
+    return;
+  }
   // A retired Scalingo tile cannot be reopened from stale navigation or console calls.
   if(name==='Outils de calculs rapides'&&!q('.grid [data-universe="Outils de calculs rapides"]'))return;
   const viewRequest=++universeViewRequest;
