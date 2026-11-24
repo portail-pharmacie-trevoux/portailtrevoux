@@ -1,3 +1,4 @@
+import {exportCollaborateurs} from './collaborateurs-export.mjs';
 import {invitationAddress} from './invitations.mjs';
 import { readFile } from 'node:fs/promises';
 import { readEmployeeDetails, saveEmployeeDetails, validateEmployeeDetails } from './employee-details.mjs';
@@ -59,6 +60,11 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
   const view=(person,req)=>publicPerson(person,req.auth.role==='admin',req.auth.id);
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
   app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all();if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
+  app.get('/api/collaborateurs/export.xlsx',auth,ready,admin,async(req,res)=>{
+    const people=(await all()).filter(p=>p.active);
+    const rows=await Promise.all(people.map(async p=>({first_name:p.first_name,last_name:p.last_name,phone:p.phone,email:await invitationAddress(db,p,secret)})));
+    res.set('Cache-Control','no-store').type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment('PortailPlus-collaborateurs.xlsx').send(exportCollaborateurs(rows));
+  });
   app.get('/api/collaborateurs/celebrations',auth,ready,directoryAccess,async(req,res)=>{
     const calendar=await feastCalendar(),day=calendar.day,people=(await all()).filter(p=>p.active);
     res.json({day,feasts:calendar.feasts,feastsAvailable:calendar.available,
@@ -172,4 +178,5 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release?.();}
   });
 }
+
 
