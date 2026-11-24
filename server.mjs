@@ -38,6 +38,7 @@ import {registerTrainingDocuments} from './training-documents.mjs';
 import { registerProcedures } from './procedures.mjs';
 import {procedureUploadJsonLimit,maxProcedureDocumentMiB} from './public/procedure-upload-limits.js';
 import { registerContacts } from './contacts.mjs';
+import { registerDirectoryCapabilities } from './employee-details.mjs';
 import { registerCollaborateurs } from './collaborateurs.mjs';
 import { createProductSources } from './product-sources.mjs';
 import { registerSchedule } from './schedule.mjs';
@@ -180,6 +181,7 @@ export function createApp(db,config) {
     res.json(await newSession({...req.auth,password_hash:hash,must_change:false},res));
   });
   registerEmployeeImport({app,db,auth,ready,admin,csrf,fail,secret,apiKey:config.openaiKey,model:config.employeeScanModel,fetchImpl:config.employeeImportFetch??config.employeeScanFetch,requireConsent:config.employeeImportConsentRequired===true,previewRestrictions:config.employeeAccountsReadOnly?{accountReadOnly:config.scalingoAccountManagement!==true}:undefined,uploadParser:express.json({limit:'15mb'})});
+  if(config.scalingoAccountManagement===true&&!config.menuOnly)registerDirectoryCapabilities({app,db,secret,auth,ready,directoryAccess:viewUniverse('Collaborateurs')});
   registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret,feastCalendar:config.feastCalendar,scalingoAccountCreation:config.scalingoAccountCreation===true,scalingoAccountManagement:config.scalingoAccountManagement===true,freshDirectory:config.menuOnly===true,workbookParser:express.raw({type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',limit:'1mb'})});
   const calendarFetch=config.calendarFetch||fetch;
   async function googleTokens(){
