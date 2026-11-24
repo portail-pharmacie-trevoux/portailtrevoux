@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { readEmployeeDetails, saveEmployeeDetails, validateEmployeeDetails } from './employee-details.mjs';
 import { hashPassword, passwordValid, universes, digest, canAccess } from './security.mjs';
 
+export const sarahDirectoryIdentity="lower(btrim(email))='factures.phdt@gmail.com' AND lower(btrim(first_name))='sarah' AND lower(btrim(last_name))='dias'";
 export const normalizeName=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 export function parisDate(now=new Date()) {
   const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value]));
@@ -57,7 +58,7 @@ export function registerCollaborateurs({app,db,auth,ready,admin,csrf,fail,secret
     const pdf=await readFile(new URL('./assets/fiche-inscription-salarie.pdf',import.meta.url));
     res.type('application/pdf').attachment('fiche-inscription-salarie.pdf').send(pdf);
   });
-  const all=async(ownId=null)=>(await db.query('SELECT * FROM users '+(freshDirectory?"WHERE directory_key LIKE 'scalingo-new-directory:%' OR id=$1 OR ($1 IS NOT NULL AND email='admin-test@portailplus.invalid' AND role='admin') ":'')+'ORDER BY active DESC,last_name,first_name',freshDirectory?[ownId]:[])).rows;
+  const all=async(ownId=null)=>(await db.query('SELECT * FROM users '+(freshDirectory?`WHERE directory_key LIKE 'scalingo-new-directory:%' OR id=$1 OR ($1 IS NOT NULL AND email='admin-test@portailplus.invalid' AND role='admin') OR ($1 IS NOT NULL AND (${sarahDirectoryIdentity})) `:'')+'ORDER BY active DESC,last_name,first_name',freshDirectory?[ownId]:[])).rows;
   const view=(person,req)=>({...publicPerson(person,req.auth.role==='admin',req.auth.id),...(scalingoAccountCreation&&req.auth.role==='admin'?{temporaryPasswordRequired:!!person.password_hash&&person.must_change===true}:{})});
   const directoryAccess=(req,res,next)=>canAccess(req.auth,'Collaborateurs')?next():next(fail(403,'Accès à l’annuaire refusé.'));
   app.get('/api/users',auth,ready,directoryAccess,async(req,res)=>{const people=await all(req.auth.role==='admin'?req.auth.id:null);if(req.auth.role!=='admin')return res.json(people.map(p=>view(p,req)));res.json(await Promise.all(people.map(async p=>({...view(p,req),invitationEmail:await invitationAddress(db,p,secret)}))));});
