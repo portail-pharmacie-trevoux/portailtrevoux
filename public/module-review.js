@@ -11,12 +11,14 @@ const modules = {
     'Nouveau message': ['Titre', 'Destinataires', 'Priorité:Normale|Prioritaire', 'Message@textarea', 'Pièce jointe@file']
   },
   'Emplois du temps': {
-    'Jour': ['Date@date'],
-    'Semaine': ['Semaine@week'],
-    'Mois': ['Mois@month'],
-    'Créneau': ['Collaborateur', 'Jour@date', 'Début@time', 'Fin@time', 'Poste', 'Type:Travail|Congé|Arrêt maladie|Récupération|Absence', 'Commentaire@textarea'],
-    'Semaines types': ['Semaine:Paire|Impaire', 'Collaborateur', 'Jour:Lundi|Mardi|Mercredi|Jeudi|Vendredi|Samedi', 'Début@time', 'Fin@time'],
-    'Publication': ['Semaine@week', 'État:Brouillon|Publié']
+    'Jour': ['Date@date', 'Affichage:Toute l’équipe|Mon planning'],
+    'Semaine': ['Semaine@week', 'Affichage:Toute l’équipe|Mon planning'],
+    'Mois': ['Mois@month', 'Adresse e-mail du comptable@email'],
+    'Créneau': ['Collaborateur', 'Jour@date', 'Type:Travail|Formation|École ou CFA|Congé|Arrêt maladie|Récupération|Absence|Repos|Journée mixte', 'Ticket restaurant@checkbox'],
+    'Postes': ['Nom du poste', 'Couleur@color', 'Actif@checkbox'],
+    'Semaines types': ['Nom du modèle', 'Alternance:Paire|Impaire', 'Collaborateur', 'Jour:Lundi|Mardi|Mercredi|Jeudi|Vendredi|Samedi|Dimanche', 'Début@time', 'Fin@time'],
+    'Congés et absences': ['Collaborateur', 'Motif:Congé|RTT|Récupération|Autre', 'Début@date', 'Fin@date', 'Période:Journée entière|Matin|Après-midi', 'Commentaire@textarea', 'Décision:À examiner|Acceptée|Refusée'],
+    'Publication': ['Semaine@week', 'Semaine source@week', 'État:Brouillon|Publié', 'Verrouiller une journée@date']
   },
   "Outils d'aide au merchandising": {
     'Plan des zones': ['Mois@month', 'Famille:Toutes|TG|IC|BS|SA|EV|DS'],
@@ -73,12 +75,14 @@ const administration = {
     'Nouveau message': ['Automatisations de messages', 'Envoyer le message']
   },
   'Emplois du temps': {
-    'Jour': ['Créneau', 'Paramétrer les postes', 'Compteur de présence'],
-    'Semaine': ['Créneau', 'Semaines types', 'Publication', 'Gérer les absences'],
-    'Mois': ['Exporter le récapitulatif en PDF', 'Récapitulatif des tickets restaurant'],
-    'Créneau': ['Paramétrer les postes', 'Enregistrer le créneau'],
-    'Semaines types': ['Enregistrer le modèle', 'Appliquer une semaine type'],
-    'Publication': ['Enregistrer le brouillon', 'Publier le planning']
+    'Jour': ['Créneau', 'Postes', 'Congés et absences'],
+    'Semaine': ['Créneau', 'Semaines types', 'Publication', 'Congés et absences'],
+    'Mois': ['Exporter le récapitulatif en PDF', 'Enregistrer le destinataire comptable'],
+    'Créneau': ['Postes', 'Enregistrer le créneau', 'Effacer la journée'],
+    'Postes': ['Enregistrer le poste', 'Désactiver le poste'],
+    'Semaines types': ['Enregistrer le modèle', 'Renommer le modèle', 'Appliquer une semaine type'],
+    'Congés et absences': ['Soumettre une demande', 'Prévisualiser la validation', 'Valider et intégrer au planning', 'Refuser', 'Annuler le congé et restaurer le planning'],
+    'Publication': ['Enregistrer le brouillon', 'Copier la semaine source', 'Verrouiller ou déverrouiller', 'Publier ou republier le planning']
   },
   "Outils d'aide au merchandising": {
     'Plan des zones': ['Fiche zone', 'Opération', 'Suivi de l’impact'],
@@ -174,13 +178,6 @@ function emptyTable(headers, message) {
   return scroll;
 }
 
-function scheduleGrid(view) {
-  const dates = view === 'Jour' ? ['Créneau', 'Affectations'] :
-    view === 'Semaine' ? ['Horaire', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'] :
-      ['Semaine', 'Heures', 'Absences', 'Tickets restaurant'];
-  return emptyTable(dates, 'Aucun horaire saisi.');
-}
-
 export function renderModuleReview(container, universe) {
   const sections = modules[universe];
   if (!sections) return false;
@@ -212,9 +209,7 @@ export function renderModuleReview(container, universe) {
     }
     admin.append(actions);
     panel.append(element('h3', name), admin, form);
-    if (universe === 'Emplois du temps' && ['Jour', 'Semaine', 'Mois'].includes(name)) {
-      panel.append(scheduleGrid(name));
-    } else if ((columns[universe] && name === Object.keys(sections)[0]) ||
+    if ((columns[universe] && name === Object.keys(sections)[0]) ||
       ['Envoyés', 'Archives', 'Documents personnels', 'Challenges'].includes(name)) {
       panel.append(emptyTable(columns[universe] || ['Intitulé', 'Statut'], 'Aucune donnée à afficher.'));
     }
@@ -235,6 +230,11 @@ export function renderModuleReview(container, universe) {
   if (universe === "Outils d'aide au merchandising") {
     void import('/merchandising-review.js').then(({mountMerchandisingReview}) => mountMerchandisingReview(panels, select)).catch(() => {
       panels[0].panel.append(element('p', 'Le plan est momentanément indisponible.', 'status-line'));
+    });
+  }
+  if (universe === 'Emplois du temps') {
+    void import('/schedule-review.js').then(({mountScheduleReview}) => mountScheduleReview(panels)).catch(() => {
+      panels[0].panel.append(element('p', 'La grille est momentanément indisponible.', 'status-line'));
     });
   }
   return true;
