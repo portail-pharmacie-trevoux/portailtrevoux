@@ -192,3 +192,14 @@
 .people-card-management{margin-top:8px;overflow-wrap:anywhere}
 .people-card-management summary,.people-bento-directory>summary{cursor:pointer;font-weight:650}
 @media(prefers-reduced-motion:reduce){.people-person-card,.people-person-card .person-job-watermark{transition:none}.people-person-card:is(:hover,:focus-within),.people-person-card:hover .person-job-watermark{transform:none}}
+
+.leave-review-bento h4{margin:1.25rem 0 .6rem}
+.leave-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.leave-review-column{min-width:0;border:1px solid #ded7ed;border-radius:16px;padding:13px;background:#f7f3fc}
+.leave-review-column:nth-child(2){background:#eaf7f0}
+.leave-review-column:nth-child(3){background:#eef4fc}
+.leave-review-column h5{margin:0 0 12px;font-size:1rem}
+.leave-review-card{padding:10px;margin:8px 0;background:#fff;border-radius:10px;overflow-wrap:anywhere}
+.leave-review-card p{margin:.3rem 0}
+.leave-review-actions{display:flex;gap:8px;margin-top:8px}
+@media(max-width:760px){.leave-review-grid{grid-template-columns:1fr}}
