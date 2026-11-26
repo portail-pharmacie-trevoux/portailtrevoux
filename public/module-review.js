@@ -11,8 +11,8 @@ const modules = {
     'Nouveau message': ['Titre', 'Destinataires', 'Priorité:Normale|Prioritaire', 'Message@textarea', 'Pièce jointe@file']
   },
   'Emplois du temps': {
-    'Jour': ['Date@date', 'Affichage:Toute l’équipe|Mon planning'],
-    'Semaine': ['Semaine@week', 'Affichage:Toute l’équipe|Mon planning'],
+    'Jour': ['Date@date'],
+    'Semaine': ['Semaine@week'],
     'Mois': ['Mois@month', 'Adresse e-mail du comptable@email'],
     'Créneau': ['Collaborateur', 'Jour@date', 'Type:Travail|Formation|École ou CFA|Congé|Arrêt maladie|Récupération|Absence|Repos|Journée mixte', 'Ticket restaurant@checkbox'],
     'Postes': ['Nom du poste', 'Couleur@color', 'Actif@checkbox'],
@@ -217,7 +217,11 @@ export function renderModuleReview(container, universe) {
     panels.push({name, button, panel});
   }
   let leaveMounted=false;
+  const periodFields=new Map();
+  let selectedPanel;
   function select(active) {
+    selectedPanel=active;
+    for(const [entry,field] of periodFields)field.hidden=entry!==active;
     if(universe==='Emplois du temps'&&active.name==='Congés et absences'&&!leaveMounted){
       leaveMounted=true;
       void import('/leave-review-bento.js').then(module=>module.mountLeaveReview(active.panel)).catch(()=>{
@@ -256,12 +260,10 @@ export function renderModuleReview(container, universe) {
     };
     leaveRow.append(requestButton,leaveStatus);
     const scopes=element('div','','module-review-nav');scopes.setAttribute('role','group');scopes.setAttribute('aria-label','Planning à afficher');
-    const selectors=panels.flatMap(({panel})=>[...panel.querySelectorAll('select[data-field="Affichage"]')]);
-    for(const selector of selectors)selector.closest('label').hidden=true;
     for(const [label,value] of [['Mon planning','Mon planning'],['Équipe','Toute l’équipe']]){
       const control=element('button',label,'btn');control.type='button';
       control.onclick=()=>{
-        for(const field of selectors)field.value=value;
+        root.dataset.scheduleScope=value==='Mon planning'?'mine':'team';
         for(const item of scopes.children)item.setAttribute('aria-pressed',String(item===control));
       };
       scopes.append(control);
@@ -276,7 +278,17 @@ export function renderModuleReview(container, universe) {
     });
   }
   if (universe === 'Emplois du temps') {
-    void import('/schedule-review.js').then(({mountScheduleReview}) => mountScheduleReview(panels)).catch(() => {
+    void import('/schedule-review.js').then(({mountScheduleReview}) => {
+      mountScheduleReview(panels);
+      for(const [name,fieldName] of [['Jour','Date'],['Semaine','Semaine'],['Mois','Mois']]){
+        const entry=panels.find(panel=>panel.name===name);
+        const label=entry.panel.querySelector('input[data-field="'+fieldName+'"]').closest('label');
+        const holder=element('span');holder.style.alignSelf='center';holder.hidden=entry!==selectedPanel;
+        const form=label.closest('form');
+        holder.append(label);navigation.append(holder);periodFields.set(entry,holder);
+        if(!form.childElementCount)form.remove();
+      }
+    }).catch(() => {
       panels[0].panel.append(element('p', 'La grille est momentanément indisponible.', 'status-line'));
     });
   }
