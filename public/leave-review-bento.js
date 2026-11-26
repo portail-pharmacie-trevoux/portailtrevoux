@@ -22,7 +22,8 @@ export async function mountLeaveReview(panel){
   };
   let csrf,user;
   function draw(rows){
-    const grouped=new Map();
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const grouped=new Map([[weekOf(today),[]]]);
     for(const row of rows.filter(row=>['pending','approved'].includes(row.status))){
       for(let week=weekOf(row.start_date);week<=row.end_date;){
         if(!grouped.has(week))grouped.set(week,[]);
@@ -31,7 +32,6 @@ export async function mountLeaveReview(panel){
       }
     }
     weeks.replaceChildren();
-    if(!grouped.size)weeks.append(element('p','Aucune demande en attente ni congé validé.'));
     for(const [week,items] of [...grouped].sort(([a],[b])=>a.localeCompare(b))){
       const block=element('section');
       block.append(element('h4','Semaine du '+format(week)+' au '+format(endOfWeek(week))));
