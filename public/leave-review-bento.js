@@ -12,7 +12,28 @@ const button=(label,action,cls='btn small')=>{const b=element('button',label,cls
 export async function mountLeaveReview(panel){
   const root=element('section','','leave-review-bento');
   const notice=element('p','Chargement des demandes…');notice.setAttribute('role','status');
-  const weeks=element('div');root.append(notice,weeks);
+  const weeks=element('div');
+  const toolbar=element('div','','leave-review-actions');
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const picker=element('input');picker.type='date';picker.value=today;
+  const dateLabel=element('label','Choisir une date ');dateLabel.append(picker);
+  const pendingOnly=element('input');pendingOnly.type='checkbox';
+  const pendingLabel=element('label');pendingLabel.append(pendingOnly,' Demandes en attente uniquement');
+  let selectedWeek=weekOf(today),loadedRows=null;
+  const changeWeek=offset=>{
+    const day=date(selectedWeek);day.setUTCDate(day.getUTCDate()+offset*7);
+    picker.value=iso(day);selectDate();
+  };
+  function selectDate(){
+    if(!picker.value||!Number.isFinite(date(picker.value).getTime()))return;
+    selectedWeek=weekOf(picker.value);
+    if(loadedRows)draw(loadedRows);
+  }
+  picker.onchange=selectDate;
+  pendingOnly.onchange=()=>{if(loadedRows)draw(loadedRows);};
+  toolbar.style.flexWrap='wrap';toolbar.style.alignItems='center';
+  toolbar.append(button('← Semaine précédente',()=>changeWeek(-1)),button('Cette semaine',()=>{picker.value=today;selectDate();}),button('Semaine suivante →',()=>changeWeek(1)),dateLabel,pendingLabel);
+  root.append(toolbar,notice,weeks);
   panel.querySelector('.module-review-form')?.replaceWith(root);
   const request=async(path,payload)=>{
     const response=await fetch(path,payload?{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(payload)}:{});
@@ -22,17 +43,10 @@ export async function mountLeaveReview(panel){
   };
   let csrf,user;
   function draw(rows){
-    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-    const grouped=new Map([[weekOf(today),[]]]);
-    for(const row of rows.filter(row=>['pending','approved'].includes(row.status))){
-      for(let week=weekOf(row.start_date);week<=row.end_date;){
-        if(!grouped.has(week))grouped.set(week,[]);
-        grouped.get(week).push(row);
-        const next=date(week);next.setUTCDate(next.getUTCDate()+7);week=iso(next);
-      }
-    }
+    const week=selectedWeek;
+    const items=rows.filter(row=>['pending','approved'].includes(row.status)&&row.start_date<=endOfWeek(week)&&row.end_date>=week);
     weeks.replaceChildren();
-    for(const [week,items] of [...grouped].sort(([a],[b])=>a.localeCompare(b))){
+    {
       const block=element('section');
       block.append(element('h4','Semaine du '+format(week)+' au '+format(endOfWeek(week))));
       const grid=element('div','','leave-review-grid');
@@ -75,10 +89,11 @@ export async function mountLeaveReview(panel){
       const remaining=items.filter(row=>row.status==='approved'&&!row.planning_applied).length;
       application.append(element('p',applied+' absence'+(applied===1?' intégrée':'s intégrées')+' cette semaine.'));
       if(remaining)application.append(element('p',remaining+' congé(s) validé(s) sans intégration.'));
+      if(pendingOnly.checked){approved.remove();application.remove();grid.style.gridTemplateColumns='minmax(0,1fr)';}
       block.append(grid);weeks.append(block);
     }
   }
-  async function refresh(){const rows=await request('/api/leave-requests?scope=team');if(root.isConnected)draw(rows);}
+  async function refresh(){loadedRows=await request('/api/leave-requests?scope=team');if(root.isConnected)draw(loadedRows);}
   try{
     const session=await request('/api/me');csrf=session.csrf;user=session.user;
     if(user.role!=='admin'){notice.textContent='Rubrique réservée à l’administration.';return;}
