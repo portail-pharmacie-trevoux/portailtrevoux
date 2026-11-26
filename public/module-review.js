@@ -189,7 +189,7 @@ export function renderModuleReview(container, universe) {
   for (const [name, fields] of Object.entries(sections)) {
     const button = element('button', name, 'btn');
     button.type = 'button';
-    navigation.append(button);
+    if (universe !== 'Emplois du temps' || ['Jour','Semaine','Mois'].includes(name)) navigation.append(button);
     const panel = element('div');
     const form = element('form', '', 'module-review-form');
     form.onsubmit = event => event.preventDefault();
@@ -232,7 +232,43 @@ export function renderModuleReview(container, universe) {
   for (const entry of panels) entry.button.onclick = () => select(entry);
   select(panels[0]);
   const root = element('div', '', 'module-review');
-  root.append(heading, navigation, content);
+  if(universe==='Emplois du temps'){
+    const leaveRow=element('div','','module-review-nav');
+    const requestButton=element('button','Demande de congés','btn primary');requestButton.type='button';
+    const call=async(path,method='GET',data,csrf)=>{
+      const options=method==='GET'?{}:{method,headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(data)};
+      const response=await fetch(path,options),result=await response.json();
+      if(!response.ok)throw Error(result.error||'Opération indisponible.');
+      return result;
+    };
+    const leaveStatus=element('p','','status-line');leaveStatus.setAttribute('role','status');leaveStatus.hidden=true;
+    requestButton.onclick=async()=>{
+      requestButton.disabled=true;leaveStatus.hidden=true;
+      try{
+        const [{openLeaveRequests},session]=await Promise.all([import('/schedule-tools.js'),call('/api/me')]);
+        if(!root.isConnected)return;
+        await openLeaveRequests({user:session.user,api:(path,method,data)=>call(path,method,data,session.csrf),dialogFactory:title=>{
+          const dialog=element('dialog','','schedule-dialog');dialog.setAttribute('aria-label',title);dialog.append(element('h2',title));
+          document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});return dialog;
+        }});
+      }catch(error){leaveStatus.textContent=error.message;leaveStatus.hidden=false;}
+      finally{requestButton.disabled=false;}
+    };
+    leaveRow.append(requestButton,leaveStatus);
+    const scopes=element('div','','module-review-nav');scopes.setAttribute('role','group');scopes.setAttribute('aria-label','Planning à afficher');
+    const selectors=panels.flatMap(({panel})=>[...panel.querySelectorAll('select[data-field="Affichage"]')]);
+    for(const selector of selectors)selector.closest('label').hidden=true;
+    for(const [label,value] of [['Mon planning','Mon planning'],['Équipe','Toute l’équipe']]){
+      const control=element('button',label,'btn');control.type='button';
+      control.onclick=()=>{
+        for(const field of selectors)field.value=value;
+        for(const item of scopes.children)item.setAttribute('aria-pressed',String(item===control));
+      };
+      scopes.append(control);
+    }
+    scopes.firstElementChild.onclick();
+    root.append(heading,leaveRow,navigation,scopes,content);
+  }else root.append(heading,navigation,content);
   container.replaceChildren(root);
   if (universe === "Outils d'aide au merchandising") {
     void import('/merchandising-review.js').then(({mountMerchandisingReview}) => mountMerchandisingReview(panels, select)).catch(() => {
