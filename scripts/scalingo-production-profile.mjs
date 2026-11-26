@@ -22,6 +22,8 @@ function freshDirectoryRoute(req){
  const method=req.method;
  if((method==='GET'||method==='HEAD')&&['/api/users','/api/collaborateurs/registration-form','/api/collaborateurs/me/payroll','/api/schedule-posts'].includes(path))return true;
  if(method==='POST'&&['/api/users','/api/collaborateurs/import-excel'].includes(path))return true;
+ if((method==='GET'||method==='HEAD')&&(path==='/api/leave-requests'||/^\/api\/leave-requests\/[1-9]\d*\/preview$/.test(path)))return true;
+ if(method==='POST'&&/^\/api\/leave-requests\/[1-9]\d*\/review$/.test(path))return true;
  const record=path.match(/^\/api\/users\/[1-9]\d*(?:\/(details|restore|invitation-preview))?$/);
  if(!record)return false;
  const action=record[1];
