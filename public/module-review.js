@@ -216,7 +216,14 @@ export function renderModuleReview(container, universe) {
     content.append(panel);
     panels.push({name, button, panel});
   }
+  let leaveMounted=false;
   function select(active) {
+    if(universe==='Emplois du temps'&&active.name==='Congés et absences'&&!leaveMounted){
+      leaveMounted=true;
+      void import('/leave-review-bento.js').then(module=>module.mountLeaveReview(active.panel)).catch(()=>{
+        leaveMounted=false;active.panel.append(element('p','Les demandes sont momentanément indisponibles.','status-line'));
+      });
+    }
     for (const entry of panels) {
       entry.panel.hidden = entry !== active;
       entry.button.setAttribute('aria-pressed', String(entry === active));
