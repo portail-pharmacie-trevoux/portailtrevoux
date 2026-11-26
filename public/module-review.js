@@ -75,14 +75,14 @@ const administration = {
     'Nouveau message': ['Automatisations de messages', 'Envoyer le message']
   },
   'Emplois du temps': {
-    'Jour': ['Créneau', 'Postes', 'Congés et absences'],
-    'Semaine': ['Créneau', 'Semaines types', 'Publication', 'Congés et absences'],
-    'Mois': ['Exporter le récapitulatif en PDF', 'Enregistrer le destinataire comptable'],
-    'Créneau': ['Postes', 'Enregistrer le créneau', 'Effacer la journée'],
-    'Postes': ['Enregistrer le poste', 'Désactiver le poste'],
-    'Semaines types': ['Enregistrer le modèle', 'Renommer le modèle', 'Appliquer une semaine type'],
-    'Congés et absences': ['Soumettre une demande', 'Prévisualiser la validation', 'Valider et intégrer au planning', 'Refuser', 'Annuler le congé et restaurer le planning'],
-    'Publication': ['Enregistrer le brouillon', 'Copier la semaine source', 'Verrouiller ou déverrouiller', 'Publier ou republier le planning']
+    'Jour': ['Congés et absences', 'Semaines types', 'Postes'],
+    'Semaine': ['Congés et absences', 'Semaines types', 'Postes'],
+    'Mois': ['Congés et absences', 'Semaines types', 'Postes'],
+    'Créneau': ['Congés et absences', 'Semaines types', 'Postes'],
+    'Postes': ['Congés et absences', 'Semaines types', 'Postes'],
+    'Semaines types': ['Congés et absences', 'Semaines types', 'Postes'],
+    'Congés et absences': ['Congés et absences', 'Semaines types', 'Postes'],
+    'Publication': ['Congés et absences', 'Semaines types', 'Postes']
   },
   "Outils d'aide au merchandising": {
     'Plan des zones': ['Fiche zone', 'Opération', 'Suivi de l’impact'],
